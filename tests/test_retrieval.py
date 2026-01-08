@@ -1,0 +1,55 @@
+from pathlib import Path
+
+from typer.testing import CliRunner
+
+from cerberus.index import build_index, load_index
+from cerberus.main import app
+from cerberus.retrieval import find_symbol, read_range
+from cerberus.schemas import CodeSymbol
+
+
+TEST_FILES_DIR = Path(__file__).parent / "test_files"
+runner = CliRunner()
+
+
+def test_find_symbol_returns_all_matches(tmp_path):
+    """
+    Ensures find_symbol returns every matching entry (supports disambiguation).
+    """
+    index_path = tmp_path / "index.json"
+    scan_result = build_index(TEST_FILES_DIR, index_path, respect_gitignore=False)
+
+    duplicate = scan_result.symbols[0].model_copy(deep=True)
+    scan_result.symbols.append(duplicate)
+
+    matches = find_symbol(duplicate.name, scan_result)
+    assert len(matches) >= 2
+
+
+def test_read_range_respects_padding_bounds():
+    """
+    Ensures read_range applies padding without exceeding file boundaries.
+    """
+    sample_py = TEST_FILES_DIR / "sample.py"
+    snippet = read_range(sample_py, start_line=3, end_line=3, padding=1)
+
+    assert snippet.start_line == 2
+    assert snippet.end_line == 4
+    assert "class MyClass" in snippet.content
+
+
+def test_get_symbol_cli(tmp_path):
+    """
+    CLI should return the symbol table and context for a known symbol.
+    """
+    index_path = tmp_path / "cli_index.json"
+    build_index(TEST_FILES_DIR, index_path, respect_gitignore=False)
+
+    result = runner.invoke(
+        app,
+        ["get-symbol", "MyClass", "--index", str(index_path), "--padding", "0"],
+    )
+
+    assert result.exit_code == 0
+    assert "MyClass" in result.stdout
+    assert "class MyClass" in result.stdout
