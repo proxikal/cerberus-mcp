@@ -6,10 +6,14 @@ from typing import List, Optional
 import pathspec
 
 from cerberus.logging_config import logger
+from cerberus.tracing import trace
 from cerberus.parser import parse_file
-from cerberus.schemas import CodeSymbol, FileObject, ScanResult
+from cerberus.parser.dependencies import extract_imports, extract_calls, extract_import_links
+from cerberus.parser.type_resolver import extract_types_from_file
+from cerberus.schemas import CallReference, CodeSymbol, FileObject, ImportReference, ScanResult, TypeInfo, ImportLink
 from .config import DEFAULT_IGNORE_PATTERNS
 
+@trace
 def scan(
     directory: Path,
     respect_gitignore: bool = True,
@@ -63,6 +67,10 @@ def scan(
 
     found_files: List[FileObject] = []
     parsed_symbols: List[CodeSymbol] = []
+    imports: List[ImportReference] = []
+    calls: List[CallReference] = []
+    type_infos: List[TypeInfo] = []
+    import_links: List[ImportLink] = []
     
     # Use a set for faster extension checking
     allowed_extensions = set(extensions) if extensions else None
@@ -112,16 +120,25 @@ def scan(
 
                 # Parse the file to extract symbols, if supported
                 # If incremental and unchanged, reuse cached symbols
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
                 if incremental and previous_index:
                     prev_mtime = previous_files.get(str(relative_path))
                     if prev_mtime and abs(prev_mtime - stats.st_mtime) < 1e-6:
                         cached = previous_symbols_by_file.get(str(file_path), [])
                         parsed_symbols.extend(cached)
                         logger.debug(f"Reused {len(cached)} cached symbols for '{relative_path}'")
-                        continue
+                    else:
+                        file_symbols = parse_file(file_path)
+                        parsed_symbols.extend(file_symbols)
+                else:
+                    file_symbols = parse_file(file_path)
+                    parsed_symbols.extend(file_symbols)
 
-                file_symbols = parse_file(file_path)
-                parsed_symbols.extend(file_symbols)
+                imports.extend(extract_imports(file_path, content))
+                calls.extend(extract_calls(file_path, content))
+                # Phase 1: Extract type information and import links
+                type_infos.extend(extract_types_from_file(file_path, content))
+                import_links.extend(extract_import_links(file_path, content))
             except (IOError, OSError, FileNotFoundError) as e:
                 logger.warning(f"Could not access metadata for '{file_path}'. Skipping. Error: {e}")
                 
@@ -133,6 +150,10 @@ def scan(
         files=found_files,
         scan_duration=scan_duration,
         symbols=parsed_symbols,
+        imports=imports,
+        calls=calls,
+        type_infos=type_infos,
+        import_links=import_links,
     )
     
     logger.info(f"Scan complete. Found {scan_result.total_files} files in {scan_duration:.2f} seconds.")

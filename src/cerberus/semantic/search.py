@@ -6,8 +6,9 @@ from typing import List, Tuple
 import numpy as np
 
 from cerberus.logging_config import logger
-from cerberus.index import load_index
-from cerberus.retrieval import read_range
+from cerberus.tracing import trace
+from cerberus.index.index_loader import load_index
+from cerberus.retrieval.utils import read_range
 from cerberus.schemas import CodeSymbol, SearchResult
 from cerberus.semantic.embeddings import embed_texts
 from cerberus.semantic.vector_store import (
@@ -25,6 +26,7 @@ class IndexedDocument:
     snippet_text: str
 
 
+@trace
 def build_documents(index_path: Path, padding: int = 3) -> List[IndexedDocument]:
     scan_result = load_index(index_path)
     documents: List[IndexedDocument] = []
@@ -35,6 +37,7 @@ def build_documents(index_path: Path, padding: int = 3) -> List[IndexedDocument]
     return documents
 
 
+@trace
 def semantic_search(
     query: str,
     index_path: Path,

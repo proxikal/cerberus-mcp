@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional, Literal
+from typing import Dict, List, Optional, Literal, Any
 
 class FileObject(BaseModel):
     """
@@ -15,11 +15,31 @@ class CodeSymbol(BaseModel):
     Represents a code symbol (function, class, etc.) extracted from a file.
     """
     name: str
-    type: Literal["function", "class", "method", "variable"]
+    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct"]
     file_path: str
     start_line: int
     end_line: int
     signature: Optional[str] = None
+    # Phase 1.2: Type-aware resolution
+    return_type: Optional[str] = None  # Return type annotation/hint
+    parameters: Optional[List[str]] = None  # Parameter names
+    parent_class: Optional[str] = None  # For methods, the containing class
+
+class ImportReference(BaseModel):
+    """
+    Represents an import statement in a file.
+    """
+    module: str
+    file_path: str
+    line: int
+
+class CallReference(BaseModel):
+    """
+    Represents a function call within a file.
+    """
+    caller_file: str
+    callee: str
+    line: int
 
 class CodeSnippet(BaseModel):
     """
@@ -47,6 +67,15 @@ class ScanResult(BaseModel):
     scan_duration: float
     symbols: List[CodeSymbol] = Field(default_factory=list)
     embeddings: List[SymbolEmbedding] = Field(default_factory=list)
+    imports: List[ImportReference] = Field(default_factory=list)
+    calls: List[CallReference] = Field(default_factory=list)
+    # Phase 1.2: Type information
+    type_infos: List["TypeInfo"] = Field(default_factory=list)
+    # Phase 1.3: Import linkage
+    import_links: List["ImportLink"] = Field(default_factory=list)
+    # Phase 3: Metadata (git commit, etc.)
+    project_root: str = ""  # Root path of project
+    metadata: Dict[str, Any] = Field(default_factory=dict)  # Additional metadata (git_commit, etc.)
 
 class IndexStats(BaseModel):
     """
@@ -65,3 +94,167 @@ class SearchResult(BaseModel):
     symbol: CodeSymbol
     score: float
     snippet: CodeSnippet
+
+
+# Phase 1: Advanced Dependency Intelligence Schemas
+
+class TypeInfo(BaseModel):
+    """
+    Represents type information for a symbol (variable, parameter, return type).
+    """
+    name: str  # Variable or parameter name
+    type_annotation: Optional[str] = None  # The type hint/annotation
+    inferred_type: Optional[str] = None  # Inferred from assignments
+    file_path: str
+    line: int
+
+
+class ImportLink(BaseModel):
+    """
+    Represents an explicit link between an import statement and the symbols it provides.
+    """
+    importer_file: str  # File that imports
+    imported_module: str  # Module being imported
+    imported_symbols: List[str] = Field(default_factory=list)  # Specific symbols imported (e.g., from X import Y)
+    import_line: int
+    # Optional: link to definition location if internal to project
+    definition_file: Optional[str] = None
+    definition_symbol: Optional[str] = None
+
+
+class CallGraphNode(BaseModel):
+    """
+    Represents a node in the recursive call graph.
+    """
+    symbol_name: str
+    file_path: str
+    line: int
+    depth: int = 0  # Depth in the call graph (0 = target symbol, 1 = direct caller, etc.)
+    callers: List["CallGraphNode"] = Field(default_factory=list)  # Recursive structure
+
+
+class CallGraphResult(BaseModel):
+    """
+    Complete call graph starting from a target symbol.
+    """
+    target_symbol: str
+    max_depth: int
+    root_node: Optional[CallGraphNode] = None
+    total_nodes: int = 0
+
+
+# Enable forward references for recursive CallGraphNode
+CallGraphNode.model_rebuild()
+
+
+# Phase 2: Context Synthesis & Compaction Schemas
+
+class SkeletonizedCode(BaseModel):
+    """
+    Represents code with implementation removed, preserving structure.
+    """
+    file_path: str
+    original_lines: int
+    skeleton_lines: int
+    content: str  # Skeletonized source code
+    preserved_symbols: List[str] = Field(default_factory=list)  # Symbols with full implementation kept
+    pruned_symbols: List[str] = Field(default_factory=list)  # Symbols that were skeletonized
+    compression_ratio: float  # skeleton_lines / original_lines
+
+
+class ContextPayload(BaseModel):
+    """
+    Synthesized context payload for a target symbol.
+    Complete context package with target implementation, skeleton context, and resolved imports.
+    """
+    target_symbol: CodeSymbol
+    target_implementation: str  # Full implementation of target
+    skeleton_context: List[SkeletonizedCode] = Field(default_factory=list)  # Surrounding skeletons
+    resolved_imports: List[CodeSymbol] = Field(default_factory=list)  # Imported symbols with implementations
+    call_graph: Optional[CallGraphResult] = None  # Recursive call graph
+    type_context: List[TypeInfo] = Field(default_factory=list)  # Relevant type definitions
+    total_lines: int = 0
+    estimated_tokens: int = 0  # Rough token count
+    metadata: Dict[str, Any] = Field(default_factory=dict)  # Additional context metadata
+
+
+class CodeSummary(BaseModel):
+    """
+    LLM-generated summary of code or architecture.
+    """
+    target: str  # File path or symbol name
+    summary_type: Literal["file", "symbol", "architecture", "layer"]
+    summary_text: str  # Natural language summary
+    key_points: List[str] = Field(default_factory=list)  # Bullet points of key functionality
+    dependencies: List[str] = Field(default_factory=list)  # Major dependencies identified
+    complexity_score: Optional[int] = None  # 1-10 complexity rating
+    generated_at: float = 0.0  # Timestamp
+    model_used: str = "unknown"  # LLM model identifier
+
+
+# Phase 3: Operational Excellence Schemas
+
+class LineRange(BaseModel):
+    """
+    Represents a range of modified lines in a file.
+    """
+    start: int
+    end: int
+    change_type: Literal["added", "modified", "deleted"]
+
+
+class ModifiedFile(BaseModel):
+    """
+    Represents a file that was modified with line ranges.
+    """
+    path: str
+    changed_lines: List[LineRange] = Field(default_factory=list)
+    affected_symbols: List[str] = Field(default_factory=list)  # Symbols that need re-parsing
+
+
+class FileChange(BaseModel):
+    """
+    Represents detected changes from git diff or filesystem monitoring.
+    """
+    added: List[str] = Field(default_factory=list)  # New files
+    modified: List[ModifiedFile] = Field(default_factory=list)  # Changed files with line ranges
+    deleted: List[str] = Field(default_factory=list)  # Removed files
+    timestamp: float  # When changes were detected
+
+
+class IncrementalUpdateResult(BaseModel):
+    """
+    Result of an incremental index update.
+    """
+    updated_symbols: List[CodeSymbol] = Field(default_factory=list)  # Symbols that were updated
+    removed_symbols: List[str] = Field(default_factory=list)  # Symbols that were removed
+    affected_callers: List[str] = Field(default_factory=list)  # Callers that were re-analyzed
+    files_reparsed: int = 0
+    elapsed_time: float = 0.0
+    strategy: Literal["full_reparse", "surgical", "incremental", "failed"] = "incremental"
+
+
+class WatcherStatus(BaseModel):
+    """
+    Status of the background watcher daemon.
+    """
+    running: bool
+    pid: Optional[int] = None
+    watching: Optional[str] = None  # Project path being watched
+    index_path: Optional[str] = None
+    uptime: Optional[float] = None  # Seconds since start
+    last_update: Optional[float] = None  # Timestamp of last index update
+    events_processed: int = 0  # Total filesystem events handled
+    updates_triggered: int = 0  # Number of index updates triggered
+
+
+class HybridSearchResult(BaseModel):
+    """
+    Search result with hybrid BM25 + Vector ranking.
+    """
+    symbol: CodeSymbol
+    bm25_score: float  # Keyword relevance (0-1)
+    vector_score: float  # Semantic similarity (0-1)
+    hybrid_score: float  # Combined score (0-1)
+    rank: int  # Final ranking position
+    match_type: Literal["keyword", "semantic", "both"]

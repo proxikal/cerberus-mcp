@@ -2,13 +2,15 @@ from pathlib import Path
 from typing import List, Optional
 
 from cerberus.logging_config import logger
+from cerberus.tracing import trace
 from cerberus.scanner import scan
 from cerberus.schemas import ScanResult, SymbolEmbedding
 from .json_store import JSONIndexStore
 from cerberus.semantic.embeddings import embed_texts
-from cerberus.retrieval import read_range
+from cerberus.retrieval.utils import read_range
 
 
+@trace
 def build_index(
     directory: Path,
     output_path: Path,
@@ -40,6 +42,26 @@ def build_index(
         incremental=incremental,
         max_bytes=max_bytes,
     )
+
+    # Phase 3: Store project root and git commit metadata
+    scan_result.project_root = str(directory.resolve())
+
+    # Try to get git commit if in a git repository
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=str(directory),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            git_commit = result.stdout.strip()
+            scan_result.metadata["git_commit"] = git_commit
+            logger.info(f"Stored git commit in index: {git_commit[:8]}")
+    except Exception as e:
+        logger.debug(f"Could not get git commit (not a git repo?): {e}")
 
     if store_embeddings:
         try:

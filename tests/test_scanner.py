@@ -100,7 +100,7 @@ def test_scan_collects_symbols_from_supported_files():
     """
     scan_result = scan(TEST_FILES_DIR, respect_gitignore=False)
 
-    assert scan_result.total_files == 4
+    assert scan_result.total_files == 5
     symbol_names = {s.name for s in scan_result.symbols}
 
     expected_symbols = {
@@ -112,6 +112,11 @@ def test_scan_collects_symbols_from_supported_files():
         "topLevelJsFunction",
         "MyTsClass",
         "topLevelTsFunction",
+        "UserProfile",
+        "Status",
+        "Widget",
+        "Greet",
+        "add",
     }
 
     assert expected_symbols.issubset(symbol_names)
@@ -127,3 +132,16 @@ def test_scan_respects_max_bytes_filter():
     scan_result = scan(TEST_FILES_DIR, respect_gitignore=False, max_bytes=1000)
     paths = {f.path for f in scan_result.files}
     assert "large.bin" not in paths
+
+
+def test_scan_collects_imports_and_calls():
+    """
+    Tests that imports and calls are extracted for dependency mapping.
+    """
+    scan_result = scan(TEST_FILES_DIR, respect_gitignore=False)
+
+    modules = {imp.module for imp in scan_result.imports}
+    assert {"math", "collections", "fs", "path", "fmt"}.issubset(modules)
+
+    callees = {call.callee for call in scan_result.calls}
+    assert {"sqrt", "readFileSync", "join", "Println"}.issubset(callees)

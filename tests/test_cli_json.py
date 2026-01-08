@@ -13,7 +13,7 @@ def test_scan_json_output():
     result = runner.invoke(app, ["scan", str(TEST_FILES_DIR), "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["total_files"] == 4
+    assert payload["total_files"] == 5
     assert payload["files"]
     assert payload["symbols"]
 
@@ -35,8 +35,10 @@ def test_index_and_stats_json(tmp_path):
     )
     assert stats_res.exit_code == 0
     stats_payload = json.loads(stats_res.stdout)
-    assert stats_payload["total_files"] == 4
-    assert stats_payload["total_symbols"] == 8
+    assert stats_payload["total_files"] == 5
+    assert stats_payload["total_symbols"] == 13
+    assert "imports" in stats_payload
+    assert "calls" in stats_payload
 
 
 def test_get_symbol_json(tmp_path):
@@ -51,6 +53,30 @@ def test_get_symbol_json(tmp_path):
     payload = json.loads(result.stdout)
     assert any(item["symbol"]["name"] == "MyClass" for item in payload)
     assert all("snippet" in item for item in payload)
+
+
+def test_deps_cli(tmp_path):
+    """
+    deps should surface callers/imports.
+    """
+    index_path = tmp_path / "cli_index.json"
+    runner.invoke(app, ["index", str(TEST_FILES_DIR), "--output", str(index_path), "--json"])
+
+    result = runner.invoke(
+        app,
+        ["deps", "--symbol", "top_level_function", "--index", str(index_path), "--json"],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["callers"]
+
+    result_imports = runner.invoke(
+        app,
+        ["deps", "--file", "sample.py", "--index", str(index_path), "--json"],
+    )
+    assert result_imports.exit_code == 0
+    imports_payload = json.loads(result_imports.stdout)
+    assert imports_payload["imports"]
 
 
 def test_search_json(tmp_path):
@@ -92,8 +118,8 @@ def test_incremental_index(tmp_path, monkeypatch):
     )
     assert second.exit_code == 0
     payload = json.loads(second.stdout)
-    assert payload["total_files"] == 4
+    assert payload["total_files"] == 5
 
     stats_res = runner.invoke(app, ["stats", "--index", str(index_path), "--json"])
     stats_payload = json.loads(stats_res.stdout)
-    assert stats_payload["total_symbols"] == 9  # added one symbol
+    assert stats_payload["total_symbols"] == 14  # added one symbol

@@ -41,6 +41,7 @@ TOOL_SCHEMAS = {
             },
             "required": ["total_files", "files", "scan_duration"],
         },
+        "examples": ["cerberus scan . --json --ext .py --max-bytes 50000"],
     },
     "FindSymbol": {
         "description": "Find symbols by name in an existing index.",
@@ -59,10 +60,12 @@ TOOL_SCHEMAS = {
                 "properties": {
                     "symbol": {"type": "object"},
                     "snippet": {"type": "object"},
+                    "callers": {"type": "array"},
                 },
                 "required": ["symbol", "snippet"],
             },
         },
+        "examples": ["cerberus get-symbol top_level_function --index cerberus_index.json --json --padding 0"],
     },
     "ReadSymbol": {
         "description": "Read the code for a symbol with context padding.",
@@ -82,10 +85,12 @@ TOOL_SCHEMAS = {
                 "properties": {
                     "symbol": {"type": "object"},
                     "snippet": {"type": "object"},
+                    "callers": {"type": "array"},
                 },
                 "required": ["symbol", "snippet"],
             },
         },
+        "examples": ["cerberus get-symbol MyClass --index cerberus_index.json --skeleton --json"],
     },
     "SemanticSearch": {
         "description": "Search indexed symbols by meaning.",
@@ -110,6 +115,7 @@ TOOL_SCHEMAS = {
                 "required": ["score", "symbol", "snippet"],
             },
         },
+        "examples": ["cerberus search \"greeting\" --index cerberus_index.json --limit 3 --json"],
     },
 }
 

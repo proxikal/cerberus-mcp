@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -31,11 +32,33 @@ def test_read_range_respects_padding_bounds():
     Ensures read_range applies padding without exceeding file boundaries.
     """
     sample_py = TEST_FILES_DIR / "sample.py"
-    snippet = read_range(sample_py, start_line=3, end_line=3, padding=1)
+    snippet = read_range(sample_py, start_line=5, end_line=5, padding=1)
 
-    assert snippet.start_line == 2
-    assert snippet.end_line == 4
+    assert snippet.start_line == 4
+    assert snippet.end_line == 6
     assert "class MyClass" in snippet.content
+
+
+def test_read_range_skeleton_mode():
+    """
+    Skeleton mode should return only signatures/docstrings.
+    """
+    sample_py = TEST_FILES_DIR / "sample.py"
+    snippet = read_range(sample_py, start_line=1, end_line=50, skeleton=True)
+
+    assert "def top_level_function" in snippet.content
+    assert "return math.sqrt" not in snippet.content
+
+
+def test_skeleton_file_cli(tmp_path):
+    """
+    skeleton-file command should emit skeleton content.
+    """
+    result = runner.invoke(app, ["skeleton-file", str(TEST_FILES_DIR / "sample.py"), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert "Skeleton" not in payload["content"]  # sanity
+    assert "def top_level_function" in payload["content"]
 
 
 def test_get_symbol_cli(tmp_path):

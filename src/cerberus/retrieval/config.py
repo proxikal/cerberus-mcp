@@ -1,7 +1,5 @@
 """
 Configuration for hybrid retrieval.
-
-Phase 3 Dogfooding Test: Second modification to test incremental update.
 """
 
 HYBRID_SEARCH_CONFIG = {
