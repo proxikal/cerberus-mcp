@@ -214,12 +214,14 @@ cerberus search "data" --fusion weighted        # Use weighted fusion instead of
 - **With Cerberus:** 500 tokens (5 precise results)
 - **Reduction:** 99.7% (300x fewer tokens)
 
-**Scalability Projection:**
+**Scalability Projection (Phase 3 Baseline):**
 - 1,000 files: ~5 minutes, ~1.2 GB RAM
 - 5,000 files: ~25 minutes, ~6 GB RAM
 - 10,000 files: ~50 minutes, ~12 GB RAM
 
-**Conclusion:** Cerberus handles production-scale projects with excellent performance and reliability.
+> **Update:** These baseline projections are being addressed in Phase 4 via the **Aegis-Scale Memory Optimization** (SQLite-backed streaming architecture) which targets <250MB constant RAM usage for 10,000+ files.
+
+**Conclusion:** Cerberus handles production-scale projects with excellent performance and reliability, providing the deterministic foundation for upcoming enterprise optimizations.
 
 ---
 
@@ -422,19 +424,18 @@ All features are complete, tested, and validated. Cerberus is ready for real-wor
 
 ## 📝 Next Steps
 
-### Immediate (Optional Enhancements)
+### Immediate (Phase 4: Core Infrastructure & Ecosystem)
 
-1. **Watcher Auto-Start:** Enable auto-start on `cerberus index` command
-2. **Path Normalization:** Improve handling of edge cases
-3. **Model Caching:** Persist loaded embedding model to disk
-4. **Performance Tuning:** Optimize for 10,000+ file projects
+1.  **Aegis-Scale Memory Optimization:** Transition to SQLite-backed streaming architecture (<250MB RAM target).
+2.  **Watcher Auto-Start:** Enable auto-start on `cerberus index` command.
+3.  **Official Agent Plugins:** Native tool-sets for LangChain and CrewAI.
+4.  **Embedding Model Caching:** Persist loaded embedding model to disk.
 
-### Future (Phase 4: Integration Ecosystem)
+### Future
 
-1. **Agent Plugins:** Native tool-sets for LangChain, CrewAI, AutoGPT
-2. **Web UI:** Local dashboard for visual exploration
-3. **Security Scanning:** PII and secret detection in indexing pipeline
-4. **Multi-Language:** Expand beyond Python/JS/TS (Go, Rust, Java)
+1.  **Security Scanning:** PII and secret detection in indexing pipeline.
+2.  **Multi-Language Support:** Expand beyond Python/JS/TS (Rust, Go, Java).
+3.  **Web UI:** Local dashboard for visual exploration.
 
 ---
 

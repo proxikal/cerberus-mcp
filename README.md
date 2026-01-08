@@ -153,23 +153,22 @@ Cerberus isn't just for reading; it's for **reliable engineering**. The inclusio
 
 ---
 
-## 📊 Performance Metrics
+## 📊 Performance Metrics (Phase 3 Baseline)
 
 Tested on production-scale project (TheCookBook: 1.1GB, 24,810 files):
 
-| Metric | Value |
-|--------|-------|
-| Files Indexed | 428 TypeScript/JavaScript files |
-| Symbols Extracted | 1,199 symbols |
-| Index Time | 2.1 minutes (126s) |
-| Index Size | 23 MB |
-| Peak Memory | 522 MB |
-| **Keyword Search** | **3.06s** |
-| **Semantic Search** | **7.62s** |
-| **Hybrid Search** | **7.36s** |
-| **Token Savings** | **99.7%** (150K → 500 tokens) |
+| Metric | Phase 3 Value | Phase 4 Target (Aegis-Scale) |
+|--------|-------| :--- |
+| Files Indexed | 428 TypeScript/JavaScript files | **10,000+ Files** |
+| Symbols Extracted | 1,199 symbols | **25,000+ Symbols** |
+| Index Time | 2.1 minutes (126s) | **< 30 minutes** |
+| Index Format | Monolithic JSON | **SQLite (Disk-First)** |
+| Peak Memory | 522 MB | **< 250 MB (Constant)** |
+| **Token Savings** | **99.7%** (150K → 500 tokens) | **99.7%** |
 
-See [PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md) for detailed benchmarks.
+> **Note:** Phase 4 is actively transitioning to a streaming, disk-first architecture to break the "Context Wall" for enterprise-scale projects while maintaining absolute data integrity.
+
+See [PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md) for detailed baseline benchmarks.
 
 ---
 
@@ -369,7 +368,7 @@ cerberus/
 │   ├── facade.py     # Public API
 │   ├── index_builder.py
 │   ├── index_loader.py
-│   └── json_store.py
+│   └── sqlite_store.py   # Disk-first Aegis-Scale Storage (Phase 4)
 │
 ├── retrieval/        # The "Brain" - Hybrid search (Phase 3)
 │   ├── facade.py     # Public API (hybrid_search)

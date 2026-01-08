@@ -74,6 +74,7 @@ cerberus watcher logs --follow
 1.  **Generate Manifest:** Run `cerberus generate-tools` to get a JSON description of these capabilities.
 2.  **JSON Stream Logging:** Monitor `cerberus_agent.log` for structured error messages and performance data.
 3.  **Deterministic Retrieval:** Always prefer `get-symbol` over reading files to minimize token usage and prevent context loss.
-4.  **Automatic Synchronization:** In supported environments, the **Background Watcher (Invisible Assistant)** will automatically keep the index synchronized as you write code, ensuring that your next `get-symbol` or `search` query is always based on the latest state of the project.
+4.  **Aegis-Scale Reliability:** Cerberus uses a disk-first architecture (SQLite). This means searching and retrieving symbols is near-instant even in enterprise codebases, as the system only loads the specific code segments you request.
+5.  **Automatic Synchronization:** In supported environments, the **Background Watcher (Invisible Assistant)** will automatically keep the index synchronized as you write code, ensuring that your next `get-symbol` or `search` query is always based on the latest state of the project.
 
 **Note for Agents:** Cerberus is your context engine. It is designed to augment your capabilities (Claude, Codex, etc.) by serving deterministic, compacted code. Any mentions of "internal LLMs" or "Summarization" refer to optional background optimizations designed to save you tokens; your reasoning remains the primary driver of all project changes.
