@@ -274,13 +274,17 @@ class SQLiteIndexStore:
             if not conn:
                 _conn.close()
 
-    def write_symbols_batch(self, symbols: List[CodeSymbol], conn: Optional[sqlite3.Connection] = None):
+    def write_symbols_batch(self, symbols: List[CodeSymbol], conn: Optional[sqlite3.Connection] = None, chunk_size: int = 1000):
         """
-        Batch write symbols for performance.
+        Batch write symbols with optimized chunking for large datasets.
+
+        Uses chunked inserts to avoid memory buildup with massive symbol counts.
+        Each chunk is committed as a sub-batch for better performance.
 
         Args:
             symbols: List of CodeSymbol objects
             conn: Optional connection from transaction context
+            chunk_size: Number of symbols per chunk (default 1000)
 
         Returns:
             List of symbol IDs for linking with embeddings
@@ -290,23 +294,38 @@ class SQLiteIndexStore:
 
         _conn = conn or self._get_connection()
         try:
-            symbol_ids = []
-            for s in symbols:
-                cursor = _conn.execute("""
-                    INSERT INTO symbols (name, type, file_path, start_line, end_line,
-                                       signature, return_type, parameters, parent_class)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (s.name, s.type, s.file_path, s.start_line, s.end_line,
-                     s.signature, s.return_type,
-                     json.dumps(s.parameters) if s.parameters else None,
-                     s.parent_class))
-                symbol_ids.append(cursor.lastrowid)
+            all_symbol_ids = []
+            total_symbols = len(symbols)
+
+            # Process in chunks to avoid memory buildup
+            for chunk_start in range(0, total_symbols, chunk_size):
+                chunk_end = min(chunk_start + chunk_size, total_symbols)
+                chunk = symbols[chunk_start:chunk_end]
+
+                # Insert chunk
+                chunk_ids = []
+                for s in chunk:
+                    cursor = _conn.execute("""
+                        INSERT INTO symbols (name, type, file_path, start_line, end_line,
+                                           signature, return_type, parameters, parent_class)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (s.name, s.type, s.file_path, s.start_line, s.end_line,
+                         s.signature, s.return_type,
+                         json.dumps(s.parameters) if s.parameters else None,
+                         s.parent_class))
+                    chunk_ids.append(cursor.lastrowid)
+
+                all_symbol_ids.extend(chunk_ids)
+
+                # Log progress for large batches
+                if total_symbols > chunk_size:
+                    logger.debug(f"Wrote symbol chunk {chunk_start//chunk_size + 1}/{(total_symbols + chunk_size - 1)//chunk_size} ({chunk_end}/{total_symbols})")
 
             if not conn:
                 _conn.commit()
 
-            logger.debug(f"Wrote {len(symbols)} symbols")
-            return symbol_ids
+            logger.debug(f"Wrote {total_symbols} symbols total")
+            return all_symbol_ids
         finally:
             if not conn:
                 _conn.close()

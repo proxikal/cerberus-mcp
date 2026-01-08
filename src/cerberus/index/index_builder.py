@@ -146,11 +146,12 @@ def _build_sqlite_index(
     start_time: float,
 ) -> ScanResultAdapter:
     """
-    Build index in SQLite format with streaming writes.
+    Build index in SQLite format with true streaming.
 
-    Achieves constant memory usage by writing per-file immediately.
+    Achieves constant memory usage by parsing and writing files one batch at a time.
+    Never accumulates all symbols in memory.
     """
-    logger.info("Using SQLite format (streaming, constant memory)")
+    logger.info("Using SQLite format (TRUE streaming, constant memory)")
 
     # Initialize stores
     sqlite_store = SQLiteIndexStore(output_path)
@@ -160,90 +161,163 @@ def _build_sqlite_index(
         sqlite_store._faiss_store = faiss_store
 
     # Load previous index for incremental
-    previous_index = None
+    previous_files = {}
     if incremental and output_path.exists():
         try:
             result = load_index(output_path)
             if isinstance(result, ScanResultAdapter):
-                # Extract previous index data for scanner
-                previous_index = ScanResult(
-                    total_files=result.total_files,
-                    files=result.files,
-                    scan_duration=result.scan_duration,
-                    symbols=result.symbols,
-                    project_root=result.project_root,
-                    metadata=result.metadata,
-                )
-                logger.info(f"Loaded previous SQLite index for incremental scan")
+                # Load only file modification times for incremental comparison
+                for file_obj in result.files:
+                    previous_files[file_obj.path] = file_obj.last_modified
+                logger.info(f"Loaded {len(previous_files)} cached files for incremental scan")
         except Exception as exc:
             logger.warning(f"Could not load previous SQLite index: {exc}")
 
-    # Run scan (still accumulates in memory for now - streaming scanner in next step)
-    scan_result = scan(
-        directory,
+    # Stream files from scanner and write immediately in batches
+    from ..scanner.streaming import scan_files_streaming
+
+    total_files = 0
+    total_symbols = 0
+    file_batch = []
+    symbol_batch = []
+    import_batch = []
+    call_batch = []
+    type_info_batch = []
+    import_link_batch = []
+
+    BATCH_SIZE = 100  # Process 100 files at a time for optimal performance
+
+    logger.info(f"Streaming files from {directory}...")
+
+    for file_result in scan_files_streaming(
+        directory=directory,
         respect_gitignore=respect_gitignore,
         extensions=extensions,
-        previous_index=previous_index,
+        previous_files=previous_files,
         incremental=incremental,
         max_bytes=max_bytes,
-    )
+    ):
+        # Accumulate into batches
+        file_batch.append(file_result.file_obj)
+        symbol_batch.extend(file_result.symbols)
+        import_batch.extend(file_result.imports)
+        call_batch.extend(file_result.calls)
+        type_info_batch.extend(file_result.type_infos)
+        import_link_batch.extend(file_result.import_links)
 
-    # Write to SQLite with transaction
-    logger.info(f"Writing {len(scan_result.symbols)} symbols to SQLite...")
+        total_files += 1
 
-    # Build path mapping for normalization (absolute -> relative)
-    path_map = {file_obj.abs_path: file_obj.path for file_obj in scan_result.files}
+        # Write batch when it reaches BATCH_SIZE
+        if len(file_batch) >= BATCH_SIZE:
+            _write_batch_to_sqlite(
+                sqlite_store=sqlite_store,
+                faiss_store=faiss_store,
+                file_batch=file_batch,
+                symbol_batch=symbol_batch,
+                import_batch=import_batch,
+                call_batch=call_batch,
+                type_info_batch=type_info_batch,
+                import_link_batch=import_link_batch,
+                store_embeddings=store_embeddings,
+                padding=padding,
+                model_name=model_name,
+            )
 
-    def normalize_path(path: str) -> str:
-        """Convert absolute or relative path to relative path matching files.path."""
-        # If it's in the map, convert it
-        if path in path_map:
-            return path_map[path]
-        # Otherwise, it's already relative or needs matching
-        # Try to find by suffix match
-        for abs_path, rel_path in path_map.items():
-            if abs_path == path or abs_path.endswith(f"/{path}") or abs_path.endswith(f"\\{path}"):
-                return rel_path
-        # Last resort: return as-is
-        return path
+            total_symbols += len(symbol_batch)
 
-    # Normalize all file_path references to relative paths
-    for symbol in scan_result.symbols:
-        symbol.file_path = normalize_path(symbol.file_path)
+            # Clear batches to release memory
+            file_batch.clear()
+            symbol_batch.clear()
+            import_batch.clear()
+            call_batch.clear()
+            type_info_batch.clear()
+            import_link_batch.clear()
 
-    for import_ref in scan_result.imports:
-        import_ref.file_path = normalize_path(import_ref.file_path)
+            if total_files % 500 == 0:
+                logger.info(f"Progress: {total_files} files, {total_symbols} symbols written")
 
-    for call_ref in scan_result.calls:
-        call_ref.caller_file = normalize_path(call_ref.caller_file)
+    # Write final partial batch
+    if file_batch:
+        _write_batch_to_sqlite(
+            sqlite_store=sqlite_store,
+            faiss_store=faiss_store,
+            file_batch=file_batch,
+            symbol_batch=symbol_batch,
+            import_batch=import_batch,
+            call_batch=call_batch,
+            type_info_batch=type_info_batch,
+            import_link_batch=import_link_batch,
+            store_embeddings=store_embeddings,
+            padding=padding,
+            model_name=model_name,
+        )
 
-    for type_info in scan_result.type_infos:
-        type_info.file_path = normalize_path(type_info.file_path)
+        total_symbols += len(symbol_batch)
 
-    for import_link in scan_result.import_links:
-        import_link.importer_file = normalize_path(import_link.importer_file)
-        if import_link.definition_file:
-            import_link.definition_file = normalize_path(import_link.definition_file)
+    # Store metadata
+    project_root = str(directory.resolve())
+    sqlite_store.set_metadata('project_root', project_root)
 
+    scan_duration = time.time() - start_time
+    sqlite_store.set_metadata('scan_duration', str(scan_duration))
+    sqlite_store.set_metadata('total_files', str(total_files))
+
+    # Store git commit
+    git_commit = _get_git_commit(directory)
+    if git_commit:
+        sqlite_store.set_metadata('git_commit', git_commit)
+
+    # Save FAISS index
+    if faiss_store is not None:
+        faiss_store.save()
+        logger.info(f"Saved FAISS index with {len(faiss_store)} vectors")
+
+    logger.info(f"SQLite streaming index complete: {total_files} files, {total_symbols} symbols in {scan_duration:.2f}s")
+
+    # Return adapter
+    return ScanResultAdapter(sqlite_store)
+
+
+def _write_batch_to_sqlite(
+    sqlite_store: SQLiteIndexStore,
+    faiss_store: Optional[FAISSVectorStore],
+    file_batch: List,
+    symbol_batch: List,
+    import_batch: List,
+    call_batch: List,
+    type_info_batch: List,
+    import_link_batch: List,
+    store_embeddings: bool,
+    padding: int,
+    model_name: str,
+):
+    """
+    Write a batch of files and related data to SQLite in a single transaction.
+
+    This keeps transactions small and predictable (~100 files at a time).
+    """
     with sqlite_store.transaction() as conn:
         # Write files
-        for file_obj in scan_result.files:
+        for file_obj in file_batch:
             sqlite_store.write_file(file_obj, conn=conn)
 
-        # Write symbols and get IDs
-        symbol_ids = sqlite_store.write_symbols_batch(scan_result.symbols, conn=conn)
+        # Write symbols with chunked batching (handles large symbol counts)
+        symbol_ids = sqlite_store.write_symbols_batch(symbol_batch, conn=conn)
 
-        # Write imports, calls, type_infos, import_links
-        sqlite_store.write_imports_batch(scan_result.imports, conn=conn)
-        sqlite_store.write_calls_batch(scan_result.calls, conn=conn)
-        sqlite_store.write_type_infos_batch(scan_result.type_infos, conn=conn)
-        sqlite_store.write_import_links_batch(scan_result.import_links, conn=conn)
+        # Write related data
+        if import_batch:
+            sqlite_store.write_imports_batch(import_batch, conn=conn)
+        if call_batch:
+            sqlite_store.write_calls_batch(call_batch, conn=conn)
+        if type_info_batch:
+            sqlite_store.write_type_infos_batch(type_info_batch, conn=conn)
+        if import_link_batch:
+            sqlite_store.write_import_links_batch(import_link_batch, conn=conn)
 
         # Generate and store embeddings
-        if store_embeddings and faiss_store is not None:
-            logger.info(f"Generating embeddings for {len(scan_result.symbols)} symbols...")
+        if store_embeddings and faiss_store is not None and symbol_batch:
             _generate_embeddings_sqlite(
-                scan_result.symbols,
+                symbol_batch,
                 symbol_ids,
                 faiss_store,
                 sqlite_store,
@@ -251,29 +325,6 @@ def _build_sqlite_index(
                 model_name,
                 conn
             )
-
-        # Store metadata
-        project_root = str(directory.resolve())
-        sqlite_store.set_metadata('project_root', project_root, conn=conn)
-
-        scan_duration = time.time() - start_time
-        sqlite_store.set_metadata('scan_duration', str(scan_duration), conn=conn)
-        sqlite_store.set_metadata('total_files', str(len(scan_result.files)), conn=conn)
-
-        # Store git commit
-        git_commit = _get_git_commit(directory)
-        if git_commit:
-            sqlite_store.set_metadata('git_commit', git_commit, conn=conn)
-
-    # Save FAISS index
-    if faiss_store is not None:
-        faiss_store.save()
-        logger.info(f"Saved FAISS index with {len(faiss_store)} vectors")
-
-    logger.info(f"SQLite index build complete in {time.time() - start_time:.2f}s")
-
-    # Return adapter
-    return ScanResultAdapter(sqlite_store)
 
 
 def _generate_embeddings_json(scan_result: ScanResult, padding: int, model_name: str):
