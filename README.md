@@ -9,6 +9,26 @@
 
 ---
 
+## 📖 Documentation
+
+### User Documentation
+- **[README.md](./README.md)** - This file
+- **[Quick Start](#-quick-start)** - Get started in 5 minutes
+- **[CLI Reference](#-complete-cli-reference)** - All commands
+
+### Developer Documentation
+- **[VISION.md](./docs/VISION.md)** - Architectural philosophy
+- **[MANDATES.md](./docs/MANDATES.md)** - Development rules
+- **[ROADMAP.md](./docs/ROADMAP.md)** - Current status and future plans
+- **[AGENT_GUIDE.md](./docs/AGENT_GUIDE.md)** - AI agent integration guide
+
+### Phase Documentation
+- **[PHASE3_COMPLETE.md](./PHASE3_COMPLETE.md)** - Phase 3 completion report
+- **[PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md)** - Performance benchmarks
+- **[PHASE4_ENHANCEMENTS.md](./docs/PHASE4_ENHANCEMENTS.md)** - Planned enhancements
+
+---
+
 ## 🚨 The Problem: The Context Wall
 
 Autonomous AI agents face a critical limitation when working with large codebases:
@@ -447,24 +467,6 @@ PYTHONPATH=src python3 tests/test_phase3_integration.py
 **Test Results:** 34/34 passing (100%) ✅
 
 ---
-
-## 📖 Documentation
-
-### User Documentation
-- **[README.md](./README.md)** - This file
-- **[Quick Start](#-quick-start)** - Get started in 5 minutes
-- **[CLI Reference](#-complete-cli-reference)** - All commands
-
-### Developer Documentation
-- **[VISION.md](./docs/VISION.md)** - Architectural philosophy
-- **[MANDATES.md](./docs/MANDATES.md)** - Development rules
-- **[ROADMAP.md](./docs/ROADMAP.md)** - Current status and future plans
-- **[AGENT_GUIDE.md](./docs/AGENT_GUIDE.md)** - AI agent integration guide
-
-### Phase Documentation
-- **[PHASE3_COMPLETE.md](./PHASE3_COMPLETE.md)** - Phase 3 completion report
-- **[PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md)** - Performance benchmarks
-- **[PHASE4_ENHANCEMENTS.md](./docs/PHASE4_ENHANCEMENTS.md)** - Planned enhancements
 
 ---
 
