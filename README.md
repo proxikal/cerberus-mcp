@@ -15,6 +15,7 @@
 - **[README.md](./README.md)** - This file
 - **[Quick Start](#-quick-start)** - Get started in 5 minutes
 - **[CLI Reference](#-complete-cli-reference)** - All commands
+- **[Competitor Comparison](#-competitor-comparison)** - How Cerberus stacks up
 
 ### Developer Documentation
 - **[VISION.md](./docs/VISION.md)** - Architectural philosophy
@@ -733,6 +734,27 @@ MIT License - See LICENSE file for details.
 - **Benchmarks:** [PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md)
 - **Completion Report:** [PHASE3_COMPLETE.md](./PHASE3_COMPLETE.md)
 - **Future Plans:** [PHASE4_ENHANCEMENTS.md](./docs/PHASE4_ENHANCEMENTS.md)
+
+---
+
+## 🏁 Competitor Comparison
+
+Cerberus occupies a specialized niche between "Code Search Engines" and "RAG Frameworks." Here is how it stacks up against the current landscape:
+
+| Feature | Cerberus | Cursor / Copilot | Sourcegraph | Aider | Bloop / Greptile |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Parsing** | **AST-Based (Surgical)** | Text-Based (Chunks) | LSIF (Heavy) | Simple Map | Chunk-based |
+| **Infrastructure** | **100% Local** | Cloud-Dependent | Enterprise/Cloud | Local | Cloud API |
+| **Git Integration** | **Native (Surgical)** | Basic Hash | Repository Sync | None/Manual | Webhook Sync |
+| **Agent-Native** | **Yes (JSON-First)** | IDE-Locked | Partial (API) | Yes | Yes (API) |
+| **Context Tooling** | **Skeletonizer** | Snippets | Full File | Repomap | Snippets |
+
+### Key Differentiators
+
+*   **vs. Cursor / GitHub Copilot:** These are closed-source "black boxes" locked to specific IDEs. Cerberus is an open **Context Layer** that any autonomous agent, CLI tool, or custom script can leverage.
+*   **vs. Sourcegraph:** While Sourcegraph is powerful for enterprise-scale code intelligence, it is "Heavy" (often requiring build-server setups). Cerberus is **"Light"**—using Tree-sitter to get deep intelligence with zero configuration.
+*   **vs. Aider:** Aider’s "repomap" is excellent for quick overviews. Cerberus provides a **persistent, queryable graph database** (JSON/Vector) that supports complex semantic searches and tracks symbol-level changes over time.
+*   **vs. Standard RAG:** Most RAG apps treat code as raw text chunks. Cerberus understands **code structure**. It knows the difference between a function signature and its implementation, allowing for advanced techniques like **Skeletonization**.
 
 ---
 
