@@ -22,7 +22,8 @@ This roadmap focuses on the remaining milestones to transition Cerberus into a D
 
 **Status:** All milestones complete (34/34 tests passing). Includes `cerberus update` and `cerberus watcher` commands with full functionality.
 
-## Phase 4: Integration Ecosystem
-*   **Official Agent Plugins:** Native tool-sets for LangChain, CrewAI, and AutoGPT.
+## Phase 4: Integration & Aegis-Scale Performance
+*   **Aegis-Scale Memory Optimization:** Transition to a streaming, disk-first architecture (SQLite) to support 10,000+ files under 250MB RAM.
+*   **Official Agent Plugins:** Native tool-sets for LangChain, CrewAI, and MCP (Model Context Protocol) for Desktop AI apps.
 *   **Web-UI (Optional):** A lightweight local dashboard for visual exploration of the project graph.
 *   **Security Scanning:** Automated PII and secret detection within the indexing pipeline.
