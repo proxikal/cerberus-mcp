@@ -21,3 +21,6 @@ tree-sitter-go>=0.20.0
 watchdog>=3.0.0  # Filesystem monitoring for background watcher
 rank-bm25>=0.2.2  # BM25 keyword search for hybrid retrieval
 psutil>=5.9.0  # Process management for daemon
+
+# Phase 4: Aegis-Scale Performance (SQLite + FAISS)
+faiss-cpu>=1.7.4  # Vector similarity search for embeddings (use faiss-gpu for production)
