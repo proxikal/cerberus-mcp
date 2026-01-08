@@ -151,9 +151,18 @@ def update_index_incrementally(
         current_commit = get_current_commit(project_path)
         if current_commit:
             scan_result = load_index(index_path)
-            scan_result.metadata["git_commit"] = current_commit
-            from ..index import save_index
-            save_index(scan_result, index_path)
-            logger.info(f"Updated index metadata with git commit: {current_commit[:8]}")
+
+            # Handle SQLite vs JSON differently
+            from ..storage import ScanResultAdapter
+            if isinstance(scan_result, ScanResultAdapter):
+                # SQLite: Update metadata directly in store
+                scan_result._store.set_metadata('git_commit', current_commit)
+                logger.info(f"Updated SQLite metadata with git commit: {current_commit[:8]}")
+            else:
+                # JSON: Update in-memory and save
+                scan_result.metadata["git_commit"] = current_commit
+                from ..index import save_index
+                save_index(scan_result, index_path)
+                logger.info(f"Updated JSON metadata with git commit: {current_commit[:8]}")
 
     return result

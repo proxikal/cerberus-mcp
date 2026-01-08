@@ -1,10 +1,12 @@
 """
 Surgical index updates for incremental re-parsing.
+
+Optimized for Phase 4: Transaction-based updates for SQLite indices.
 """
 
 import time
 from pathlib import Path
-from typing import List, Set
+from typing import List, Set, Union
 from loguru import logger
 
 from ..schemas import (
@@ -16,6 +18,7 @@ from ..schemas import (
 )
 from ..scanner import scan
 from ..index import load_index, save_index
+from ..storage import ScanResultAdapter, SQLiteIndexStore
 from .config import INCREMENTAL_CONFIG
 from .change_analyzer import (
     identify_affected_symbols,
@@ -32,6 +35,9 @@ def apply_surgical_update(
     """
     Apply surgical updates to an existing index based on detected changes.
 
+    Optimized for Phase 4: Uses transactions for SQLite indices, maintains
+    backward compatibility with JSON format.
+
     Args:
         index_path: Path to existing index file
         file_changes: Detected file changes
@@ -46,6 +52,128 @@ def apply_surgical_update(
     logger.info(f"Loading existing index from {index_path}")
     scan_result = load_index(index_path)
 
+    # Detect index format and use appropriate update strategy
+    is_sqlite = isinstance(scan_result, ScanResultAdapter)
+
+    if is_sqlite:
+        logger.info("Using transactional SQLite update path")
+        return _apply_surgical_update_sqlite(
+            scan_result=scan_result,
+            file_changes=file_changes,
+            project_path=project_path,
+            start_time=start_time,
+        )
+    else:
+        logger.info("Using legacy JSON update path")
+        return _apply_surgical_update_json(
+            scan_result=scan_result,
+            index_path=index_path,
+            file_changes=file_changes,
+            project_path=project_path,
+            start_time=start_time,
+        )
+
+
+def _apply_surgical_update_sqlite(
+    scan_result: ScanResultAdapter,
+    file_changes: FileChange,
+    project_path: Path,
+    start_time: float,
+) -> IncrementalUpdateResult:
+    """
+    SQLite-specific surgical update using transactions (Phase 4).
+
+    All changes are wrapped in a single atomic transaction for data integrity.
+    """
+    store = scan_result._store
+    updated_symbols: List[CodeSymbol] = []
+    removed_symbols: List[str] = []
+    affected_callers: Set[str] = set()
+    files_reparsed = 0
+
+    # Use transaction for atomic updates
+    with store.transaction() as conn:
+        # Handle deleted files (CASCADE handles related data)
+        if file_changes.deleted:
+            logger.info(f"Removing {len(file_changes.deleted)} deleted files")
+            for deleted_path in file_changes.deleted:
+                faiss_ids = store.delete_file(deleted_path, conn=conn)
+                removed_symbols.append(f"<deleted from {deleted_path}>")
+
+                # Clean up FAISS vectors
+                if store._faiss_store and faiss_ids:
+                    store._faiss_store.remove_vectors(faiss_ids)
+
+        # Handle new files
+        if file_changes.added:
+            logger.info(f"Parsing {len(file_changes.added)} new files")
+            for added_file in file_changes.added:
+                new_symbols = _parse_single_file(added_file, project_path)
+                if new_symbols:
+                    # Write symbols to SQLite
+                    store.write_symbols_batch(new_symbols, conn=conn)
+                    updated_symbols.extend(new_symbols)
+                    files_reparsed += 1
+
+        # Handle modified files
+        if file_changes.modified:
+            logger.info(f"Updating {len(file_changes.modified)} modified files")
+            for modified_file in file_changes.modified:
+                # Delete old symbols from this file
+                faiss_ids = store.delete_file(modified_file.path, conn=conn)
+
+                # Clean up FAISS vectors
+                if store._faiss_store and faiss_ids:
+                    store._faiss_store.remove_vectors(faiss_ids)
+
+                # Re-parse file and write new symbols
+                new_symbols = _parse_single_file(modified_file.path, project_path)
+                if new_symbols:
+                    store.write_symbols_batch(new_symbols, conn=conn)
+                    updated_symbols.extend(new_symbols)
+                    files_reparsed += 1
+
+    # Save FAISS index if updated
+    if store._faiss_store and (file_changes.deleted or file_changes.modified):
+        store._faiss_store.save()
+        logger.info("Saved updated FAISS index")
+
+    # Clear adapter cache to reload fresh data
+    scan_result.clear_cache()
+
+    elapsed_time = time.time() - start_time
+
+    result = IncrementalUpdateResult(
+        updated_symbols=updated_symbols,
+        removed_symbols=removed_symbols,
+        affected_callers=list(affected_callers),
+        files_reparsed=files_reparsed,
+        elapsed_time=elapsed_time,
+        strategy="incremental_sqlite",
+    )
+
+    logger.info(
+        f"SQLite incremental update complete: "
+        f"{len(updated_symbols)} symbols updated, "
+        f"{len(removed_symbols)} removed, "
+        f"{files_reparsed} files re-parsed in {elapsed_time:.2f}s"
+    )
+
+    return result
+
+
+def _apply_surgical_update_json(
+    scan_result: ScanResult,
+    index_path: Path,
+    file_changes: FileChange,
+    project_path: Path,
+    start_time: float,
+) -> IncrementalUpdateResult:
+    """
+    JSON-specific surgical update (legacy, full memory load).
+
+    Maintains backward compatibility with existing JSON indices.
+    """
     updated_symbols: List[CodeSymbol] = []
     removed_symbols: List[str] = []
     affected_callers: Set[str] = set()
@@ -72,13 +200,6 @@ def apply_surgical_update(
             # Identify affected symbols in this file
             affected = identify_affected_symbols(modified_file, scan_result)
 
-            # Note: We re-parse the file even if no existing symbols are affected
-            # because new symbols may have been added (e.g., new functions/classes)
-            if affected:
-                logger.info(f"Re-parsing {modified_file.path} (affected: {len(affected)} symbols)")
-            else:
-                logger.info(f"Re-parsing {modified_file.path} (no existing symbols affected, checking for new symbols)")
-
             # Re-parse the entire file
             file_path = project_path / modified_file.path
             if not file_path.exists():
@@ -96,7 +217,6 @@ def apply_surgical_update(
             )
 
             # Remove old symbols from this file
-            # Normalize paths for comparison (scanner returns absolute, git diff returns relative)
             modified_file_abs = str((project_path / modified_file.path).resolve())
 
             scan_result.symbols = [
@@ -104,7 +224,7 @@ def apply_surgical_update(
                 if Path(s.file_path).resolve() != Path(modified_file_abs)
             ]
 
-            # Add newly scanned symbols (filter to only this file)
+            # Add newly scanned symbols
             new_file_symbols = [
                 s for s in new_scan.symbols
                 if Path(s.file_path).resolve() == Path(modified_file_abs)
@@ -123,13 +243,6 @@ def apply_surgical_update(
                 )
                 affected_callers.update(callers)
 
-    # Re-parse affected callers if needed
-    if affected_callers:
-        logger.info(f"Re-parsing {len(affected_callers)} affected callers")
-        # For now, we don't re-parse callers (would require complex dependency resolution)
-        # This is a future enhancement
-        pass
-
     # Save updated index
     logger.info(f"Saving updated index to {index_path}")
     save_index(scan_result, index_path)
@@ -141,18 +254,62 @@ def apply_surgical_update(
         removed_symbols=removed_symbols,
         affected_callers=list(affected_callers),
         files_reparsed=files_reparsed,
-        elapsed_time=elapsed_time,
-        strategy="incremental",
+        strategy="incremental_json",
     )
 
     logger.info(
-        f"Incremental update complete: "
+        f"JSON incremental update complete: "
         f"{len(updated_symbols)} symbols updated, "
         f"{len(removed_symbols)} removed, "
         f"{files_reparsed} files re-parsed in {elapsed_time:.2f}s"
     )
 
     return result
+
+
+def _parse_single_file(file_path: str, project_path: Path) -> List[CodeSymbol]:
+    """
+    Parse a single file and extract symbols (Phase 4 helper).
+
+    Args:
+        file_path: Relative file path
+        project_path: Project root path
+
+    Returns:
+        List of extracted symbols
+    """
+    abs_path = project_path / file_path
+    if not abs_path.exists():
+        logger.warning(f"File {abs_path} does not exist")
+        return []
+
+    try:
+        scan_result = scan(
+            directory=abs_path.parent,
+            respect_gitignore=False,
+            extensions=None,
+            previous_index=None,
+            incremental=False,
+            max_bytes=None,
+        )
+
+        # Filter to only this file
+        abs_path_str = str(abs_path.resolve())
+        file_symbols = [
+            s for s in scan_result.symbols
+            if Path(s.file_path).resolve() == Path(abs_path_str)
+        ]
+
+        # Normalize file paths to relative (for SQLite consistency)
+        for symbol in file_symbols:
+            symbol.file_path = file_path
+
+        logger.debug(f"Extracted {len(file_symbols)} symbols from {file_path}")
+        return file_symbols
+
+    except Exception as e:
+        logger.error(f"Failed to parse {abs_path}: {e}")
+        return []
 
 
 def _remove_deleted_files(
