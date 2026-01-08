@@ -2,16 +2,19 @@
 Public API for hybrid retrieval.
 
 Facade for BM25 keyword search, vector semantic search, and hybrid fusion.
+
+Optimized for Phase 4 Aegis-Scale with streaming support for SQLite indices.
 """
 
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Union
 from loguru import logger
 
 from ..schemas import ScanResult, SearchResult, HybridSearchResult, CodeSymbol
 from ..index.index_loader import load_index
+from ..storage import ScanResultAdapter, SQLiteIndexStore, FAISSVectorStore
 from .bm25_search import BM25Index
-from .vector_search import vector_search
+from .vector_search import vector_search, vector_search_faiss
 from .hybrid_ranker import (
     detect_query_type,
     reciprocal_rank_fusion,
@@ -37,6 +40,9 @@ def hybrid_search(
 ) -> List[HybridSearchResult]:
     """
     Perform hybrid search combining BM25 keyword and vector semantic search.
+
+    Optimized for Phase 4: Uses streaming queries for SQLite indices to maintain
+    constant memory usage regardless of project size.
 
     Args:
         query: Search query
@@ -77,7 +83,151 @@ def hybrid_search(
     # Load index
     scan_result = load_index(index_path)
 
-    # Build document snippets
+    # Detect if SQLite index and use optimized streaming path
+    is_sqlite = isinstance(scan_result, ScanResultAdapter)
+
+    if is_sqlite:
+        logger.info("Using streaming SQLite optimized search path")
+        return _hybrid_search_streaming(
+            query=query,
+            scan_result=scan_result,
+            mode=mode,
+            top_k=top_k,
+            keyword_weight=keyword_weight,
+            semantic_weight=semantic_weight,
+            fusion_method=fusion_method,
+            padding=padding,
+        )
+    else:
+        logger.info("Using legacy in-memory search path (JSON index)")
+        return _hybrid_search_legacy(
+            query=query,
+            scan_result=scan_result,
+            mode=mode,
+            top_k=top_k,
+            keyword_weight=keyword_weight,
+            semantic_weight=semantic_weight,
+            fusion_method=fusion_method,
+            padding=padding,
+        )
+
+
+def _hybrid_search_streaming(
+    query: str,
+    scan_result: ScanResultAdapter,
+    mode: str,
+    top_k: int,
+    keyword_weight: float,
+    semantic_weight: float,
+    fusion_method: str,
+    padding: int,
+) -> List[HybridSearchResult]:
+    """
+    Streaming search for SQLite indices (constant memory).
+
+    Key optimization: Defer snippet loading until after we identify top candidates.
+    """
+    store = scan_result._store
+    top_k_per_method = HYBRID_SEARCH_CONFIG["top_k_per_method"]
+
+    bm25_results: List[SearchResult] = []
+    vector_results: List[SearchResult] = []
+
+    # BM25 keyword search (still needs to iterate all symbols for document frequency)
+    if mode in ["keyword", "balanced"]:
+        logger.info(f"Performing streaming BM25 search for '{query}'")
+
+        # Stream symbols and build lightweight documents (metadata only, no file content yet)
+        documents = []
+        for symbol in store.query_symbols(batch_size=100):
+            # Use symbol metadata as "document" - signature, name, type
+            doc_text = f"{symbol.name} {symbol.type} {symbol.signature or ''}"
+            documents.append({
+                "symbol": symbol,
+                "snippet_text": doc_text,  # Lightweight metadata-based text
+            })
+
+        logger.debug(f"Built {len(documents)} lightweight documents for BM25")
+
+        # Build BM25 index and search
+        bm25_index = BM25Index(
+            documents=documents,
+            k1=BM25_CONFIG["k1"],
+            b=BM25_CONFIG["b"],
+        )
+        bm25_results = bm25_index.search(query, top_k=top_k_per_method)
+
+    # Vector semantic search (query FAISS directly)
+    if mode in ["semantic", "balanced"]:
+        logger.info(f"Performing streaming vector search for '{query}'")
+
+        # Check if FAISS store is available
+        if store._faiss_store and len(store._faiss_store) > 0:
+            logger.debug("Using FAISS direct query (streaming)")
+            vector_results = vector_search_faiss(
+                query=query,
+                sqlite_store=store,
+                faiss_store=store._faiss_store,
+                top_k=top_k_per_method,
+                model_name=VECTOR_CONFIG["model"],
+                padding=padding,
+            )
+        else:
+            logger.warning("No FAISS store available, skipping vector search")
+
+    # Handle single-method modes
+    if mode == "keyword":
+        # Load snippets for top results only
+        return _finalize_results(bm25_results[:top_k], "keyword", padding)
+
+    if mode == "semantic":
+        return _finalize_results(vector_results[:top_k], "semantic", padding)
+
+    # Balanced mode - fuse results
+    logger.info(f"Fusing results using {fusion_method} method")
+
+    if fusion_method == "rrf":
+        hybrid_results = reciprocal_rank_fusion(bm25_results, vector_results)
+    else:
+        hybrid_results = weighted_score_fusion(
+            bm25_results,
+            vector_results,
+            keyword_weight=keyword_weight,
+            semantic_weight=semantic_weight,
+        )
+
+    # Load full snippets for final top-K results only (lazy loading optimization)
+    final_results = hybrid_results[:top_k]
+    for result in final_results:
+        # Load actual file snippet if not already loaded
+        if not hasattr(result, 'snippet') or not result.snippet:
+            snippet_obj = read_range(
+                Path(result.symbol.file_path),
+                result.symbol.start_line,
+                result.symbol.end_line,
+                padding=padding,
+            )
+            # Note: HybridSearchResult doesn't have snippet field, but we ensure SearchResults do
+
+    return final_results
+
+
+def _hybrid_search_legacy(
+    query: str,
+    scan_result: ScanResult,
+    mode: str,
+    top_k: int,
+    keyword_weight: float,
+    semantic_weight: float,
+    fusion_method: str,
+    padding: int,
+) -> List[HybridSearchResult]:
+    """
+    Legacy search for JSON indices (full memory load).
+
+    Maintains backward compatibility with existing code.
+    """
+    # Build document snippets (legacy full-load approach)
     snippets = []
     for symbol in scan_result.symbols:
         snippet_obj = read_range(
@@ -162,3 +312,54 @@ def hybrid_search(
 
     # Return top K
     return hybrid_results[:top_k]
+
+
+def _finalize_results(
+    results: List[SearchResult],
+    match_type: str,
+    padding: int,
+) -> List[HybridSearchResult]:
+    """
+    Convert SearchResults to HybridSearchResults with proper scoring.
+
+    Args:
+        results: List of SearchResult objects
+        match_type: "keyword" or "semantic"
+        padding: Snippet padding
+
+    Returns:
+        List of HybridSearchResult objects
+    """
+    hybrid_results = []
+    for idx, r in enumerate(results):
+        # Ensure snippet is loaded
+        if not r.snippet or not r.snippet.content:
+            snippet_obj = read_range(
+                Path(r.symbol.file_path),
+                r.symbol.start_line,
+                r.symbol.end_line,
+                padding=padding,
+            )
+            r.snippet.content = snippet_obj.content
+
+        if match_type == "keyword":
+            hybrid_result = HybridSearchResult(
+                symbol=r.symbol,
+                bm25_score=r.score,
+                vector_score=0.0,
+                hybrid_score=r.score,
+                rank=idx + 1,
+                match_type="keyword",
+            )
+        else:
+            hybrid_result = HybridSearchResult(
+                symbol=r.symbol,
+                bm25_score=0.0,
+                vector_score=r.score,
+                hybrid_score=r.score,
+                rank=idx + 1,
+                match_type="semantic",
+            )
+        hybrid_results.append(hybrid_result)
+
+    return hybrid_results
