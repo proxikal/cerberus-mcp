@@ -141,7 +141,7 @@ Persist loaded embedding model to disk to eliminate 4-second cold-start delay.
 ### High Priority (Do First)
 1. ✅ Aegis-Scale Memory Optimization (Streaming + SQLite Store)
 2. ✅ Watcher Auto-Start
-3. ✅ Official Agent Plugins (LangChain, CrewAI, MCP)
+3. ✅ Official Agent Plugins (LangChain, CrewAI)
 
 ### Medium Priority (Do Next)
 4. ✅ Embedding Model Caching & Quantization
@@ -162,7 +162,6 @@ Persist loaded embedding model to disk to eliminate 4-second cold-start delay.
 
 **Phase 4 Sprint 2 (3 weeks):**
 - LangChain / CrewAI plugins
-- MCP Support for Desktop Apps
 - Documentation
 
 **Phase 4 Sprint 3 (2 weeks):**
@@ -183,10 +182,9 @@ Phase 4 is complete when:
 1. ✅ Constant RAM usage <250MB for 10,000+ files
 2. ✅ Watcher auto-starts on index command
 3. ✅ Official plugins published to PyPI
-4. ✅ MCP Server available for Desktop AI apps
-5. ✅ Path normalization handles all edge cases
-6. ✅ Security scanning detects common patterns
-7. ✅ Documentation complete for all features
+4. ✅ Path normalization handles all edge cases
+5. ✅ Security scanning detects common patterns
+6. ✅ Documentation complete for all features
 
 ---
 

@@ -24,6 +24,6 @@ This roadmap focuses on the remaining milestones to transition Cerberus into a D
 
 ## Phase 4: Integration & Aegis-Scale Performance
 *   **Aegis-Scale Memory Optimization:** Transition to a streaming, disk-first architecture (SQLite) to support 10,000+ files under 250MB RAM.
-*   **Official Agent Plugins:** Native tool-sets for LangChain, CrewAI, and MCP (Model Context Protocol) for Desktop AI apps.
+*   **Official Agent Plugins:** Native tool-sets for LangChain and CrewAI.
 *   **Web-UI (Optional):** A lightweight local dashboard for visual exploration of the project graph.
 *   **Security Scanning:** Automated PII and secret detection within the indexing pipeline.
