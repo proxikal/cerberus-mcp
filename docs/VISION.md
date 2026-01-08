@@ -7,28 +7,18 @@ We build rigid, reliable software tools (CLIs, Parsers) to provide a determinist
 *   **Code over Prompts:** We don't rely on LLMs for the heavy lifting of code analysis. We use AST parsing and Vector search.
 *   **Deterministic Foundation:** Indexing and retrieval are predictable, allowing agents to be creative without hallucinating facts about the codebase.
 
-## 2. The "Powerhouse" Evolution
+## 2. Strategic Evolution
 Our goal is to move from "Search and Retrieve" to **Deep Context Synthesis**.
 
-### Deep Resolution (Symbolic Intelligence)
-*   **Cross-File Symbol Resolution:** Resolve instances to their source definitions (e.g., knowing `authService` is a `JWTService`).
-*   **Type-Aware Indexing:** Indexing types, interfaces, and enums to answer architectural questions.
-*   **Call-Graph Navigation:** Recursive mapping of execution paths.
+### Symbolic Intelligence
+Beyond simple indexing, Cerberus aims to understand the *meaning* of code relationships. This includes resolving instances to their source definitions and tracking types across file boundaries.
 
-### Context Compaction & Synthesis
-*   **Skeletonized Scoping:** Providing the implementation of a target function while skeletonizing the rest of the file to preserve context without wasting tokens.
-*   **Import Resolution Padding:** Automatically including definitions of internal types used in retrieved snippets.
-*   **Synthesis:** Merging related snippets into a single, cohesive "Goldilocks" payload.
-*   **Auto-Summarization (Optional / Low Priority):** The use of lightweight, local LLMs to pre-summarize boilerplate or non-critical modules. This serves as an optimization layer to further reduce token usage for high-reasoning agents (Claude, Codex) by delivering pre-digested summaries instead of raw code where appropriate.
+### Context Compaction
+Cerberus is a "token-saver." By providing surgical snippets and skeletonized architectural views, it allows high-reasoning agents (like Claude or Gemini) to operate on massive codebases without hitting context limits or wasting compute on boilerplate.
 
-### Operational Power (Speed & Scalability)
-*   **Git-Native Incrementalism:** Use `git diff` to identify modified lines and surgically update the index (re-parsing only changed symbols).
-*   **Background Watcher (Invisible Assistant):** A lightweight daemon process that automatically starts when an agent initiates a scan or query if not already active. It keeps the index synchronized with the filesystem in real-time without user intervention.
-*   **Hybrid Semantic Search:** Combine **BM25 (Keyword)** and **Vector (Semantic)** search to ensure precise hits for specific variable names and broad conceptual queries alike.
+### Operational Transparency
+Through the **Aegis Robustness Model**, Cerberus provides clear diagnostics and structured logging, ensuring that an autonomous agent can monitor its own context layer's health.
 
-## 3. Technology Stack
-*   **Language:** Python 3.10+
-*   **Type System:** Strict Typing with Pydantic
-*   **CLI Framework:** Typer
-*   **Parsing:** Hybrid approach (Tree-Sitter for deep AST, Regex for lightweight scans)
-*   **ML:** Local Transformer Embeddings (Sentence-Transformers)
+---
+
+For specific features and roadmap, see the [README.md](../README.md).

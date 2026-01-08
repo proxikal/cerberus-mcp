@@ -464,7 +464,7 @@ All features are complete, tested, and validated. Cerberus is ready for real-wor
 
 **Validation:** Production-scale testing on TheCookBook project
 
-**Philosophy:** Aegis Foundation's robustness mandates
+**Philosophy:** Aegis robustness mandates
 
 ---
 
@@ -494,5 +494,3 @@ All three core features are delivered:
 **Date:** 2026-01-08
 
 **Version:** Cerberus v0.3.0 (Phase 3)
-
-**Developed by:** Aegis Foundation

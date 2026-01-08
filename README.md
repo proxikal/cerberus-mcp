@@ -149,7 +149,7 @@ Unlike indexers that re-scan the entire project or use basic file-hash checking,
 When an agent needs to understand a massive file, most tools send either the whole file (wasting tokens) or a tiny snippet (losing context). Cerberus can generate a **Skeleton**—stripping the logic out and sending only the signatures. This allows an agent to "see" the entire structure of a massive project for a fraction of the cost.
 
 ### 🩺 Built-in "Doctor" Protocol
-Cerberus isn't just for reading; it's for **reliable engineering**. The inclusion of `doctor.py` and the **XCalibr Autonomous Debugging Protocol** means Cerberus is designed to help an agent diagnose its own environment, ensuring grammars are compiled and the index is healthy before it starts working.
+Cerberus isn't just for reading; it's for **reliable engineering**. The inclusion of `doctor.py` and the **Aegis Autonomous Debugging Protocol** means Cerberus is designed to help an agent diagnose its own environment, ensuring grammars are compiled and the index is healthy before it starts working.
 
 ---
 
@@ -184,8 +184,8 @@ See [PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md) for detailed be
 
 ```bash
 # Clone repository
-git clone https://github.com/aegis-foundation/cerberus.git
-cd cerberus
+git clone https://github.com/proxikal/Cerberus.git
+cd Cerberus
 
 # Install Python dependencies
 pip install -r requirements.txt
@@ -703,7 +703,7 @@ MIT License - See LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
-**Philosophy:** Aegis Foundation's robustness mandates
+**Philosophy:** Aegis robustness mandates
 
 **Implementation:** Claude Sonnet 4.5 (Anthropic)
 
@@ -759,5 +759,3 @@ Cerberus occupies a specialized niche between "Code Search Engines" and "RAG Fra
 ---
 
 **Cerberus: Empowering AI agents to work efficiently with massive codebases.**
-
-*Developed by the Aegis Foundation.*
