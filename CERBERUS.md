@@ -52,12 +52,11 @@ Forbidden:
   IF: violates_self_similarity OR violates_aegis
   DO: [STOP, cite_mandate, propose_compliant_alternative]
 
-@exploration:
-  REQUIRE: cerberus_commands_only WHEN: index_exists
-  IF: uses_grep_read_glob_tools THEN: [PAUSE, propose_cerberus_command, explain_why, ask_to_implement_or_continue]
-  IF: cerberus_cmd_missing THEN: [PAUSE, "Cerberus needs [command]. Implement? Or use workaround?", get_user_approval]
-  IF: cerberus_cmd_fails THEN: check_help_syntax NOT fallback_to_standard_tools
-  PATTERN: 100%_dogfooding_mandate + continuous_improvement
+@surgical_edits:
+  CONTEXT: Interface requires 'Read' before 'Write/Update'.
+  RULE: Never use `read_file` for the entire file.
+  DO: Use `cerberus get-symbol` OR `cerberus read --lines` to satisfy the tool's read-requirement.
+  GOAL: Minimal tokens to satisfy safety check.
 
 ## STATUS
 version: 0.7.0 | phases: P1-7(complete) P7-mono(deferred)
