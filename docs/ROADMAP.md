@@ -139,8 +139,9 @@ cerberus/resolution/
     *   **SQLite FTS5 Integration:** Replace in-memory BM25 with high-speed SQLite full-text search.
     *   **Remote Embeddings:** Optional support for API-based vectors (Gemini/OpenAI) to eliminate local model RAM usage.
     *   **AST Memory Streaming:** Optimize Tree-sitter processing to prevent memory accumulation in giant files.
+*   **Codebase De-Monolithization:** Break down massive files (`main.py`, `sqlite_store.py`) into modular sub-packages to reduce the project's internal context wall.
 
-**Goal:** Beat Aider's memory efficiency while maintaining 100% AST integrity.
+**Goal:** Beat Aider's memory efficiency and optimize the codebase for AI agent maintenance.
 
 **Estimated Scope:** 2 weeks implementation. See [PHASE7_SPEC.md](./PHASE7_SPEC.md) for details.
 

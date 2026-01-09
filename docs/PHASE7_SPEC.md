@@ -39,23 +39,28 @@
 
 ---
 
-## 🛠️ Architecture Changes
+## 🏗️ Codebase De-Monolithization (Modularity Upgrade)
 
-### Package: `cerberus/retrieval`
-- Refactor `facade.py` to handle on-demand model loading.
-- Update `config.py` to include `REMOTE_EMBEDDING_CONFIG`.
+To adhere to the **Self-Similarity Mandate**, we must break down the monolithic "God Files" that have exceeded 1,000+ lines. This will make the codebase "Agent-Optimized" by reducing the context wall for future development.
 
-### Package: `cerberus/storage`
-- Update `sqlite_store.py` to initialize FTS5 virtual tables.
-- Implement triggers or manual procedures to keep FTS index synced with the `symbols` table.
+### 1. Refactor `src/cerberus/main.py` (2,939 lines)
+**Target:** Create `src/cerberus/cli/` package.
+- **`cli/index.py`**: Implementation of `index` and `scan` commands.
+- **`cli/retrieval.py`**: Implementation of `search`, `get-symbol`, `get-context`, `skeleton-file`, and `skeletonize`.
+- **`cli/symbolic.py`**: Implementation of all Phase 5/6 symbolic intelligence commands (`deps`, `inherit-tree`, `calls`, `references`, `smart-context`, etc.).
+- **`cli/operational.py`**: Implementation of `watcher`, `update`, `hello`, `version`, `doctor`, and `session` commands.
+- **`main.py` (Minimalist Orchestrator)**: Acts as the entry point, using `app.add_typer()` to assemble the sub-modules.
+
+### 2. Refactor `src/cerberus/storage/sqlite_store.py` (1,063 lines)
+**Target:** Create `src/cerberus/storage/sqlite/` package.
+- **`sqlite/schema.py`**: Table definitions, indices, and FTS5 configuration.
+- **`sqlite/symbols.py`**: Logic for symbol and file CRUD operations.
+- **`sqlite/resolution.py`**: Logic for method calls, type infos, import links, and symbol references.
+- **`sqlite/persistence.py`**: Connection management, transactions, and metadata handling.
 
 ---
 
 ## ✅ Integrity Mandate
-These optimizations are **Upgrades only**.
-1. **No Hallucinations:** Search results must remain 100% grounded in the local AST.
-2. **Deterministic:** FTS5 rankings must be consistent across runs.
-3. **Agent-Native:** JSON response schemas must remain unchanged to avoid breaking downstream AI agents.
 
 ---
 
