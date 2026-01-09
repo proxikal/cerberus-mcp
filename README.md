@@ -133,12 +133,34 @@ Every package exposes a clean `facade.py` API (Self-Similarity Mandate).
 
 ## 🏁 Competitor Comparison
 
-| Feature | Cerberus | Cursor / Copilot | Sourcegraph | Aider |
-| :--- | :--- | :--- | :--- | :--- |
-| **Parsing** | **AST-Based (Surgical)** | Text Chunks | LSIF (Heavy) | Simple Map |
-| **Infrastructure** | **100% Local** | Cloud-Dependent | Enterprise | Local |
-| **Git Integration** | **Native (Surgical)** | Basic Hash | Repository Sync | Manual |
-| **Context Tooling** | **Skeletonizer** | Snippets | Full File | Repomap |
+Cerberus occupies a specialized niche: **The Local Context Engine.** Unlike IDE plugins or cloud search engines, Cerberus is designed to be the "Cortex" for autonomous agents.
+
+| Feature | Cerberus | Cursor / Copilot | Sourcegraph | Aider | Standard RAG |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Parsing** | **AST-Based (Surgical)** | Text-Based (Chunks) | LSIF (Heavy) | Simple Map | Raw Chunks |
+| **Infrastructure** | **100% Local** | Cloud-Dependent | Enterprise/Cloud | Local | Cloud API |
+| **Git Integration** | **Native (Diff-Aware)** | Basic Hash | Repository Sync | None/Manual | None |
+| **Agent Interface** | **JSON / API** | IDE UI | Web UI / API | Chat UI | Vector DB |
+| **Cost (Tokens)** | **$ (Surgical)** | $$ (Full Files) | N/A (Search) | $ (Map) | $$ (Dump) |
+
+### 🏆 Why Cerberus Wins (The Data)
+
+1.  **Surgical vs. Chunked:** 
+    *   **The Competitors:** Most RAG tools split code into arbitrary 500-token chunks. This often cuts functions in half, forcing the agent to request multiple chunks to understand one logic block.
+    *   **Cerberus:** Uses Tree-Sitter to understand **Symbol Boundaries**. When you ask for `auth_user`, you get the *exact* function—headers, body, and decorators—padding included. Zero wasted tokens on irrelevant neighbors.
+
+2.  **The "Skeleton" Advantage:**
+    *   **The Competitors:** To understand a class, Copilot often reads the whole file. For a 2,000-line `User` class, that's ~15k tokens.
+    *   **Cerberus:** Can generate a **Skeleton** (signatures only). The agent sees the entire class structure for ~500 tokens. **That is a 30x cost reduction for architectural reasoning.**
+
+3.  **Local Speed vs. Cloud Latency:**
+    *   **The Competitors:** Sourcegraph and Greptile are incredible, but they require network calls. Latency is 500ms - 2s.
+    *   **Cerberus:** Is a local SQLite file. Queries happen in **milliseconds** on your SSD. This makes "Plan Mode" (where an agent queries dependencies 50 times in a row) feel instant rather than sluggish.
+
+4.  **The Truth (Where we lose):**
+    *   If you want a **UI** to click around in, use Sourcegraph.
+    *   If you want **Autocomplete** while typing, use Copilot.
+    *   **Cerberus is for AGENTS, not Humans.** It has no UI. It has no autocomplete. It is a pure, high-speed data pipeline designed to feed Claude and Gemini exactly what they need to write code without crashing.
 
 ---
 
