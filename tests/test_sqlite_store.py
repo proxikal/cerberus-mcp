@@ -5,7 +5,7 @@ Tests cover:
 - SQLite CRUD operations
 - Transaction management
 - Streaming queries
-- FAISS vector operations
+- FAISS vector operations (optional - skipped if FAISS not installed)
 - Integration between SQLite and FAISS
 """
 
@@ -14,7 +14,6 @@ import numpy as np
 from pathlib import Path
 
 from cerberus.storage.sqlite_store import SQLiteIndexStore
-from cerberus.storage.faiss_store import FAISSVectorStore
 from cerberus.schemas import (
     FileObject,
     CodeSymbol,
@@ -22,6 +21,19 @@ from cerberus.schemas import (
     CallReference,
     TypeInfo,
     ImportLink,
+)
+
+# Check if FAISS is actually available (not just if the module can be imported)
+try:
+    import faiss  # Try to import faiss directly
+    FAISS_AVAILABLE = True
+except ImportError:
+    FAISS_AVAILABLE = False
+
+# Skip marker for FAISS tests
+requires_faiss = pytest.mark.skipif(
+    not FAISS_AVAILABLE,
+    reason="FAISS not installed - optional dependency for Cerberus Enterprise (install: pip install faiss-cpu)"
 )
 
 
@@ -207,8 +219,8 @@ def test_write_and_query_import_links(tmp_path):
 
     store.write_import_links_batch(import_links)
 
-    # Query by importer_file
-    result = store.query_import_links(filter={'importer_file': 'main.py'})
+    # Query by importer_file (returns Iterator, convert to list)
+    result = list(store.query_import_links(filter={'importer_file': 'main.py'}))
     assert len(result) == 1
     assert result[0].imported_symbols == ["helper", "process"]
 
@@ -380,12 +392,12 @@ def test_streaming_batch_size(tmp_path):
 @pytest.fixture
 def faiss_store(tmp_path):
     """Fixture providing a FAISS store instance."""
-    try:
-        return FAISSVectorStore(tmp_path / "faiss_index", dimension=384)
-    except ImportError:
-        pytest.skip("FAISS not installed")
+    if not FAISS_AVAILABLE:
+        pytest.skip("FAISS not installed - optional dependency for Cerberus Enterprise")
+    return FAISSVectorStore(tmp_path / "faiss_index", dimension=384)
 
 
+@requires_faiss
 def test_faiss_initialization(faiss_store):
     """Test FAISS store initialization."""
     assert faiss_store.dimension == 384
@@ -393,6 +405,7 @@ def test_faiss_initialization(faiss_store):
     assert faiss_store.faiss_path.parent.exists()
 
 
+@requires_faiss
 def test_faiss_add_vector(faiss_store):
     """Test adding a single vector."""
     vector = np.random.rand(384).astype(np.float32)
@@ -405,6 +418,7 @@ def test_faiss_add_vector(faiss_store):
     assert symbol_id in faiss_store
 
 
+@requires_faiss
 def test_faiss_add_vectors_batch(faiss_store):
     """Test batch adding vectors."""
     vectors = np.random.rand(10, 384).astype(np.float32)
@@ -417,6 +431,7 @@ def test_faiss_add_vectors_batch(faiss_store):
     assert len(faiss_store) == 10
 
 
+@requires_faiss
 def test_faiss_vector_normalization(faiss_store):
     """Test that vectors are L2-normalized for cosine similarity."""
     # Create a non-normalized vector
@@ -434,6 +449,7 @@ def test_faiss_vector_normalization(faiss_store):
     assert scores[0] == pytest.approx(1.0, abs=0.01)
 
 
+@requires_faiss
 def test_faiss_search(faiss_store):
     """Test vector similarity search."""
     # Add 5 vectors
@@ -450,6 +466,7 @@ def test_faiss_search(faiss_store):
     assert scores[0] == pytest.approx(1.0, abs=0.01)  # Perfect cosine similarity
 
 
+@requires_faiss
 def test_faiss_search_empty_index(faiss_store):
     """Test search on empty index."""
     query = np.random.rand(384).astype(np.float32)
@@ -459,6 +476,7 @@ def test_faiss_search_empty_index(faiss_store):
     assert len(faiss_ids) == 0
 
 
+@requires_faiss
 def test_faiss_remove_vectors(faiss_store):
     """Test removing vectors (requires index rebuild)."""
     # Add 5 vectors
@@ -482,6 +500,7 @@ def test_faiss_remove_vectors(faiss_store):
     assert 5 in faiss_store  # symbol_id 5 (faiss_id 4) still exists
 
 
+@requires_faiss
 def test_faiss_save_and_load(tmp_path):
     """Test persistence of FAISS index and ID map."""
     # Create and populate store
@@ -503,6 +522,7 @@ def test_faiss_save_and_load(tmp_path):
     assert 3 in store2
 
 
+@requires_faiss
 def test_faiss_get_symbol_id(faiss_store):
     """Test reverse lookup from faiss_id to symbol_id."""
     symbol_ids = [10, 20, 30]
@@ -519,6 +539,7 @@ def test_faiss_get_symbol_id(faiss_store):
         faiss_store.get_symbol_id(999)
 
 
+@requires_faiss
 def test_faiss_get_stats(faiss_store):
     """Test stats reporting."""
     vectors = np.random.rand(10, 384).astype(np.float32)
@@ -534,6 +555,7 @@ def test_faiss_get_stats(faiss_store):
     assert stats['id_map_size_bytes'] >= 0
 
 
+@requires_faiss
 def test_faiss_clear(faiss_store):
     """Test clearing all vectors."""
     vectors = np.random.rand(5, 384).astype(np.float32)
@@ -550,6 +572,7 @@ def test_faiss_clear(faiss_store):
 
 # ========== Integration Tests ==========
 
+@requires_faiss
 def test_sqlite_faiss_integration(tmp_path):
     """Test integration between SQLite and FAISS for embeddings."""
     # Create stores
@@ -606,6 +629,7 @@ def test_sqlite_faiss_integration(tmp_path):
     assert matched_symbol.name == "func_0"
 
 
+@requires_faiss
 def test_delete_file_with_embeddings(tmp_path):
     """Test that deleting a file also removes embedding metadata."""
     sqlite_store = SQLiteIndexStore(tmp_path / "test.db")

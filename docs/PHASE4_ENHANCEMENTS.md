@@ -41,14 +41,14 @@ Enable automatic watcher startup when running `cerberus index` command.
 
 **Current Behavior:**
 ```bash
-cerberus index ./project -o index.json
+cerberus index ./project -o project.db
 # Watcher must be started manually
 cerberus watcher start
 ```
 
 **Desired Behavior:**
 ```bash
-cerberus index ./project -o index.json --watch
+cerberus index ./project -o project.db --watch
 # Watcher auto-starts in background
 ```
 

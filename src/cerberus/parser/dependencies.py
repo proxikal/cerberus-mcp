@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from typing import List
 
-from cerberus.schemas import CallReference, ImportReference, ImportLink
+from cerberus.schemas import CallReference, ImportReference, ImportLink, MethodCall
 
 # Basic regex patterns for imports and calls. These are intentionally lightweight to keep context small.
 PY_IMPORT_RE = re.compile(r"^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0-9_.]+))", re.MULTILINE)
@@ -16,6 +16,14 @@ PY_IMPORT_AS = re.compile(r"^\s*import\s+([A-Za-z0-9_.]+)(?:\s+as\s+([A-Za-z_][A
 TS_NAMED_IMPORTS = re.compile(r"^\s*import\s+\{([^}]+)\}\s+from\s+['\"]([^'\"]+)['\"]", re.MULTILINE)
 TS_DEFAULT_IMPORT = re.compile(r"^\s*import\s+([A-Za-z_][A-Za-z0-9_]*)\s+from\s+['\"]([^'\"]+)['\"]", re.MULTILINE)
 GO_IMPORT_ALIAS = re.compile(r'^\s*import\s+(?:([A-Za-z_][A-Za-z0-9_]*)\s+)?"([^"]+)"', re.MULTILINE)
+
+# Phase 5.1: Method call extraction patterns
+# Matches: obj.method(), self.method(), instance.attr.method(), etc.
+# Captures receiver (everything before last dot) and method name
+METHOD_CALL_RE = re.compile(
+    r"(?P<receiver>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\.(?P<method>[A-Za-z_][A-Za-z0-9_]*)\s*\(",
+    re.MULTILINE
+)
 
 
 def extract_imports(file_path: Path, content: str) -> List[ImportReference]:
@@ -152,3 +160,49 @@ def extract_import_links(file_path: Path, content: str) -> List[ImportLink]:
             ))
 
     return import_links
+
+
+def extract_method_calls(file_path: Path, content: str) -> List[MethodCall]:
+    """
+    Extract method calls with receiver information.
+
+    Phase 5.1: Method Call Extraction.
+
+    Captures patterns like:
+    - obj.method()
+    - self.method()
+    - instance.attr.method()  (chained)
+    - module.Class.method()
+
+    Args:
+        file_path: Path to the file.
+        content: File content as string.
+
+    Returns:
+        List of MethodCall objects with receiver and method information.
+    """
+    method_calls: List[MethodCall] = []
+    file_str = str(file_path)
+
+    # Process line by line to get accurate line numbers
+    lines = content.splitlines()
+    for line_idx, line in enumerate(lines, start=1):
+        # Skip definition/signature lines (same as extract_calls)
+        if re.match(r"\s*(def |class |interface |enum |export |func )", line):
+            continue
+
+        # Find all method calls on this line
+        for match in METHOD_CALL_RE.finditer(line):
+            receiver = match.group("receiver")
+            method = match.group("method")
+
+            # For chained calls like "obj.attr.method()", we want just the immediate receiver
+            # For now, keep the full chain as receiver
+            method_calls.append(MethodCall(
+                caller_file=file_str,
+                line=line_idx,
+                receiver=receiver,
+                method=method,
+            ))
+
+    return method_calls

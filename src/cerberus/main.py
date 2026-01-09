@@ -126,7 +126,7 @@ def index(
         ".", help="The directory to index.", exists=True, file_okay=False, readable=True
     ),
     output: Path = typer.Option(
-        "cerberus_index.json", "--output", "-o", help="Path to save the index file."
+        "cerberus.db", "--output", "-o", help="Path to save the index file."
     ),
     no_gitignore: bool = typer.Option(
         False, "--no-gitignore", help="Do not respect .gitignore files."
@@ -151,7 +151,7 @@ def index(
     ),
 ):
     """
-    Runs a scan and writes the results to a JSON index.
+    Runs a scan and writes the results to a SQLite index.
     """
     respect_gitignore = not no_gitignore
     scan_result = build_index(
@@ -180,7 +180,7 @@ def index(
 @app.command()
 def stats(
     index_path: Path = typer.Option(
-        "cerberus_index.json",
+        "cerberus.db",
         "--index",
         "-i",
         help="Path to a previously generated index file.",
@@ -231,7 +231,7 @@ def stats(
 def get_symbol(
     name: str = typer.Argument(..., help="Name of the symbol to retrieve."),
     index_path: Path = typer.Option(
-        "cerberus_index.json",
+        "cerberus.db",
         "--index",
         "-i",
         help="Path to a previously generated index file.",
@@ -344,7 +344,7 @@ def get_symbol(
 def search(
     query: str = typer.Argument(..., help="Search query (keyword or natural language)."),
     index_path: Path = typer.Option(
-        "cerberus_index.json",
+        "cerberus.db",
         "--index",
         "-i",
         help="Path to a previously generated index file.",
@@ -497,7 +497,7 @@ def bench(
         "example", "--query", "-q", help="Query to use for semantic search benchmark."
     ),
     output: Path = typer.Option(
-        "cerberus_index.json",
+        "cerberus.db",
         "--output",
         "-o",
         help="Path to write/read the benchmark index.",
@@ -566,7 +566,7 @@ def deps(
     recursive: bool = typer.Option(False, "--recursive", "-r", help="Build recursive call graph for symbol (requires --symbol)."),
     depth: int = typer.Option(3, "--depth", "-d", help="Maximum depth for recursive call graph (default: 3)."),
     index_path: Path = typer.Option(
-        "cerberus_index.json",
+        "cerberus.db",
         "--index",
         "-i",
         help="Path to a previously generated index file.",
@@ -684,7 +684,7 @@ def skeletonize_cmd(
 def get_context(
     symbol_name: str = typer.Argument(..., help="Symbol name to get context for."),
     index_path: Path = typer.Option(
-        "cerberus_index.json",
+        "cerberus.db",
         "--index",
         "-i",
         help="Path to index file.",
@@ -845,7 +845,7 @@ def summarize(
 @app.command("update")
 def update(
     index_path: Path = typer.Option(
-        "cerberus_index.json",
+        "cerberus.db",
         "--index",
         "-i",
         help="Path to index file to update.",
@@ -990,7 +990,7 @@ def watcher_cmd(
         help="Path to project (default: current directory).",
     ),
     index_path: Path = typer.Option(
-        "cerberus_index.json",
+        "cerberus.db",
         "--index",
         "-i",
         help="Path to index file.",

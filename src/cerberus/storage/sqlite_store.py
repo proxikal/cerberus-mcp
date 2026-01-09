@@ -21,6 +21,8 @@ from cerberus.schemas import (
     FileObject,
     ImportLink,
     ImportReference,
+    MethodCall,
+    SymbolReference,
     TypeInfo,
 )
 
@@ -138,6 +140,45 @@ CREATE INDEX IF NOT EXISTS idx_import_links_importer ON import_links(importer_fi
 CREATE INDEX IF NOT EXISTS idx_import_links_module ON import_links(imported_module);
 CREATE INDEX IF NOT EXISTS idx_import_links_definition ON import_links(definition_file, definition_symbol)
     WHERE definition_file IS NOT NULL;
+
+-- Phase 5.1: Method calls table
+CREATE TABLE IF NOT EXISTS method_calls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    caller_file TEXT NOT NULL,
+    line INTEGER NOT NULL,
+    receiver TEXT NOT NULL,
+    method TEXT NOT NULL,
+    receiver_type TEXT,
+
+    FOREIGN KEY (caller_file) REFERENCES files(path) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_method_calls_file ON method_calls(caller_file);
+CREATE INDEX IF NOT EXISTS idx_method_calls_receiver ON method_calls(receiver);
+CREATE INDEX IF NOT EXISTS idx_method_calls_method ON method_calls(method);
+CREATE INDEX IF NOT EXISTS idx_method_calls_location ON method_calls(caller_file, line);
+
+-- Phase 5.2+: Symbol references table
+CREATE TABLE IF NOT EXISTS symbol_references (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_file TEXT NOT NULL,
+    source_line INTEGER NOT NULL,
+    source_symbol TEXT NOT NULL,
+    reference_type TEXT NOT NULL CHECK(reference_type IN ('method_call', 'instance_of', 'inherits', 'type_annotation', 'return_type')),
+    target_file TEXT,
+    target_symbol TEXT,
+    target_type TEXT,
+    confidence REAL DEFAULT 1.0,
+    resolution_method TEXT,
+
+    FOREIGN KEY (source_file) REFERENCES files(path) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_symbol_refs_source ON symbol_references(source_file, source_line);
+CREATE INDEX IF NOT EXISTS idx_symbol_refs_target ON symbol_references(target_file, target_symbol)
+    WHERE target_file IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_symbol_refs_type ON symbol_references(reference_type);
+CREATE INDEX IF NOT EXISTS idx_symbol_refs_source_symbol ON symbol_references(source_symbol);
 
 -- Metadata table
 CREATE TABLE IF NOT EXISTS metadata (
@@ -410,6 +451,62 @@ class SQLiteIndexStore:
             if not conn:
                 _conn.close()
 
+    def write_method_calls_batch(self, method_calls: List[MethodCall], conn: Optional[sqlite3.Connection] = None):
+        """
+        Batch write method calls (Phase 5.1).
+
+        Args:
+            method_calls: List of MethodCall objects
+            conn: Optional connection from transaction context
+        """
+        if not method_calls:
+            return
+
+        _conn = conn or self._get_connection()
+        try:
+            _conn.executemany("""
+                INSERT INTO method_calls (caller_file, line, receiver, method, receiver_type)
+                VALUES (?, ?, ?, ?, ?)
+            """, [(mc.caller_file, mc.line, mc.receiver, mc.method, mc.receiver_type)
+                  for mc in method_calls])
+
+            if not conn:
+                _conn.commit()
+                logger.debug(f"Wrote {len(method_calls)} method_calls")
+        finally:
+            if not conn:
+                _conn.close()
+
+    def write_symbol_references_batch(self, refs: List[SymbolReference], conn: Optional[sqlite3.Connection] = None):
+        """
+        Batch write symbol references (Phase 5.2+).
+
+        Args:
+            refs: List of SymbolReference objects
+            conn: Optional connection from transaction context
+        """
+        if not refs:
+            return
+
+        _conn = conn or self._get_connection()
+        try:
+            _conn.executemany("""
+                INSERT INTO symbol_references (source_file, source_line, source_symbol,
+                                              reference_type, target_file, target_symbol,
+                                              target_type, confidence, resolution_method)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [(ref.source_file, ref.source_line, ref.source_symbol,
+                   ref.reference_type, ref.target_file, ref.target_symbol,
+                   ref.target_type, ref.confidence, ref.resolution_method)
+                  for ref in refs])
+
+            if not conn:
+                _conn.commit()
+                logger.debug(f"Wrote {len(refs)} symbol_references")
+        finally:
+            if not conn:
+                _conn.close()
+
     def write_embedding_metadata(
         self,
         symbol_id: int,
@@ -556,33 +653,45 @@ class SQLiteIndexStore:
         finally:
             conn.close()
 
-    def query_import_links(self, filter: Dict[str, Any]) -> List[ImportLink]:
+    def query_import_links(self, filter: Optional[Dict[str, Any]] = None, batch_size: int = 100) -> Iterator[ImportLink]:
         """
-        Query import links (typically small result sets).
+        Stream import links with optional filtering.
+
+        Phase 5.2: Updated to support streaming all import links for resolution.
 
         Args:
-            filter: Dict with 'importer_file' key
+            filter: Optional dict with 'importer_file' key for filtering
+            batch_size: Rows per iteration (for streaming)
 
-        Returns:
-            List of ImportLink objects
+        Yields:
+            ImportLink objects
         """
         conn = self._get_connection()
         try:
-            query = "SELECT * FROM import_links WHERE importer_file = ?"
-            cursor = conn.execute(query, (filter['importer_file'],))
+            if filter and 'importer_file' in filter:
+                query = "SELECT * FROM import_links WHERE importer_file = ?"
+                params = (filter['importer_file'],)
+            else:
+                # Query all import links (for resolution)
+                query = "SELECT * FROM import_links"
+                params = ()
 
-            results = []
-            for row in cursor:
-                results.append(ImportLink(
-                    importer_file=row['importer_file'],
-                    imported_module=row['imported_module'],
-                    imported_symbols=json.loads(row['imported_symbols']),
-                    import_line=row['import_line'],
-                    definition_file=row['definition_file'],
-                    definition_symbol=row['definition_symbol'],
-                ))
+            cursor = conn.execute(query, params)
 
-            return results
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+
+                for row in rows:
+                    yield ImportLink(
+                        importer_file=row['importer_file'],
+                        imported_module=row['imported_module'],
+                        imported_symbols=json.loads(row['imported_symbols']),
+                        import_line=row['import_line'],
+                        definition_file=row['definition_file'],
+                        definition_symbol=row['definition_symbol'],
+                    )
         finally:
             conn.close()
 
@@ -614,6 +723,103 @@ class SQLiteIndexStore:
                         caller_file=row['caller_file'],
                         callee=row['callee'],
                         line=row['line']
+                    )
+        finally:
+            conn.close()
+
+    def query_method_calls(self, batch_size: int = 100) -> Iterator[MethodCall]:
+        """
+        Stream all method calls (Phase 5.3).
+
+        Args:
+            batch_size: Rows per iteration
+
+        Yields:
+            MethodCall objects
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM method_calls ORDER BY caller_file, line")
+
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+
+                for row in rows:
+                    yield MethodCall(
+                        caller_file=row['caller_file'],
+                        line=row['line'],
+                        receiver=row['receiver'],
+                        method=row['method'],
+                        receiver_type=row['receiver_type'],
+                    )
+        finally:
+            conn.close()
+
+    def query_type_infos(self, batch_size: int = 100) -> Iterator[TypeInfo]:
+        """
+        Stream all type infos (Phase 5.3).
+
+        Args:
+            batch_size: Rows per iteration
+
+        Yields:
+            TypeInfo objects
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("SELECT * FROM type_infos ORDER BY file_path, line")
+
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+
+                for row in rows:
+                    yield TypeInfo(
+                        name=row['name'],
+                        type_annotation=row['type_annotation'],
+                        inferred_type=row['inferred_type'],
+                        file_path=row['file_path'],
+                        line=row['line'],
+                    )
+        finally:
+            conn.close()
+
+    def query_symbol_references(self, batch_size: int = 100) -> Iterator[SymbolReference]:
+        """
+        Stream all symbol references (Phase 5.3).
+
+        Args:
+            batch_size: Rows per iteration
+
+        Yields:
+            SymbolReference objects
+        """
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute("""
+                SELECT * FROM symbol_references
+                ORDER BY source_file, source_line
+            """)
+
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+
+                for row in rows:
+                    yield SymbolReference(
+                        source_file=row['source_file'],
+                        source_line=row['source_line'],
+                        source_symbol=row['source_symbol'],
+                        reference_type=row['reference_type'],
+                        target_file=row['target_file'],
+                        target_symbol=row['target_symbol'],
+                        target_type=row['target_type'],
+                        confidence=row['confidence'],
+                        resolution_method=row['resolution_method'],
                     )
         finally:
             conn.close()

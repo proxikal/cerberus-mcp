@@ -99,7 +99,7 @@ def hybrid_search(
             padding=padding,
         )
     else:
-        logger.info("Using legacy in-memory search path (JSON index)")
+        logger.info("Using legacy in-memory search path (Legacy memory-load index)")
         return _hybrid_search_legacy(
             query=query,
             scan_result=scan_result,

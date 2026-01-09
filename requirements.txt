@@ -23,4 +23,7 @@ rank-bm25>=0.2.2  # BM25 keyword search for hybrid retrieval
 psutil>=5.9.0  # Process management for daemon
 
 # Phase 4: Aegis-Scale Performance (SQLite + FAISS)
-faiss-cpu>=1.7.4  # Vector similarity search for embeddings (use faiss-gpu for production)
+# Note: FAISS is OPTIONAL for Cerberus Light (small-medium projects)
+# For Cerberus Enterprise (10K+ files), install with:
+#   pip install faiss-cpu>=1.7.4  # CPU version
+#   pip install faiss-gpu>=1.7.4  # GPU version (production)

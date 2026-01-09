@@ -8,7 +8,7 @@ import pathspec
 from cerberus.logging_config import logger
 from cerberus.tracing import trace
 from cerberus.parser import parse_file
-from cerberus.parser.dependencies import extract_imports, extract_calls, extract_import_links
+from cerberus.parser.dependencies import extract_imports, extract_calls, extract_import_links, extract_method_calls
 from cerberus.parser.type_resolver import extract_types_from_file
 from cerberus.schemas import CallReference, CodeSymbol, FileObject, ImportReference, ScanResult, TypeInfo, ImportLink
 from .config import DEFAULT_IGNORE_PATTERNS
@@ -71,6 +71,7 @@ def scan(
     calls: List[CallReference] = []
     type_infos: List[TypeInfo] = []
     import_links: List[ImportLink] = []
+    method_calls = []  # Phase 5.1
     
     # Use a set for faster extension checking
     allowed_extensions = set(extensions) if extensions else None
@@ -139,6 +140,8 @@ def scan(
                 # Phase 1: Extract type information and import links
                 type_infos.extend(extract_types_from_file(file_path, content))
                 import_links.extend(extract_import_links(file_path, content))
+                # Phase 5.1: Extract method calls
+                method_calls.extend(extract_method_calls(file_path, content))
             except (IOError, OSError, FileNotFoundError) as e:
                 logger.warning(f"Could not access metadata for '{file_path}'. Skipping. Error: {e}")
                 
@@ -154,6 +157,7 @@ def scan(
         calls=calls,
         type_infos=type_infos,
         import_links=import_links,
+        method_calls=method_calls,  # Phase 5.1
     )
     
     logger.info(f"Scan complete. Found {scan_result.total_files} files in {scan_duration:.2f} seconds.")

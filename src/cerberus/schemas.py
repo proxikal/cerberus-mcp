@@ -73,6 +73,9 @@ class ScanResult(BaseModel):
     type_infos: List["TypeInfo"] = Field(default_factory=list)
     # Phase 1.3: Import linkage
     import_links: List["ImportLink"] = Field(default_factory=list)
+    # Phase 5: Symbolic intelligence
+    method_calls: List["MethodCall"] = Field(default_factory=list)
+    symbol_references: List["SymbolReference"] = Field(default_factory=list)
     # Phase 3: Metadata (git commit, etc.)
     project_root: str = ""  # Root path of project
     metadata: Dict[str, Any] = Field(default_factory=dict)  # Additional metadata (git_commit, etc.)
@@ -258,3 +261,33 @@ class HybridSearchResult(BaseModel):
     hybrid_score: float  # Combined score (0-1)
     rank: int  # Final ranking position
     match_type: Literal["keyword", "semantic", "both"]
+
+
+# Phase 5: Symbolic Intelligence Schemas
+
+class MethodCall(BaseModel):
+    """
+    Represents a method call on an object/instance.
+    Phase 5.1: Extract method calls with receiver information.
+    """
+    caller_file: str  # File containing the call
+    line: int  # Line number of the call
+    receiver: str  # Object/variable name (e.g., 'optimizer')
+    method: str  # Method name (e.g., 'step')
+    receiver_type: Optional[str] = None  # Resolved class name (populated later)
+
+
+class SymbolReference(BaseModel):
+    """
+    Represents a resolved reference from a symbol usage to its definition.
+    Phase 5.2+: Track instance→definition relationships.
+    """
+    source_file: str  # File containing the reference
+    source_line: int  # Line of the reference
+    source_symbol: str  # Variable/receiver name
+    reference_type: Literal["method_call", "instance_of", "inherits", "type_annotation", "return_type"]
+    target_file: Optional[str] = None  # Resolved definition file
+    target_symbol: Optional[str] = None  # Resolved symbol name
+    target_type: Optional[str] = None  # Class/type name
+    confidence: float = 1.0  # Resolution confidence (0.0-1.0)
+    resolution_method: Optional[str] = None  # How it was resolved: "import_trace", "type_annotation", "inference"

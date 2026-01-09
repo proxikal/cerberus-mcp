@@ -14,9 +14,9 @@ import pathspec
 
 from cerberus.logging_config import logger
 from cerberus.parser import parse_file
-from cerberus.parser.dependencies import extract_imports, extract_calls, extract_import_links
+from cerberus.parser.dependencies import extract_imports, extract_calls, extract_import_links, extract_method_calls
 from cerberus.parser.type_resolver import extract_types_from_file
-from cerberus.schemas import CallReference, CodeSymbol, FileObject, ImportReference, TypeInfo, ImportLink
+from cerberus.schemas import CallReference, CodeSymbol, FileObject, ImportReference, TypeInfo, ImportLink, MethodCall
 from .config import DEFAULT_IGNORE_PATTERNS
 
 
@@ -29,6 +29,7 @@ class FileResult:
     calls: List[CallReference]
     type_infos: List[TypeInfo]
     import_links: List[ImportLink]
+    method_calls: List[MethodCall]  # Phase 5.1
 
 
 def scan_files_streaming(
@@ -148,6 +149,7 @@ def scan_files_streaming(
                 calls = extract_calls(file_path, content)
                 type_infos = extract_types_from_file(file_path, content)
                 import_links = extract_import_links(file_path, content)
+                method_calls = extract_method_calls(file_path, content)  # Phase 5.1
 
                 # Normalize file paths in related data
                 for imp in imports:
@@ -158,6 +160,8 @@ def scan_files_streaming(
                     ti.file_path = str(relative_path)
                 for link in import_links:
                     link.importer_file = str(relative_path)
+                for mc in method_calls:  # Phase 5.1
+                    mc.caller_file = str(relative_path)
 
                 # Yield result immediately (no accumulation!)
                 yield FileResult(
@@ -167,6 +171,7 @@ def scan_files_streaming(
                     calls=calls,
                     type_infos=type_infos,
                     import_links=import_links,
+                    method_calls=method_calls,  # Phase 5.1
                 )
 
                 file_count += 1

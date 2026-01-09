@@ -10,6 +10,18 @@ from pathlib import Path
 from cerberus.index import build_index, load_index
 from cerberus.storage import ScanResultAdapter, SQLiteIndexStore
 
+# Check if FAISS is actually available (not just if the module can be imported)
+try:
+    import faiss  # Try to import faiss directly
+    FAISS_AVAILABLE = True
+except ImportError:
+    FAISS_AVAILABLE = False
+
+requires_faiss = pytest.mark.skipif(
+    not FAISS_AVAILABLE,
+    reason="FAISS not installed - optional dependency for Cerberus Enterprise (install: pip install faiss-cpu)"
+)
+
 
 def test_build_sqlite_index(tmp_path):
     """Test building a SQLite index from demo directory."""
@@ -65,6 +77,7 @@ def test_load_sqlite_index(tmp_path):
     assert len(result.symbols) > 0
 
 
+@requires_faiss
 def test_sqlite_index_with_embeddings(tmp_path):
     """Test building SQLite index with FAISS embeddings."""
     demo_dir = Path(__file__).parent.parent / "demo"

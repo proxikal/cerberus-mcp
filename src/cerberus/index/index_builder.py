@@ -31,7 +31,7 @@ def build_index(
     Run a scan and persist the results to an index.
 
     Automatically detects output format:
-    - .json extension -> Legacy JSON format (full memory load)
+    - .json extension -> Legacy format (full memory load)
     - Directory or .db -> SQLite + FAISS format (streaming, constant memory)
 
     Args:
@@ -105,9 +105,9 @@ def _build_json_index(
     if incremental and output_path.exists():
         try:
             previous_index = JSONIndexStore(output_path).read()
-            logger.info(f"Loaded previous JSON index for incremental scan")
+            logger.info(f"Loaded previous legacy index for incremental scan")
         except Exception as exc:
-            logger.warning(f"Could not load previous JSON index: {exc}")
+            logger.warning(f"Could not load previous legacy index: {exc}")
 
     scan_result = scan(
         directory,
@@ -184,6 +184,7 @@ def _build_sqlite_index(
     call_batch = []
     type_info_batch = []
     import_link_batch = []
+    method_call_batch = []  # Phase 5.1
 
     BATCH_SIZE = 100  # Process 100 files at a time for optimal performance
 
@@ -204,6 +205,7 @@ def _build_sqlite_index(
         call_batch.extend(file_result.calls)
         type_info_batch.extend(file_result.type_infos)
         import_link_batch.extend(file_result.import_links)
+        method_call_batch.extend(file_result.method_calls)  # Phase 5.1
 
         total_files += 1
 
@@ -218,6 +220,7 @@ def _build_sqlite_index(
                 call_batch=call_batch,
                 type_info_batch=type_info_batch,
                 import_link_batch=import_link_batch,
+                method_call_batch=method_call_batch,  # Phase 5.1
                 store_embeddings=store_embeddings,
                 padding=padding,
                 model_name=model_name,
@@ -232,6 +235,7 @@ def _build_sqlite_index(
             call_batch.clear()
             type_info_batch.clear()
             import_link_batch.clear()
+            method_call_batch.clear()  # Phase 5.1
 
             if total_files % 500 == 0:
                 logger.info(f"Progress: {total_files} files, {total_symbols} symbols written")
@@ -247,6 +251,7 @@ def _build_sqlite_index(
             call_batch=call_batch,
             type_info_batch=type_info_batch,
             import_link_batch=import_link_batch,
+            method_call_batch=method_call_batch,  # Phase 5.1
             store_embeddings=store_embeddings,
             padding=padding,
             model_name=model_name,
@@ -274,6 +279,24 @@ def _build_sqlite_index(
 
     logger.info(f"SQLite streaming index complete: {total_files} files, {total_symbols} symbols in {scan_duration:.2f}s")
 
+    # Phase 5.2: Post-processing - Import resolution
+    try:
+        from ..resolution import resolve_imports
+        resolved_count = resolve_imports(sqlite_store, project_root)
+        logger.info(f"Phase 5.2: Resolved {resolved_count} import links")
+    except Exception as e:
+        logger.warning(f"Phase 5.2: Import resolution failed: {e}")
+        # Continue anyway - resolution is optional enhancement
+
+    # Phase 5.3: Post-processing - Type tracking and method resolution
+    try:
+        from ..resolution import resolve_types
+        reference_count = resolve_types(sqlite_store)
+        logger.info(f"Phase 5.3: Created {reference_count} symbol references")
+    except Exception as e:
+        logger.warning(f"Phase 5.3: Type tracking failed: {e}")
+        # Continue anyway - resolution is optional enhancement
+
     # Return adapter
     return ScanResultAdapter(sqlite_store)
 
@@ -287,6 +310,7 @@ def _write_batch_to_sqlite(
     call_batch: List,
     type_info_batch: List,
     import_link_batch: List,
+    method_call_batch: List,  # Phase 5.1
     store_embeddings: bool,
     padding: int,
     model_name: str,
@@ -313,6 +337,8 @@ def _write_batch_to_sqlite(
             sqlite_store.write_type_infos_batch(type_info_batch, conn=conn)
         if import_link_batch:
             sqlite_store.write_import_links_batch(import_link_batch, conn=conn)
+        if method_call_batch:  # Phase 5.1
+            sqlite_store.write_method_calls_batch(method_call_batch, conn=conn)
 
         # Generate and store embeddings
         if store_embeddings and faiss_store is not None and symbol_batch:

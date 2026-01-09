@@ -17,6 +17,6 @@ def test_bench_json(tmp_path):
     )
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["files_indexed"] == 5
+    assert payload["files_indexed"] == 8  # Updated for Phase 5
     assert payload["symbols_indexed"] >= 13
     assert payload["total_duration"] >= payload["index_duration"]

@@ -55,6 +55,6 @@ def load_index(index_path: Path) -> Union[ScanResult, ScanResultAdapter]:
         return ScanResultAdapter(store)
     else:
         # Legacy JSON format - full load
-        logger.info(f"Loading JSON index from {index_path}")
+        logger.info(f"Loading legacy index from {index_path}")
         store = JSONIndexStore(index_path)
         return store.read()

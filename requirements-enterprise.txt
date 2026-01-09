@@ -1,0 +1,11 @@
+# Cerberus Enterprise Dependencies
+# Install with: pip install -r requirements.txt -r requirements-enterprise.txt
+
+# FAISS for production-scale vector search (10K+ files)
+# Choose ONE of the following:
+
+# CPU version (works everywhere)
+faiss-cpu>=1.7.4
+
+# GPU version (requires CUDA, faster for large-scale deployments)
+# faiss-gpu>=1.7.4

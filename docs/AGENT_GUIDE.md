@@ -42,16 +42,16 @@ cerberus deps --symbol "handle_request" --json
 Use `update` to keep your index fresh without full reparse (10x faster).
 ```bash
 # Update index based on git changes
-cerberus update --index my_index.json --json
+cerberus update --index project.db --json
 
 # Show what would be updated (dry-run)
-cerberus update --index my_index.json --dry-run --json
+cerberus update --index project.db --dry-run --json
 
 # Update with detailed statistics
-cerberus update --index my_index.json --stats --json
+cerberus update --index project.db --stats --json
 
 # Force full reparse if needed
-cerberus update --index my_index.json --full --json
+cerberus update --index project.db --full --json
 ```
 
 ### 👁️ Background Watcher
@@ -61,13 +61,10 @@ Use `watcher` to auto-sync index with filesystem changes.
 cerberus watcher status --json
 
 # Start watcher daemon
-cerberus watcher start --project ./my-project --index my_index.json --json
+cerberus watcher start --project ./my-project --index project.db --json
 
 # Stop watcher daemon
 cerberus watcher stop --json
-
-# View watcher logs
-cerberus watcher logs --follow
 ```
 
 ## Integration Instructions

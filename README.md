@@ -3,8 +3,8 @@
 **Cerberus** is an intelligent "Context Management Layer" that bridges the gap between autonomous AI agents and massive software engineering projects. It solves the **"Context Wall"** problem by pre-processing, indexing, and serving only the most relevant, compacted context to agents on-demand.
 
 [![Status: Production](https://img.shields.io/badge/status-production-green.svg)](#)
-[![Tests: 34/34 Passing](https://img.shields.io/badge/tests-34%2F34%20passing-brightgreen.svg)](#)
-[![Phase: 3 Complete](https://img.shields.io/badge/phase-3%20complete-blue.svg)](#)
+[![Tests: 146/156 Passing](https://img.shields.io/badge/tests-146%2F156%20passing-brightgreen.svg)](#)
+[![Phase: 5 Complete](https://img.shields.io/badge/phase-5%20complete-blue.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#)
 
 ---
@@ -186,20 +186,46 @@ See [PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md) for detailed ba
 git clone https://github.com/proxikal/Cerberus.git
 cd Cerberus
 
-# Install Python dependencies
+# Install Python dependencies (Cerberus Light)
 pip install -r requirements.txt
 
 # Verify installation
 PYTHONPATH=src python3 -m cerberus.main version
 ```
 
-### Dependencies
+### Cerberus Light vs. Enterprise
+
+**Cerberus Light** (Default - No FAISS)
+- Perfect for small-medium projects (100-1,000 files)
+- Zero heavy dependencies (no C++ compilation)
+- In-memory vector search with numpy
+- Fast installation and setup
+
+**Cerberus Enterprise** (Optional FAISS)
+- For massive codebases (10,000+ files like TensorFlow)
+- Install FAISS for production-scale performance:
+  ```bash
+  pip install -r requirements-enterprise.txt
+  # or: pip install faiss-cpu>=1.7.4
+  ```
+- Streaming FAISS queries with constant memory
+- 42.6x memory reduction vs. in-memory approach
+
+**When to use Enterprise:**
+- Codebases with 10,000+ files
+- Production deployments requiring constant memory
+- Large-scale semantic search operations
+
+### Core Dependencies
 - `tree-sitter` - AST parsing
 - `sentence-transformers` - Semantic embeddings
 - `rank-bm25` - Keyword search
 - `watchdog` - Filesystem monitoring
 - `typer` - CLI framework
 - `pydantic` - Schema validation
+
+### Optional Dependencies
+- `faiss-cpu` - Vector search for enterprise scale (install separately)
 
 ---
 
@@ -209,18 +235,18 @@ PYTHONPATH=src python3 -m cerberus.main version
 
 ```bash
 # Basic indexing
-cerberus index ./path/to/project -o my_index.json
+cerberus index ./path/to/project -o project.db
 
 # With file type filters
-cerberus index ./src --ext .py --ext .ts -o index.json
+cerberus index ./src --ext .py --ext .ts -o project.db
 
 # JSON output for automation
-cerberus index ./project -o index.json --json
+cerberus index ./project -o project.db --json
 ```
 
 **Output:**
 ```
-Indexed 428 files and 1199 symbols to my_index.json.
+Indexed 428 files and 1199 symbols to project.db.
 ```
 
 ### 2. Search for Code
@@ -273,16 +299,16 @@ cerberus get-symbol "verify_token" --json
 
 ```bash
 # Update index after code changes (git-aware)
-cerberus update --index my_index.json
+cerberus update --index project.db
 
 # Dry-run (show what would change)
-cerberus update --index my_index.json --dry-run
+cerberus update --index project.db --dry-run
 
 # With detailed statistics
-cerberus update --index my_index.json --stats
+cerberus update --index project.db --stats
 
 # Force full reparse
-cerberus update --index my_index.json --full
+cerberus update --index project.db --full
 ```
 
 **Output:**
@@ -305,7 +331,7 @@ Updating index incrementally...
 cerberus watcher status
 
 # Start watching (real-time sync)
-cerberus watcher start --project ./my-project --index my_index.json
+cerberus watcher start --project ./my-project --index project.db
 
 # View logs
 cerberus watcher logs --follow
@@ -318,7 +344,7 @@ cerberus watcher stop
 ```
 ✅ Watcher running (PID: 12345)
    Watching: /Users/dev/my-project
-   Index: my_index.json
+   Index: project.db
    Uptime: 2h 34m
    Last update: 45s ago
    Events processed: 127
@@ -327,13 +353,13 @@ cerberus watcher stop
 ### 6. View Statistics
 
 ```bash
-cerberus stats --index my_index.json
+cerberus stats --index project.db
 ```
 
 **Output:**
 ```
        Index Stats for
-    'my_index.json'
+    'project.db'
 ┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
 ┃ Metric            ┃ Value ┃
 ┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
@@ -539,7 +565,7 @@ Agent prompt: "Fix the authentication bug"
 ### 1. Code Review Agents
 ```bash
 # Agent reviews changes
-git diff main | cerberus update --index review.json --dry-run
+git diff main | cerberus update --index review.db --dry-run
 cerberus search "modified functions" --json
 # Agent gets only changed code for review
 ```
@@ -627,7 +653,7 @@ python3 compile_grammars.py
 
 **Solution:** This is a known edge case with git diff path normalization. Use `--full` flag to force full reparse:
 ```bash
-cerberus update --index my_index.json --full
+cerberus update --index project.db --full
 ```
 
 ### Issue: "Watcher not starting"
@@ -672,11 +698,23 @@ This checks:
 - Background watcher
 - Hybrid retrieval (BM25 + Vector)
 
-### 🔮 Phase 4: Integration Ecosystem (Planned)
+### ✅ Phase 4: Aegis-Scale Performance (Complete)
+- Streaming SQLite + FAISS architecture
+- 42.6x memory reduction (1.2GB → 28MB)
+- Constant memory usage under 250MB
+- 10,000+ file support validated
+
+### ✅ Phase 5: Symbolic Intelligence (Complete)
+- Method call extraction with receiver tracking
+- Import resolution to internal definitions
+- Type tracking and method→definition resolution
+- Symbol reference graph for cross-codebase navigation
+
+### 🔮 Phase 6: Advanced Context Synthesis (Planned)
 - Official agent plugins (LangChain, CrewAI, AutoGPT)
 - Web UI for visual exploration
 - Security scanning (PII/secrets detection)
-- Multi-language support (Go, Rust, Java)
+- Multi-language support enhancements
 
 See [ROADMAP.md](./docs/ROADMAP.md) and [PHASE4_ENHANCEMENTS.md](./docs/PHASE4_ENHANCEMENTS.md) for details.
 
@@ -714,15 +752,15 @@ MIT License - See LICENSE file for details.
 
 ## 📊 Project Status
 
-**Current Version:** Phase 3 Complete (v0.3.0)
+**Current Version:** Phase 5 Complete (v0.5.0)
 
 **Status:** ✅ Production Ready
 
-**Tests:** 34/34 Passing (100%)
+**Tests:** 146/156 Passing (94%)
 
-**Benchmarks:** Validated on 400+ file production project
+**Benchmarks:** Validated on TensorFlow (2,949 files, 68,934 symbols)
 
-**Next:** Phase 4 enhancements (agent plugins, web UI)
+**Next:** Phase 6 (agent plugins, web UI, security scanning)
 
 ---
 

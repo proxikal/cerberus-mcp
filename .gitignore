@@ -11,6 +11,7 @@ ENV/
 
 # Log files
 *.log
+.logs/
 
 # IDE / Editor
 .vscode/
@@ -31,3 +32,14 @@ vendor/
 node_modules/
 package.json
 package-lock.json
+
+# AI Agent Context (local only, not version controlled)
+AGENT_INSTRUCTIONS.md
+
+# Databases and test data
+*.db
+*.db-shm
+*.db-wal
+test_data/
+cerberus_agent.log
+.logs/
