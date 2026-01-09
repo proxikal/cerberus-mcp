@@ -30,7 +30,14 @@ def get_symbol_with_routing(
         List of matching CodeSymbol objects
 
     Phase 9.5: Smart routing with transparent fallback
+    Phase 10: Respect --no-daemon flag for batch optimization
     """
+    # Phase 10: Check if daemon routing is globally disabled
+    from cerberus.cli.config import CLIConfig
+    if CLIConfig.is_daemon_disabled():
+        logger.debug("Daemon routing disabled via --no-daemon flag")
+        use_daemon = False
+
     # Try daemon first if available and enabled
     if use_daemon and is_daemon_available():
         try:

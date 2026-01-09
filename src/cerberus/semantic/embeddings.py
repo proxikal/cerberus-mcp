@@ -1,14 +1,16 @@
 from functools import lru_cache
-from typing import List
+from typing import List, TYPE_CHECKING
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from cerberus.logging_config import logger
 
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
+
 
 @lru_cache(maxsize=1)
-def get_model(model_name: str = "all-MiniLM-L6-v2") -> SentenceTransformer:
+def get_model(model_name: str = "all-MiniLM-L6-v2") -> "SentenceTransformer":
     """
     Phase 7: Lazy load embedding model (400MB+) only when semantic search is used.
 
@@ -21,6 +23,9 @@ def get_model(model_name: str = "all-MiniLM-L6-v2") -> SentenceTransformer:
     Returns:
         Loaded SentenceTransformer model
     """
+    # Lazy import to avoid loading torch for commands that don't need semantic search
+    from sentence_transformers import SentenceTransformer
+
     logger.warning(
         f"Loading 400MB+ embedding model '{model_name}' into RAM. "
         "This only happens for semantic searches. Keyword searches remain < 50MB."

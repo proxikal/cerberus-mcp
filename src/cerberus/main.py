@@ -4,11 +4,10 @@ import atexit
 from pathlib import Path
 from typing import List, Optional
 
-from rich.console import Console
 from rich.table import Table
 from rich.markup import escape
 
-from cerberus.logging_config import logger
+from cerberus.logging_config import logger, setup_logging
 from cerberus.agent_session import display_session_summary, record_operation
 from cerberus.schemas import ScanResult
 from cerberus.scanner import scan as perform_scan
@@ -22,12 +21,62 @@ from cerberus.index import (
     semantic_search,
 )
 from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon
+from cerberus.cli.config import CLIConfig
+from cerberus.cli.output import get_console
 
 app = typer.Typer()
-console = Console()
+console = get_console()
 
 # Register session summary display at exit (for agent dogfooding metrics)
 atexit.register(display_session_summary)
+
+# Global CLI callback for flags that apply to all commands
+@app.callback()
+def global_options(
+    machine: bool = typer.Option(
+        False,
+        "--machine",
+        help="Enable machine mode: pure data output, no formatting (also via CERBERUS_MACHINE_MODE env var)"
+    ),
+    show_turn_savings: bool = typer.Option(
+        False,
+        "--show-turn-savings",
+        help="Show per-turn token savings metrics"
+    ),
+    show_session_savings: bool = typer.Option(
+        True,
+        "--show-session-savings/--no-show-session-savings",
+        help="Show session-total token savings metrics (default: enabled)"
+    ),
+    silent_metrics: bool = typer.Option(
+        False,
+        "--silent-metrics",
+        help="Suppress all metric output (overrides other metric flags)"
+    ),
+    no_daemon: bool = typer.Option(
+        False,
+        "--no-daemon",
+        help="[PHASE 10] Disable daemon routing, force direct execution (for batch optimization)"
+    ),
+):
+    """
+    Cerberus: Deterministic Context Layer for AI Agents
+
+    Global flags apply to all commands.
+    """
+    # Configure machine mode
+    if machine:
+        CLIConfig.set_machine_mode(True)
+        # Reconfigure logging to suppress console output in machine mode
+        setup_logging(suppress_console=True)
+
+    # Configure metrics display
+    CLIConfig.set_show_turn_savings(show_turn_savings)
+    CLIConfig.set_show_session_savings(show_session_savings)
+    CLIConfig.set_silent_metrics(silent_metrics)
+
+    # Configure daemon routing
+    CLIConfig.set_disable_daemon(no_daemon)
 
 # Register CLI submodules
 app.add_typer(daemon.app, name="daemon", help="Daemon management commands (start, stop, status, health)")

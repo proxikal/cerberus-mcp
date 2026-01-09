@@ -4,6 +4,7 @@ CLI Configuration
 Centralized configuration for the Cerberus CLI subsystem.
 """
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +21,71 @@ class CLIConfig:
     # Default context limits
     DEFAULT_MAX_DEPTH = 3
     DEFAULT_TOKEN_LIMIT = 8000
+
+    # Machine mode (Agent-optimized output)
+    _machine_mode: Optional[bool] = None
+    _show_turn_savings: bool = False
+    _show_session_savings: bool = True  # Default to session savings
+    _silent_metrics: bool = False
+
+    # Daemon routing control (Phase 10 batch optimization)
+    _disable_daemon: bool = False
+
+    @classmethod
+    def set_machine_mode(cls, enabled: bool) -> None:
+        """Set machine mode (pure data output, no presentation)"""
+        cls._machine_mode = enabled
+
+    @classmethod
+    def is_machine_mode(cls) -> bool:
+        """Check if machine mode is active (env var or explicit setting)"""
+        if cls._machine_mode is not None:
+            return cls._machine_mode
+        # Check environment variable
+        return os.getenv("CERBERUS_MACHINE_MODE", "").lower() in ("1", "true", "yes")
+
+    @classmethod
+    def set_show_turn_savings(cls, enabled: bool) -> None:
+        """Enable per-turn savings metrics"""
+        cls._show_turn_savings = enabled
+
+    @classmethod
+    def show_turn_savings(cls) -> bool:
+        """Check if per-turn savings should be displayed"""
+        return cls._show_turn_savings and not cls._silent_metrics
+
+    @classmethod
+    def set_show_session_savings(cls, enabled: bool) -> None:
+        """Enable session savings metrics"""
+        cls._show_session_savings = enabled
+
+    @classmethod
+    def show_session_savings(cls) -> bool:
+        """Check if session savings should be displayed"""
+        return cls._show_session_savings and not cls._silent_metrics
+
+    @classmethod
+    def set_silent_metrics(cls, enabled: bool) -> None:
+        """Suppress all metric output"""
+        cls._silent_metrics = enabled
+
+    @classmethod
+    def is_silent_metrics(cls) -> bool:
+        """Check if metrics are suppressed"""
+        # In machine mode, default to silent unless explicitly enabled
+        if cls.is_machine_mode():
+            return not (cls._show_turn_savings or cls._show_session_savings)
+        return cls._silent_metrics
+
+    @classmethod
+    def set_disable_daemon(cls, disabled: bool) -> None:
+        """Disable daemon routing (for batch subprocess optimization)"""
+        cls._disable_daemon = disabled
+
+    @classmethod
+    def is_daemon_disabled(cls) -> bool:
+        """Check if daemon routing is disabled"""
+        return cls._disable_daemon
 
     @staticmethod
     def get_default_index_path(cwd: Optional[Path] = None) -> Path:

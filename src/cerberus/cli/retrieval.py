@@ -23,9 +23,13 @@ from cerberus.index import (
 )
 # Phase 9.5: Thin Client Routing
 from .retrieval_routing import get_symbol_with_routing
+# Phase 10: Machine mode and structured errors
+from .output import print_error, structured_error, get_console
+from .config import CLIConfig
+from .suggestions import symbol_suggestions
 
 app = typer.Typer()
-console = Console()
+console = get_console()
 
 @app.command("get-symbol")
 def get_symbol(
@@ -77,8 +81,16 @@ def get_symbol(
     if index_path is None:
         index_path = Path("cerberus.db")
         if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            if CLIConfig.is_machine_mode():
+                error = structured_error(
+                    code="INDEX_NOT_FOUND",
+                    message="Index file 'cerberus.db' not found in current directory",
+                    actionable_fix="cerberus index ."
+                )
+                print(json.dumps(error, separators=(',', ':')))
+            else:
+                console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+                console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
             raise typer.Exit(code=1)
 
     # Phase 9.5: Load index when needed for enrichment data (calls, imports)
@@ -113,7 +125,27 @@ def get_symbol(
         raise typer.Exit(code=1)
 
     if not matches:
-        console.print(f"[red]No matches found for '{name or file}' in index '{index_path}'.[/red]")
+        if CLIConfig.is_machine_mode():
+            # Generate suggestions using fuzzy matching
+            suggestions = []
+            if name:
+                suggestions = symbol_suggestions(name, scan_result, max_suggestions=5)
+
+            error = structured_error(
+                code="SYMBOL_NOT_FOUND",
+                message=f"No matches found for '{name or file}'",
+                input_value=name or file,
+                suggestions=suggestions,
+                actionable_fix=f"cerberus get-symbol {suggestions[0]}" if suggestions else None
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print(f"[red]No matches found for '{name or file}' in index '{index_path}'.[/red]")
+            # Show suggestions in human mode too
+            if name:
+                suggestions = symbol_suggestions(name, scan_result, max_suggestions=3)
+                if suggestions:
+                    console.print(f"[dim]Did you mean: {', '.join(suggestions)}?[/dim]")
         raise typer.Exit(code=1)
 
     enriched = []

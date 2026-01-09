@@ -125,10 +125,32 @@ class SessionTracker:
             self.metrics.session_end = datetime.now().timestamp()
 
     def display_summary(self):
-        """Display beautiful session summary using Rich."""
+        """Display session summary respecting machine mode and metric configuration."""
         if not self.enabled:
             return
 
+        # Skip if no commands were used
+        if not self.metrics.commands_used:
+            return
+
+        # Import config to check machine mode and metric settings
+        from cerberus.cli.config import CLIConfig
+
+        # Check if metrics should be suppressed
+        if CLIConfig.is_silent_metrics():
+            return
+
+        total_tokens = self.metrics.get_total_tokens()
+        efficiency = self.metrics.get_efficiency_percent()
+
+        # Machine mode: minimal text output
+        if CLIConfig.is_machine_mode():
+            # Only show what's requested
+            if CLIConfig.show_session_savings():
+                print(f"[Meta] Session Saved: {self.metrics.tokens_saved:,} tokens")
+            return
+
+        # Human mode: rich output
         from rich.console import Console
         from rich.panel import Panel
         from rich.table import Table
@@ -136,19 +158,12 @@ class SessionTracker:
 
         console = Console()
 
-        # Skip if no commands were used
-        if not self.metrics.commands_used:
-            return
-
         # Create main stats table
         stats_table = Table.grid(padding=(0, 2))
         stats_table.add_column(style="cyan", justify="right")
         stats_table.add_column(style="bold white")
 
         # Tokens
-        total_tokens = self.metrics.get_total_tokens()
-        efficiency = self.metrics.get_efficiency_percent()
-
         stats_table.add_row("Tokens Read:", f"{self.metrics.tokens_read:,}")
         stats_table.add_row("Tokens Saved:", f"[green]{self.metrics.tokens_saved:,}[/green]")
         stats_table.add_row("Total Tokens (without Cerberus):", f"[dim]{total_tokens:,}[/dim]")

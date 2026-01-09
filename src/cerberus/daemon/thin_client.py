@@ -109,6 +109,7 @@ def auto_route(
         Result from daemon or fallback function
 
     Phase 9.5: Smart routing with transparent fallback
+    Phase 10: Respect --no-daemon flag for batch optimization
 
     Usage:
         result = auto_route(
@@ -117,6 +118,16 @@ def auto_route(
             fallback_fn=lambda: direct_get_symbol("MyClass"),
         )
     """
+    # Phase 10: Check if daemon routing is globally disabled
+    try:
+        from cerberus.cli.config import CLIConfig
+        if CLIConfig.is_daemon_disabled():
+            logger.debug(f"Daemon routing disabled via --no-daemon flag for {method}")
+            return fallback_fn()
+    except ImportError:
+        # CLIConfig not available in some contexts (e.g., daemon server itself)
+        pass
+
     # Allow disabling routing for testing
     if not enable_routing:
         logger.debug(f"Routing disabled, executing fallback for {method}")

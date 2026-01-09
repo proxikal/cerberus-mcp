@@ -326,3 +326,454 @@ def generate_context(
     generate_context_file(output, data)
     console.print(f"[green]✓ Generated {output}[/green]")
     console.print(f"[dim]Version: {data['version']} | Tests: {data['tests_passed']}/{data['tests_total']} | Commands: {data['command_count']}[/dim]")
+
+
+@app.command()
+def schema(
+    command: Optional[str] = typer.Argument(None, help="Command name to introspect (e.g., 'get-symbol', 'scan')"),
+    list_commands: bool = typer.Option(False, "--list", "-l", help="List all available commands"),
+):
+    """
+    [PHASE 10] Introspect command schemas for agent usage.
+
+    Returns JSON schema for command arguments and options, enabling
+    agents to discover interfaces without hallucination.
+
+    Examples:
+      cerberus schema --list                    # List all commands
+      cerberus schema get-symbol                # Schema for get-symbol
+      cerberus schema scan                      # Schema for scan
+    """
+    from cerberus.cli.config import CLIConfig
+
+    # Command registry - maps command names to their info
+    # This is a simplified version; a full implementation would introspect typer apps
+    command_registry = {
+        "hello": {
+            "description": "Basic check to ensure CLI is working",
+            "arguments": [],
+            "options": []
+        },
+        "version": {
+            "description": "Prints the current version of Cerberus",
+            "arguments": [],
+            "options": []
+        },
+        "doctor": {
+            "description": "Runs a diagnostic check on the Cerberus environment",
+            "arguments": [],
+            "options": [
+                {"name": "--index", "short": "-i", "type": "Path", "required": False, "help": "Path to index file to validate"},
+                {"name": "--json", "type": "bool", "default": False, "help": "Output results as JSON"}
+            ]
+        },
+        "scan": {
+            "description": "Scans a directory to build a symbol index",
+            "arguments": [
+                {"name": "root_dir", "type": "Path", "required": True, "help": "Root directory to scan"}
+            ],
+            "options": [
+                {"name": "--output", "short": "-o", "type": "Path", "required": False, "help": "Output file path for the index"},
+                {"name": "--json", "type": "bool", "default": False, "help": "Output scan result as JSON"}
+            ]
+        },
+        "index": {
+            "description": "Build/update index for a directory",
+            "arguments": [
+                {"name": "root_dir", "type": "Path", "required": True, "help": "Root directory to index"}
+            ],
+            "options": [
+                {"name": "--output", "short": "-o", "type": "Path", "required": False, "help": "Output file path"},
+                {"name": "--no-incremental", "type": "bool", "default": False, "help": "Force full rebuild"}
+            ]
+        },
+        "get-symbol": {
+            "description": "Retrieves code for a symbol from the index",
+            "arguments": [
+                {"name": "name", "type": "str", "required": False, "help": "Name of the symbol to retrieve"}
+            ],
+            "options": [
+                {"name": "--index", "short": "-i", "type": "Path", "required": False, "help": "Path to index file"},
+                {"name": "--padding", "short": "-p", "type": "int", "default": 3, "help": "Context lines before/after"},
+                {"name": "--skeleton", "type": "bool", "default": False, "help": "Return skeletonized view"},
+                {"name": "--json", "type": "bool", "default": False, "help": "Output as JSON"},
+                {"name": "--fuzzy", "type": "bool", "default": False, "help": "Enable fuzzy matching"},
+                {"name": "--file", "type": "str", "required": False, "help": "Show all symbols in file"},
+                {"name": "--type", "type": "str", "required": False, "help": "Filter by symbol type"},
+                {"name": "--auto-hydrate", "type": "bool", "default": False, "help": "Auto-fetch referenced types"}
+            ],
+            "output_schema": {
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "object", "description": "Symbol metadata"},
+                    "snippet": {"type": "object", "description": "Code snippet with context"},
+                    "callers": {"type": "array", "description": "List of call sites"},
+                    "imports": {"type": "array", "description": "Import information"}
+                }
+            }
+        },
+        "search": {
+            "description": "Search for symbols using keyword or semantic search",
+            "arguments": [
+                {"name": "query", "type": "str", "required": True, "help": "Search query"}
+            ],
+            "options": [
+                {"name": "--index", "short": "-i", "type": "Path", "required": False, "help": "Path to index file"},
+                {"name": "--mode", "type": "str", "default": "keyword", "help": "Search mode: keyword or semantic"},
+                {"name": "--top-k", "type": "int", "default": 10, "help": "Number of results to return"},
+                {"name": "--json", "type": "bool", "default": False, "help": "Output as JSON"}
+            ]
+        }
+    }
+
+    if list_commands:
+        # List all available commands
+        result = {
+            "commands": list(command_registry.keys()),
+            "count": len(command_registry)
+        }
+        print(json.dumps(result, indent=2 if not CLIConfig.is_machine_mode() else None))
+        return
+
+    if not command:
+        console.print("[red]Error: Provide a command name or use --list[/red]")
+        console.print("Example: cerberus schema get-symbol")
+        raise typer.Exit(code=1)
+
+    # Look up command schema
+    if command not in command_registry:
+        from cerberus.cli.output import structured_error
+        if CLIConfig.is_machine_mode():
+            error = structured_error(
+                code="COMMAND_NOT_FOUND",
+                message=f"Command '{command}' not found",
+                input_value=command,
+                suggestions=list(command_registry.keys())[:5],
+                actionable_fix="cerberus schema --list"
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print(f"[red]Error: Command '{command}' not found[/red]")
+            console.print(f"[dim]Use 'cerberus schema --list' to see available commands[/dim]")
+        raise typer.Exit(code=1)
+
+    # Return command schema
+    schema_data = command_registry[command]
+    print(json.dumps(schema_data, indent=2 if not CLIConfig.is_machine_mode() else None))
+
+
+@app.command()
+def batch(
+    file: Path = typer.Option(..., "--file", "-f", help="JSON file containing batch requests", exists=True, readable=True),
+    parallel: bool = typer.Option(True, "--parallel/--sequential", "-p", help="Execute requests in parallel (default: parallel)"),
+    workers: int = typer.Option(4, "--workers", "-w", help="Number of parallel workers (default: 4)"),
+    index_path: Optional[Path] = typer.Option(
+        None, "--index", "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+    ),
+):
+    """
+    [PHASE 10] Execute multiple commands atomically from a JSON file.
+
+    Direct in-process execution with thread pool parallelism.
+    Zero daemon dependency - loads index ONCE and executes all queries locally.
+    SQLite handles concurrent read access safely.
+
+    JSON format:
+      {
+        "requests": [
+          {"command": "get-symbol", "args": {"name": "MyClass"}},
+          {"command": "search", "args": {"query": "parser", "mode": "keyword"}}
+        ]
+      }
+
+    Supported commands: get-symbol, search, stats, deps, calls, references
+
+    Examples:
+      cerberus batch --file commands.json              # Parallel (default)
+      cerberus batch --file commands.json --sequential # Sequential
+      cerberus batch --file commands.json --workers 8  # 8 parallel workers
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from cerberus.cli.config import CLIConfig
+    from cerberus.index import find_symbol, compute_stats
+    from cerberus.retrieval import hybrid_search
+
+    # Default index path
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            from cerberus.cli.output import structured_error
+            if CLIConfig.is_machine_mode():
+                error = structured_error(
+                    code="INDEX_NOT_FOUND",
+                    message="Index file 'cerberus.db' not found in current directory",
+                    actionable_fix="cerberus index ."
+                )
+                print(json.dumps(error, separators=(',', ':')))
+            else:
+                console.print("[red]Error: Index file 'cerberus.db' not found.[/red]")
+                console.print("[dim]Run 'cerberus index .' first.[/dim]")
+            raise typer.Exit(code=1)
+
+    # Read batch file
+    try:
+        with open(file, 'r') as f:
+            batch_data = json.load(f)
+    except Exception as e:
+        from cerberus.cli.output import structured_error
+        if CLIConfig.is_machine_mode():
+            error = structured_error(
+                code="BATCH_FILE_ERROR",
+                message=f"Failed to read batch file: {str(e)}",
+                input_value=str(file)
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print(f"[red]Error reading batch file: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    if "requests" not in batch_data or not isinstance(batch_data["requests"], list):
+        from cerberus.cli.output import structured_error
+        if CLIConfig.is_machine_mode():
+            error = structured_error(
+                code="INVALID_BATCH_FORMAT",
+                message="Batch file must contain 'requests' array",
+                input_value=str(file)
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print("[red]Error: Batch file must contain 'requests' array[/red]")
+        raise typer.Exit(code=1)
+
+    batch_requests = batch_data["requests"]
+
+    # Load index ONCE into memory - all queries share this
+    try:
+        scan_result = load_index(index_path)
+    except Exception as e:
+        from cerberus.cli.output import structured_error
+        if CLIConfig.is_machine_mode():
+            error = structured_error(
+                code="INDEX_LOAD_ERROR",
+                message=f"Failed to load index: {str(e)}",
+                input_value=str(index_path)
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print(f"[red]Error loading index: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    # ========== Command Handlers (in-process execution) ==========
+
+    def handle_get_symbol(args: dict) -> dict:
+        """Handle get-symbol command."""
+        name = args.get("name")
+        if not name:
+            return {"error": "Missing required argument: name"}
+
+        matches = find_symbol(name, scan_result)
+        return {
+            "found": len(matches) > 0,
+            "count": len(matches),
+            "matches": [
+                {
+                    "name": m.name,
+                    "type": m.type,
+                    "file": m.file_path,
+                    "line_start": m.start_line,
+                    "line_end": m.end_line,
+                    "signature": m.signature,
+                    "parent_class": m.parent_class,
+                }
+                for m in matches
+            ]
+        }
+
+    def handle_search(args: dict) -> dict:
+        """Handle search command."""
+        query = args.get("query")
+        if not query:
+            return {"error": "Missing required argument: query"}
+
+        mode = args.get("mode", "auto")
+        top_k = args.get("top-k", args.get("limit", 10))
+        padding = args.get("padding", 3)
+
+        results = hybrid_search(
+            query=query,
+            index_path=index_path,
+            mode=mode,
+            top_k=top_k,
+            padding=padding,
+        )
+
+        return {
+            "query": query,
+            "mode": mode,
+            "count": len(results),
+            "results": [
+                {
+                    "rank": r.rank,
+                    "score": r.hybrid_score,
+                    "match_type": r.match_type,
+                    "symbol": {
+                        "name": r.symbol.name,
+                        "type": r.symbol.type,
+                        "file": r.symbol.file_path,
+                        "line_start": r.symbol.start_line,
+                    }
+                }
+                for r in results
+            ]
+        }
+
+    def handle_stats(args: dict) -> dict:
+        """Handle stats command."""
+        stats = compute_stats(scan_result)
+        return {
+            "total_files": stats.total_files,
+            "total_symbols": stats.total_symbols,
+            "symbol_types": stats.symbol_types,
+            "average_symbols_per_file": stats.average_symbols_per_file,
+        }
+
+    def handle_deps(args: dict) -> dict:
+        """Handle deps command."""
+        from cerberus.resolution import get_symbol_dependencies
+        symbol = args.get("symbol")
+        if not symbol:
+            return {"error": "Missing required argument: symbol"}
+
+        deps = get_symbol_dependencies(symbol, scan_result)
+        return {
+            "symbol": symbol,
+            "dependencies": deps
+        }
+
+    def handle_calls(args: dict) -> dict:
+        """Handle calls command - find what a symbol calls."""
+        symbol = args.get("symbol")
+        if not symbol:
+            return {"error": "Missing required argument: symbol"}
+
+        # Filter calls where this symbol is the caller
+        calls = [c for c in scan_result.calls if symbol in c.caller_file]
+        return {
+            "symbol": symbol,
+            "calls": [
+                {"callee": c.callee, "file": c.caller_file, "line": c.line}
+                for c in calls[:50]  # Limit results
+            ]
+        }
+
+    def handle_references(args: dict) -> dict:
+        """Handle references command - find where a symbol is used."""
+        symbol = args.get("symbol")
+        if not symbol:
+            return {"error": "Missing required argument: symbol"}
+
+        # Search for references to this symbol
+        refs = [r for r in getattr(scan_result, 'symbol_references', [])
+                if r.name == symbol]
+        return {
+            "symbol": symbol,
+            "reference_count": len(refs),
+            "references": [
+                {"file": r.file_path, "line": r.line}
+                for r in refs[:50]  # Limit results
+            ]
+        }
+
+    # Command handler registry
+    HANDLERS = {
+        "get-symbol": handle_get_symbol,
+        "search": handle_search,
+        "stats": handle_stats,
+        "deps": handle_deps,
+        "calls": handle_calls,
+        "references": handle_references,
+    }
+
+    # ========== Request Execution ==========
+
+    def execute_request(idx: int, req: dict) -> dict:
+        """Execute a single request and return result."""
+        if "command" not in req:
+            return {
+                "index": idx,
+                "success": False,
+                "error": "Missing 'command' field",
+            }
+
+        command = req["command"]
+        args = req.get("args", {})
+
+        handler = HANDLERS.get(command)
+        if not handler:
+            return {
+                "index": idx,
+                "command": command,
+                "success": False,
+                "error": f"Unknown command: {command}. Supported: {', '.join(HANDLERS.keys())}",
+            }
+
+        try:
+            result = handler(args)
+            # Check if handler returned an error
+            if "error" in result and len(result) == 1:
+                return {
+                    "index": idx,
+                    "command": command,
+                    "success": False,
+                    "error": result["error"],
+                }
+            return {
+                "index": idx,
+                "command": command,
+                "success": True,
+                "result": result,
+            }
+        except Exception as e:
+            return {
+                "index": idx,
+                "command": command,
+                "success": False,
+                "error": str(e),
+            }
+
+    # ========== Parallel or Sequential Execution ==========
+
+    results = []
+
+    if parallel and len(batch_requests) > 1:
+        # Thread pool execution - SQLite handles concurrent reads safely
+        with ThreadPoolExecutor(max_workers=min(workers, len(batch_requests))) as executor:
+            futures = {
+                executor.submit(execute_request, idx, req): idx
+                for idx, req in enumerate(batch_requests)
+            }
+            for future in as_completed(futures):
+                results.append(future.result())
+    else:
+        # Sequential execution
+        for idx, req in enumerate(batch_requests):
+            results.append(execute_request(idx, req))
+
+    # Sort results by original index
+    results.sort(key=lambda x: x["index"])
+
+    # ========== Output ==========
+
+    successful = [r for r in results if r.get("success")]
+    failed = [r for r in results if not r.get("success")]
+
+    output = {
+        "total_requests": len(batch_requests),
+        "successful": len(successful),
+        "failed": len(failed),
+        "results": results,
+    }
+
+    print(json.dumps(output, indent=2 if not CLIConfig.is_machine_mode() else None))
