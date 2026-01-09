@@ -1,7 +1,7 @@
 """
 CLI Dogfood Commands
 
-read, inspect, tree, ls, grep
+read, inspect, tree, ls, grep, timeline
 """
 
 import json
@@ -792,6 +792,198 @@ def grep(
 
     except Exception as e:
         logger.error(f"Grep failed: {e}")
+        console.print(f"[red]Error: {escape(str(e))}[/red]")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def timeline(
+    commits: Optional[int] = typer.Option(None, "--commits", "-n", help="Number of recent commits to analyze."),
+    since: Optional[str] = typer.Option(None, "--since", help="Branch or commit to compare from (e.g., 'main', 'HEAD~5')."),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 8] Show symbols changed in recent git history.
+
+    Instantly identifies the "Active Work Zone" by listing only the symbols
+    (functions/classes) that have changed, avoiding re-analysis of stable code.
+
+    Examples:
+      cerberus dogfood timeline --commits 3           # Last 3 commits
+      cerberus dogfood timeline --since main          # Since diverging from main
+      cerberus dogfood timeline --since HEAD~10       # Last 10 commits
+    """
+    import subprocess
+    from pathlib import Path
+    from cerberus.incremental.git_diff import get_git_root, get_git_diff, parse_git_diff
+    from cerberus.index import load_index
+
+    # Default to cerberus.db in CWD if not provided
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        # Get git root
+        cwd = Path.cwd()
+        git_root = get_git_root(cwd)
+
+        if not git_root:
+            console.print(f"[red]Not in a git repository.[/red]")
+            raise typer.Exit(code=1)
+
+        # Build git command
+        if commits:
+            # Last N commits
+            from_ref = f"HEAD~{commits}"
+        elif since:
+            # Since branch/commit
+            from_ref = since
+        else:
+            # Default: uncommitted changes
+            from_ref = None
+
+        # Get git diff
+        if from_ref:
+            try:
+                # Verify ref exists
+                subprocess.run(
+                    ["git", "rev-parse", "--verify", from_ref],
+                    cwd=str(git_root),
+                    capture_output=True,
+                    check=True,
+                    timeout=5,
+                )
+                diff_output = get_git_diff(git_root, from_ref)
+            except subprocess.CalledProcessError:
+                console.print(f"[red]Git ref '{from_ref}' not found.[/red]")
+                raise typer.Exit(code=1)
+        else:
+            diff_output = get_git_diff(git_root)
+
+        if not diff_output:
+            console.print(f"[yellow]No changes found.[/yellow]")
+            return
+
+        # Parse diff to get changed files and line ranges
+        added_files, modified_files, deleted_files = parse_git_diff(diff_output, git_root)
+
+        # Load index
+        scan_result = load_index(index_path)
+
+        # Track changed symbols
+        changed_symbols = []
+
+        # Process modified files
+        for mod_file in modified_files:
+            file_path = str(mod_file.path)
+
+            # Get all symbols in this file
+            file_symbols = list(scan_result._store.query_symbols(filter={'file_path': file_path}))
+
+            # Check which symbols overlap with changed line ranges
+            for sym in file_symbols:
+                for line_range in mod_file.changed_lines:
+                    # Check if symbol overlaps with changed lines
+                    if not (sym.end_line < line_range.start or sym.start_line > line_range.end):
+                        changed_symbols.append({
+                            'file': file_path,
+                            'symbol': sym.name,
+                            'type': sym.type,
+                            'line': sym.start_line,
+                            'change_type': 'modified'
+                        })
+                        break  # Count symbol once even if multiple ranges overlap
+
+        # Process added files
+        for file_path in added_files:
+            file_symbols = list(scan_result._store.query_symbols(filter={'file_path': str(file_path)}))
+            for sym in file_symbols:
+                changed_symbols.append({
+                    'file': str(file_path),
+                    'symbol': sym.name,
+                    'type': sym.type,
+                    'line': sym.start_line,
+                    'change_type': 'added'
+                })
+
+        # Process deleted files
+        for file_path in deleted_files:
+            changed_symbols.append({
+                'file': str(file_path),
+                'symbol': '<entire file>',
+                'type': 'file',
+                'line': 0,
+                'change_type': 'deleted'
+            })
+
+        # Deduplicate
+        seen = set()
+        unique_changes = []
+        for item in changed_symbols:
+            key = (item['file'], item['symbol'], item['line'])
+            if key not in seen:
+                seen.add(key)
+                unique_changes.append(item)
+
+        if json_output:
+            output = {
+                'ref': from_ref or 'working tree',
+                'total_symbols': len(unique_changes),
+                'changes': unique_changes
+            }
+            typer.echo(json.dumps(output, indent=2))
+            return
+
+        # Human-readable output
+        ref_desc = f"since {from_ref}" if from_ref else "in working tree"
+        console.print(f"\n[bold cyan]Timeline: Changed symbols {ref_desc}[/bold cyan]")
+        console.print(f"[dim]{len(unique_changes)} symbols affected[/dim]\n")
+
+        # Group by change type
+        by_type = {'added': [], 'modified': [], 'deleted': []}
+        for item in unique_changes:
+            by_type[item['change_type']].append(item)
+
+        # Display by type
+        for change_type, items in by_type.items():
+            if not items:
+                continue
+
+            if change_type == 'added':
+                color = 'green'
+                label = 'Added'
+            elif change_type == 'modified':
+                color = 'yellow'
+                label = 'Modified'
+            else:
+                color = 'red'
+                label = 'Deleted'
+
+            console.print(f"[bold {color}]{label} ({len(items)}):[/bold {color}]")
+            for item in items:
+                sym_display = f"{item['type']} {item['symbol']}" if item['type'] != 'file' else item['symbol']
+                console.print(f"  [{color}]{sym_display}[/{color}] [dim]- {item['file']}:{item['line']}[/dim]")
+            console.print()
+
+        # Record operation
+        record_operation('timeline', tokens_read=0, tokens_saved=0, file_path=None)
+
+    except Exception as e:
+        logger.error(f"Timeline failed: {e}")
         console.print(f"[red]Error: {escape(str(e))}[/red]")
         import traceback
         traceback.print_exc()

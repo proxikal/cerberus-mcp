@@ -1,7 +1,7 @@
 """
 CLI Retrieval Commands
 
-get-symbol, search, skeleton-file, skeletonize, get-context
+get-symbol, search, skeleton-file, skeletonize, blueprint, get-context
 """
 
 import json
@@ -56,6 +56,9 @@ def get_symbol(
     ),
     symbol_type: Optional[str] = typer.Option(
         None, "--type", help="[PHASE 2.1] Filter by symbol type (function, class, method)."
+    ),
+    auto_hydrate: bool = typer.Option(
+        False, "--auto-hydrate", help="[PHASE 8] Auto-fetch skeletons of referenced internal types."
     ),
 ):
     """
@@ -140,8 +143,55 @@ def get_symbol(
                 "snippet": snippet.model_dump(),
                 "callers": callers,
                 "imports": import_info if show_imports else [],
+                "hydrated_types": []
             }
         )
+
+    # Phase 8: Auto-hydrate referenced types
+    if auto_hydrate:
+        import re
+        for item in enriched:
+            symbol = item["symbol"]
+            hydrated = []
+
+            # Extract type names from signature and return_type
+            type_names = set()
+
+            if symbol.get("return_type"):
+                matches = re.findall(r'\b[A-Z][a-zA-Z0-9_]*\b', symbol["return_type"])
+                type_names.update(matches)
+
+            if symbol.get("signature"):
+                matches = re.findall(r':\s*([A-Z][a-zA-Z0-9_\[\]]+)', symbol["signature"])
+                for match in matches:
+                    inner_matches = re.findall(r'\b[A-Z][a-zA-Z0-9_]*\b', match)
+                    type_names.update(inner_matches)
+
+            # Filter out built-in types
+            builtins = {'List', 'Dict', 'Set', 'Tuple', 'Optional', 'Union', 'Any', 'None', 'Callable'}
+            type_names = type_names - builtins
+
+            # Look up each type in the index
+            for type_name in type_names:
+                type_matches = [s for s in scan_result.symbols if s.name == type_name and s.type in ['class', 'interface']]
+
+                for type_symbol in type_matches:
+                    type_skeleton = read_range(
+                        Path(type_symbol.file_path),
+                        type_symbol.start_line,
+                        type_symbol.end_line,
+                        padding=0,
+                        skeleton=True,
+                    )
+                    hydrated.append({
+                        'type_name': type_name,
+                        'file': type_symbol.file_path,
+                        'line': type_symbol.start_line,
+                        'skeleton': type_skeleton.content
+                    })
+                    break
+
+            item["hydrated_types"] = hydrated
 
     if json_output:
         typer.echo(json.dumps(enriched, indent=2))
@@ -185,6 +235,12 @@ def get_symbol(
                 symbols_str = ", ".join(imp["imported_symbols"]) if imp["imported_symbols"] else "(all)"
                 import_table.add_row(imp["imported_module"], symbols_str, str(imp["import_line"]))
             console.print(import_table)
+
+        if auto_hydrate and item.get("hydrated_types"):
+            console.print(f"\n[bold magenta]Auto-Hydrated Types ({len(item['hydrated_types'])}):[/bold magenta]")
+            for hydrated in item["hydrated_types"]:
+                console.print(f"\n[bold cyan]{hydrated['type_name']}[/bold cyan] [dim]({hydrated['file']}:{hydrated['line']})[/dim]")
+                console.print(f"[dim]{hydrated['skeleton']}[/dim]")
 
 
 
@@ -478,6 +534,143 @@ def skeletonize_cmd(
         raise typer.Exit(code=1)
 
 
+
+@app.command("blueprint")
+def blueprint_cmd(
+    file: Path = typer.Argument(..., help="File to generate blueprint for."),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 8] Whole-file AST blueprint from index (faster than disk read).
+    Shows complete file structure (classes, signatures, docstrings) without function bodies.
+    """
+    from cerberus.index import load_index
+    from collections import defaultdict
+
+    # Default to cerberus.db in CWD if not provided
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        # Load index
+        scan_result = load_index(index_path)
+
+        # Normalize file path
+        file_str = str(file)
+
+        # Query all symbols for the file from index
+        symbols = list(scan_result._store.query_symbols(filter={'file_path': file_str}))
+
+        if not symbols:
+            console.print(f"[red]No symbols found for file '{file}' in index.[/red]")
+            console.print(f"[dim]Make sure the file is indexed and the path matches.[/dim]")
+            raise typer.Exit(code=1)
+
+        # Deduplicate symbols (SQLite may have duplicates)
+        seen = set()
+        unique_symbols = []
+        for sym in symbols:
+            key = (sym.name, sym.type, sym.start_line, sym.parent_class or '')
+            if key not in seen:
+                seen.add(key)
+                unique_symbols.append(sym)
+        symbols = unique_symbols
+
+        # Sort symbols by line number
+        symbols.sort(key=lambda s: s.start_line)
+
+        # Build blueprint structure
+        blueprint_data = {
+            'file': file_str,
+            'symbols': [],
+            'total_symbols': len(symbols),
+        }
+
+        # Group methods by parent class
+        classes = defaultdict(list)
+        top_level = []
+
+        for sym in symbols:
+            sym_data = {
+                'name': sym.name,
+                'type': sym.type,
+                'line': sym.start_line,
+                'signature': sym.signature or '',
+            }
+
+            if sym.parent_class:
+                classes[sym.parent_class].append(sym_data)
+            else:
+                top_level.append(sym_data)
+
+        # Build structured output
+        for sym in top_level:
+            if sym['type'] == 'class':
+                # Add class with its methods
+                class_entry = {
+                    'name': sym['name'],
+                    'type': 'class',
+                    'line': sym['line'],
+                    'signature': sym['signature'],
+                    'methods': classes.get(sym['name'], [])
+                }
+                blueprint_data['symbols'].append(class_entry)
+            else:
+                # Top-level function/variable
+                blueprint_data['symbols'].append(sym)
+
+        if json_output:
+            typer.echo(json.dumps(blueprint_data, indent=2))
+            return
+
+        # Human-readable output
+        console.print(f"\n[bold cyan]Blueprint for {file}[/bold cyan]")
+        console.print(f"[dim]Total symbols: {len(symbols)} (index-backed, no disk read)[/dim]\n")
+
+        for sym in blueprint_data['symbols']:
+            if sym['type'] == 'class':
+                class_sig = sym.get('signature') or f"class {sym['name']}"
+                console.print(f"\n[bold yellow]{class_sig}[/bold yellow] [dim](line {sym['line']})[/dim]")
+
+                # Show methods
+                for method in sym.get('methods', []):
+                    method_sig = method.get('signature')
+                    if not method_sig:
+                        # Fallback: show as method name with parentheses
+                        method_sig = f"def {method['name']}(...)" if method['type'] == 'function' else method['name']
+                    console.print(f"    [green]{method_sig}[/green] [dim](line {method['line']})[/dim]")
+            else:
+                # Top-level function/variable
+                sig = sym.get('signature')
+                if not sig:
+                    # Fallback: show with def keyword for functions
+                    if sym['type'] == 'function':
+                        sig = f"def {sym['name']}(...)"
+                    else:
+                        sig = sym['name']
+                console.print(f"\n[bold green]{sig}[/bold green] [dim](line {sym['line']})[/dim]")
+
+        console.print()
+
+        # Record operation for dogfooding metrics
+        record_operation('blueprint', tokens_read=0, tokens_saved=0, file_path=file_str)
+
+    except Exception as e:
+        logger.error(f"Failed to generate blueprint for {file}: {e}")
+        console.print(f"[red]Error: {escape(str(e))}[/red]")
+        raise typer.Exit(code=1)
 
 
 @app.command("get-context")

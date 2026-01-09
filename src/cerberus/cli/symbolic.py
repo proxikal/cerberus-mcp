@@ -911,3 +911,151 @@ def smart_context_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("trace-path")
+def trace_path_cmd(
+    source: str = typer.Argument(..., help="Source symbol name (e.g., 'api_endpoint')"),
+    target: str = typer.Argument(..., help="Target symbol name (e.g., 'db_save')"),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    max_depth: int = typer.Option(10, "--max-depth", "-d", help="Maximum path depth to search."),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 8] Map execution path from source symbol to target symbol.
+
+    Shows deterministic call chains showing how data flows through the system.
+    Uses BFS to find shortest paths in the call graph.
+
+    Examples:
+      cerberus symbolic trace-path api_endpoint db_save
+      cerberus symbolic trace-path handle_request send_response --max-depth 5
+    """
+    from collections import deque
+    from cerberus.index import load_index
+    from cerberus.resolution.call_graph_builder import CallGraphBuilder
+
+    # Default to cerberus.db in CWD if not provided
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        # Load index
+        scan_result = load_index(index_path)
+
+        # Find source and target symbols
+        source_syms = [s for s in scan_result.symbols if s.name == source]
+        target_syms = [s for s in scan_result.symbols if s.name == target]
+
+        if not source_syms:
+            console.print(f"[red]Source symbol '{source}' not found in index.[/red]")
+            raise typer.Exit(code=1)
+
+        if not target_syms:
+            console.print(f"[red]Target symbol '{target}' not found in index.[/red]")
+            raise typer.Exit(code=1)
+
+        # Build call graph and find paths for each source symbol
+        builder = CallGraphBuilder(scan_result._store)
+        paths_found = []
+
+        for source_sym in source_syms:
+            # Build forward graph from this source
+            call_graph = builder.build_forward_graph(source_sym.name, source_sym.file_path)
+            source_key = f"{source_sym.file_path}:{source_sym.name}"
+
+            # BFS
+            queue = deque([(source_key, [source_key])])
+            visited = set([source_key])
+
+            while queue and len(paths_found) < 3:  # Find up to 3 paths
+                current, path = queue.popleft()
+
+                if len(path) > max_depth:
+                    continue
+
+                # Check if we reached target
+                current_name = current.split(':')[-1]
+                if current_name == target:
+                    paths_found.append(path)
+                    continue
+
+                # Get callees
+                if current in call_graph.nodes:
+                    node = call_graph.nodes[current]
+                    for callee_key in node.callees:
+                        if callee_key not in visited:
+                            visited.add(callee_key)
+                            queue.append((callee_key, path + [callee_key]))
+
+        if not paths_found:
+            console.print(f"[yellow]No execution path found from '{source}' to '{target}' (within depth {max_depth}).[/yellow]")
+            return
+
+        # Format output
+        if json_output:
+            output = {
+                'source': source,
+                'target': target,
+                'paths': []
+            }
+            for path in paths_found:
+                path_data = []
+                for key in path:
+                    file_path, sym_name = key.rsplit(':', 1)
+                    # Find symbol details
+                    sym = next((s for s in scan_result.symbols if s.file_path == file_path and s.name == sym_name), None)
+                    path_data.append({
+                        'symbol': sym_name,
+                        'file': file_path,
+                        'line': sym.start_line if sym else 0
+                    })
+                output['paths'].append(path_data)
+
+            typer.echo(json.dumps(output, indent=2))
+            return
+
+        # Human-readable output
+        console.print(f"\n[bold cyan]Execution paths from '{source}' to '{target}'[/bold cyan]")
+        console.print(f"[dim]Found {len(paths_found)} path(s)[/dim]\n")
+
+        for i, path in enumerate(paths_found, 1):
+            console.print(f"[bold yellow]Path {i}:[/bold yellow] [dim](length: {len(path)})[/dim]")
+
+            for j, key in enumerate(path):
+                file_path, sym_name = key.rsplit(':', 1)
+
+                # Find symbol details
+                sym = next((s for s in scan_result.symbols if s.file_path == file_path and s.name == sym_name), None)
+
+                # Format with arrows
+                prefix = "  " if j > 0 else ""
+                arrow = "  ↓ " if j < len(path) - 1 else ""
+
+                if sym:
+                    console.print(f"{prefix}[green]{sym_name}[/green] [dim]({file_path}:{sym.start_line})[/dim]")
+                else:
+                    console.print(f"{prefix}[green]{sym_name}[/green] [dim]({file_path})[/dim]")
+
+                if arrow:
+                    console.print(arrow)
+
+            console.print()
+
+    except Exception as e:
+        logger.error(f"Trace-path failed: {e}")
+        console.print(f"[red]Error: {escape(str(e))}[/red]")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+

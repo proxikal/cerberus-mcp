@@ -59,12 +59,17 @@ Forbidden:
   GOAL: Minimal tokens to satisfy safety check.
 
 ## STATUS
-version: 0.7.0 | phases: P1-7(complete) P7-mono(deferred)
+version: 0.8.0 | phases: P1-7(complete) P8(active) P7-mono(deferred)
 tests: 167/182 passing | 15 skipped | 0 failing | compliance: 100%
 Performance:
   memory: 0.22MB keyword | 227x under P7 target | lazy: 400MB semantic
   tokens: 99.7%↓ (150K→500) | smart_ctx: 87%↓
   capacity: 10K+ files | 68K symbols validated
+Phase 8:
+  blueprint: index-backed whole-file AST (faster than disk)
+  timeline: git-aware symbol change tracking
+  auto-hydrate: automatic type dependency injection
+  trace-path: execution flow mapping (BFS pathfinding)
 
 ## ARCH
 pipeline: scan→parse→index→retrieve→resolve→synthesize
@@ -80,23 +85,24 @@ Storage: primary: SQLite+ACID | vector: FAISS(optional) | arch: streaming_const_
 5. verify: cerberus verify-context
 6. commit: ONLY if requested
 
-## COMMANDS [32 total]
-Core: index, scan, stats, update, watcher, doctor, bench, version, hello
-Search: search, get-symbol, deps
-Symbolic: calls, references, resolution-stats, inherit-tree, descendants, overrides, call-graph, smart-context
-Synthesis: skeletonize, get-context, skeleton-file
-Dogfood: read, inspect, tree, ls, grep
-Utils: generate-tools, verify-context, generate-context
+## COMMANDS [37 total]
+Core: hello, version, doctor, scan, index, update, watcher
+Utils: stats, bench, generate-tools, summarize, verify-context, generate-context
+Retrieval: get-symbol (--auto-hydrate), search, skeleton-file, skeletonize, blueprint, get-context
+Symbolic: deps, calls, references, resolution-stats, inherit-tree, descendants, overrides, call-graph, smart-context, trace-path
+Dogfood: read, inspect, tree, ls, grep, timeline
 
 ## EXPLORATION [PROTOCOL]
 - `cerberus` is in PATH - call it directly (NOT `PYTHONPATH=src python3 -m cerberus.main`)
 - Index Cerberus itself before exploration: `cerberus index .`
 - **MANDATORY:** Use Cerberus commands for ALL exploration:
-  - Pattern search: `cerberus grep "pattern" [path] -l` (files) or `-C 3` (context)
-  - Read files: `cerberus read <file> [--lines 1-100]`
-  - Find symbols: `cerberus get-symbol <name> [--file path]`
-  - Search code: `cerberus search "query" [--mode keyword]`
-  - Dependencies: `cerberus deps <symbol>`
+  - Pattern search: `cerberus dogfood grep "pattern" [path] -l` (files) or `-C 3` (context)
+  - Read files: `cerberus dogfood read <file> [--lines 1-100]`
+  - Find symbols: `cerberus retrieval get-symbol <name> [--file path]`
+  - Search code: `cerberus retrieval search "query" [--mode keyword]`
+  - Dependencies: `cerberus symbolic deps <symbol>`
+  - Blueprint: `cerberus retrieval blueprint <file>` (Phase 8)
+  - Timeline: `cerberus dogfood timeline --commits N` (Phase 8)
 - **IF standard tool needed (Grep/Read/Glob):**
   1. PAUSE execution
   2. Explain to user: "Need to use [tool] because Cerberus lacks [feature]"
@@ -112,13 +118,19 @@ Utils: generate-tools, verify-context, generate-context
 # Setup
 cerberus index .                            # Index current directory
 PYTHONPATH=src python3 -m pytest tests/ -v # Run tests (needs PYTHONPATH)
-cerberus verify-context                     # Verify CERBERUS.md
+cerberus utils verify-context               # Verify CERBERUS.md
 
 # Exploration (100% Dogfooding - cerberus is in PATH)
-cerberus grep "def.*parse" src/ -l          # Find files with pattern
-cerberus grep "import.*embeddings" . -C 2   # Pattern with context
-cerberus read src/cerberus/main.py --lines 1-100  # Read file range
-cerberus get-symbol SQLiteIndexStore        # Get symbol definition
-cerberus search "fts5 implementation"       # Search code
-cerberus deps hybrid_search                 # Symbol dependencies
-cerberus smart-context <symbol>             # Full context assembly
+cerberus dogfood grep "def.*parse" src/ -l              # Find files with pattern
+cerberus dogfood grep "import.*embeddings" . -C 2       # Pattern with context
+cerberus dogfood read src/cerberus/main.py --lines 1-100  # Read file range
+cerberus retrieval get-symbol SQLiteIndexStore          # Get symbol definition
+cerberus retrieval search "fts5 implementation"         # Search code
+cerberus symbolic deps hybrid_search                    # Symbol dependencies
+cerberus symbolic smart-context <symbol>                # Full context assembly
+
+# Phase 8 Features
+cerberus retrieval blueprint src/cerberus/main.py       # Whole-file AST (index-backed)
+cerberus dogfood timeline --commits 3                   # Changed symbols (last 3 commits)
+cerberus retrieval get-symbol User --auto-hydrate       # Auto-fetch referenced types
+cerberus symbolic trace-path api_endpoint db_save       # Execution flow mapping
