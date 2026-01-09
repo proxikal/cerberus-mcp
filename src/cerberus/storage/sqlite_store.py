@@ -824,6 +824,142 @@ class SQLiteIndexStore:
         finally:
             conn.close()
 
+    def query_method_calls_filtered(
+        self,
+        method: Optional[str] = None,
+        receiver: Optional[str] = None,
+        receiver_type: Optional[str] = None,
+        file_path: Optional[str] = None,
+        batch_size: int = 100
+    ) -> Iterator[MethodCall]:
+        """
+        Stream method calls with optional filtering (Phase 5 CLI support).
+
+        Args:
+            method: Filter by method name
+            receiver: Filter by receiver variable name
+            receiver_type: Filter by resolved receiver type
+            file_path: Filter by caller file path
+            batch_size: Rows per iteration
+
+        Yields:
+            MethodCall objects matching filters
+        """
+        conn = self._get_connection()
+        try:
+            # Build dynamic query
+            conditions = []
+            params = []
+
+            if method:
+                conditions.append("method = ?")
+                params.append(method)
+            if receiver:
+                conditions.append("receiver = ?")
+                params.append(receiver)
+            if receiver_type:
+                conditions.append("receiver_type = ?")
+                params.append(receiver_type)
+            if file_path:
+                conditions.append("caller_file = ?")
+                params.append(file_path)
+
+            where_clause = " AND ".join(conditions) if conditions else "1=1"
+            query = f"SELECT * FROM method_calls WHERE {where_clause} ORDER BY caller_file, line"
+
+            cursor = conn.execute(query, tuple(params))
+
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+
+                for row in rows:
+                    yield MethodCall(
+                        caller_file=row['caller_file'],
+                        line=row['line'],
+                        receiver=row['receiver'],
+                        method=row['method'],
+                        receiver_type=row['receiver_type'],
+                    )
+        finally:
+            conn.close()
+
+    def query_symbol_references_filtered(
+        self,
+        source_symbol: Optional[str] = None,
+        target_symbol: Optional[str] = None,
+        reference_type: Optional[str] = None,
+        min_confidence: Optional[float] = None,
+        source_file: Optional[str] = None,
+        target_file: Optional[str] = None,
+        batch_size: int = 100
+    ) -> Iterator[SymbolReference]:
+        """
+        Stream symbol references with optional filtering (Phase 5 CLI support).
+
+        Args:
+            source_symbol: Filter by source symbol name
+            target_symbol: Filter by target symbol name
+            reference_type: Filter by reference type (method_call, instance_of, etc.)
+            min_confidence: Filter by minimum confidence score
+            source_file: Filter by source file path
+            target_file: Filter by target file path
+            batch_size: Rows per iteration
+
+        Yields:
+            SymbolReference objects matching filters
+        """
+        conn = self._get_connection()
+        try:
+            # Build dynamic query
+            conditions = []
+            params = []
+
+            if source_symbol:
+                conditions.append("source_symbol = ?")
+                params.append(source_symbol)
+            if target_symbol:
+                conditions.append("target_symbol = ?")
+                params.append(target_symbol)
+            if reference_type:
+                conditions.append("reference_type = ?")
+                params.append(reference_type)
+            if min_confidence is not None:
+                conditions.append("confidence >= ?")
+                params.append(min_confidence)
+            if source_file:
+                conditions.append("source_file = ?")
+                params.append(source_file)
+            if target_file:
+                conditions.append("target_file = ?")
+                params.append(target_file)
+
+            where_clause = " AND ".join(conditions) if conditions else "1=1"
+            query = f"SELECT * FROM symbol_references WHERE {where_clause} ORDER BY source_file, source_line"
+
+            cursor = conn.execute(query, tuple(params))
+
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+
+                for row in rows:
+                    yield SymbolReference(
+                        source_file=row['source_file'],
+                        source_line=row['source_line'],
+                        source_symbol=row['source_symbol'],
+                        reference_type=row['reference_type'],
+                        target_file=row['target_file'],
+                        target_symbol=row['target_symbol'],
+                        target_type=row['target_type'],
+                        confidence=row['confidence'],
+                        resolution_method=row['resolution_method'],
+                    )
+        finally:
+            conn.close()
+
     def find_symbol_by_line(self, file_path: str, line: int) -> Optional[CodeSymbol]:
         """
         Find symbol containing a specific line (for graph analysis).

@@ -35,7 +35,65 @@ cerberus search "user login" --mode balanced --keyword-weight 0.7 --json
 ### 🕸️ Dependencies
 Use `deps` to map relationships.
 ```bash
+# Show callers for a symbol
 cerberus deps --symbol "handle_request" --json
+
+# Show imports for a file
+cerberus deps --file src/auth.py --json
+
+# Show imports with Phase 5 resolution results
+cerberus deps --file src/auth.py --show-resolution --json
+```
+
+### 🧠 Phase 5: Symbolic Intelligence
+Phase 5 adds deep code understanding through method call tracking, type resolution, and import linkage.
+
+#### Query Method Calls
+Find all method calls in the codebase (e.g., `optimizer.step()`).
+```bash
+# Find all calls to a specific method
+cerberus calls --method step --json
+
+# Find calls on a specific receiver
+cerberus calls --receiver optimizer --json
+
+# Find calls with resolved type information
+cerberus calls --type Adam --method step --json
+
+# Find all method calls in a file
+cerberus calls --file src/train.py --json
+```
+
+#### Query Symbol References
+Navigate instance→definition relationships resolved by type tracking.
+```bash
+# Find references from a source symbol
+cerberus references --source optimizer --json
+
+# Find references to a target symbol
+cerberus references --target Adam --json
+
+# Filter by reference type
+cerberus references --type method_call --json
+
+# Filter by confidence threshold
+cerberus references --min-confidence 0.8 --json
+
+# Find references in a specific file
+cerberus references --source-file src/train.py --json
+```
+
+#### Resolution Statistics
+Check Phase 5 health metrics and resolution quality.
+```bash
+# Get symbolic intelligence statistics
+cerberus resolution-stats --json
+
+# Output includes:
+# - Import resolution rate (%)
+# - Total/resolved/unresolved imports
+# - Total method calls extracted
+# - Total symbol references created
 ```
 
 ### 📁 File Operations

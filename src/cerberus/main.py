@@ -1462,6 +1462,7 @@ def deps(
     file: Optional[Path] = typer.Option(None, "--file", "-f", help="File to list imports for."),
     recursive: bool = typer.Option(False, "--recursive", "-r", help="Build recursive call graph for symbol (requires --symbol)."),
     depth: int = typer.Option(3, "--depth", "-d", help="Maximum depth for recursive call graph (default: 3)."),
+    show_resolution: bool = typer.Option(False, "--show-resolution", help="Show Phase 5 import resolution results (requires --file)."),
     index_path: Optional[Path] = typer.Option(
         None,
         "--index",
@@ -1475,6 +1476,7 @@ def deps(
     """
     Display dependency info: callers for a symbol and imports for a file.
     Supports recursive call graph analysis with --recursive flag.
+    Use --show-resolution with --file to see Phase 5 import resolution results.
     """
     # Default to cerberus.db in CWD if not provided
     if index_path is None:
@@ -1515,13 +1517,34 @@ def deps(
             response["callers"] = callers
 
     if file:
-        file_imports = [
-            imp.model_dump()
-            for imp in scan_result.imports
-            if Path(imp.file_path).name == file.name
-        ]
+        if show_resolution:
+            # Query import_links from SQLite (Phase 5.2)
+            from cerberus.storage import open_index as open_sqlite_index
+            store = open_sqlite_index(str(index_path))
+            abs_file_path = str(file.absolute())
+
+            import_links = list(store.query_import_links(filter={'importer_file': abs_file_path}))
+            file_imports = [
+                {
+                    "module": link.imported_module,
+                    "line": link.import_line,
+                    "symbols": link.imported_symbols,
+                    "resolved": link.definition_file is not None,
+                    "definition_file": link.definition_file,
+                    "definition_symbol": link.definition_symbol,
+                }
+                for link in import_links
+            ]
+        else:
+            # Legacy: use scan_result imports
+            file_imports = [
+                imp.model_dump()
+                for imp in scan_result.imports
+                if Path(imp.file_path).name == file.name
+            ]
         response["file"] = str(file)
         response["imports"] = file_imports
+        response["show_resolution"] = show_resolution
 
     if json_output:
         typer.echo(json.dumps(response, indent=2))
@@ -1536,12 +1559,327 @@ def deps(
         console.print(table)
 
     if file:
-        table = Table(title=f"Imports in '{file}'")
-        table.add_column("Module", style="green")
-        table.add_column("Line", style="yellow")
-        for imp in response.get("imports", []):
-            table.add_row(imp["module"], str(imp["line"]))
+        if show_resolution:
+            table = Table(title=f"Imports in '{file}' (with Phase 5 resolution)")
+            table.add_column("Module", style="green")
+            table.add_column("Symbols", style="yellow")
+            table.add_column("Line", style="cyan")
+            table.add_column("Resolved", style="magenta")
+            table.add_column("Definition", style="dim")
+
+            for imp in response.get("imports", []):
+                resolved_str = "✅" if imp["resolved"] else "❌"
+                def_str = imp["definition_file"] or "[dim]external[/dim]"
+                symbols_str = ", ".join(imp["symbols"]) if imp["symbols"] else "*"
+                table.add_row(
+                    imp["module"],
+                    symbols_str,
+                    str(imp["line"]),
+                    resolved_str,
+                    def_str,
+                )
+        else:
+            table = Table(title=f"Imports in '{file}'")
+            table.add_column("Module", style="green")
+            table.add_column("Line", style="yellow")
+            for imp in response.get("imports", []):
+                table.add_row(imp["module"], str(imp["line"]))
         console.print(table)
+
+
+# ===== Phase 5: Symbolic Intelligence Commands =====
+
+@app.command("calls")
+def calls_cmd(
+    method: Optional[str] = typer.Option(None, "--method", "-m", help="Filter by method name."),
+    receiver: Optional[str] = typer.Option(None, "--receiver", "-r", help="Filter by receiver variable name."),
+    receiver_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by resolved receiver type (class name)."),
+    file: Optional[Path] = typer.Option(None, "--file", "-f", help="Filter by file path."),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    limit: int = typer.Option(100, "--limit", "-l", help="Maximum number of results to return."),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 5.1] Query method calls extracted from the codebase.
+
+    Find all method calls matching the specified filters. This enables AI agents
+    to trace where methods are invoked and understand call patterns.
+
+    Examples:
+      cerberus calls --method step --json
+      cerberus calls --receiver optimizer --json
+      cerberus calls --type Adam --method step --json
+      cerberus calls --file src/train.py --json
+    """
+    from cerberus.storage import open_index
+
+    # Default to cerberus.db in CWD
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        store = open_index(str(index_path))
+
+        # Query with filters
+        file_path_str = str(file.absolute()) if file else None
+        results = list(store.query_method_calls_filtered(
+            method=method,
+            receiver=receiver,
+            receiver_type=receiver_type,
+            file_path=file_path_str,
+        ))
+
+        # Limit results
+        results = results[:limit]
+
+        if json_output:
+            output = {
+                "total": len(results),
+                "calls": [
+                    {
+                        "file": call.caller_file,
+                        "line": call.line,
+                        "receiver": call.receiver,
+                        "method": call.method,
+                        "receiver_type": call.receiver_type,
+                    }
+                    for call in results
+                ]
+            }
+            typer.echo(json.dumps(output, indent=2))
+        else:
+            if not results:
+                console.print("[yellow]No method calls found matching the filters.[/yellow]")
+                return
+
+            table = Table(title=f"Method Calls ({len(results)} found)")
+            table.add_column("File", style="cyan")
+            table.add_column("Line", style="yellow")
+            table.add_column("Call", style="green bold")
+            table.add_column("Type", style="magenta")
+
+            for call in results:
+                call_str = f"{call.receiver}.{call.method}()"
+                type_str = call.receiver_type or "[dim]unresolved[/dim]"
+                table.add_row(
+                    call.caller_file,
+                    str(call.line),
+                    call_str,
+                    type_str,
+                )
+
+            console.print(table)
+
+    except Exception as e:
+        logger.error(f"Failed to query method calls: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command("references")
+def references_cmd(
+    source_symbol: Optional[str] = typer.Option(None, "--source", "-s", help="Filter by source symbol name."),
+    target_symbol: Optional[str] = typer.Option(None, "--target", "-t", help="Filter by target symbol name."),
+    reference_type: Optional[str] = typer.Option(
+        None,
+        "--type",
+        help="Filter by reference type (method_call, instance_of, inherits, type_annotation, return_type)."
+    ),
+    min_confidence: Optional[float] = typer.Option(None, "--min-confidence", "-c", help="Minimum confidence score (0.0-1.0)."),
+    source_file: Optional[Path] = typer.Option(None, "--source-file", help="Filter by source file path."),
+    target_file: Optional[Path] = typer.Option(None, "--target-file", help="Filter by target file path."),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    limit: int = typer.Option(100, "--limit", "-l", help="Maximum number of results to return."),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 5.3] Query symbol references resolved by type tracking.
+
+    Find references from symbol usages to their definitions. This enables AI agents
+    to navigate instance→definition relationships and understand type resolution.
+
+    Examples:
+      cerberus references --source optimizer --json
+      cerberus references --target Adam --type method_call --json
+      cerberus references --min-confidence 0.8 --json
+      cerberus references --source-file src/train.py --json
+    """
+    from cerberus.storage import open_index
+
+    # Default to cerberus.db in CWD
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        store = open_index(str(index_path))
+
+        # Query with filters
+        source_file_str = str(source_file.absolute()) if source_file else None
+        target_file_str = str(target_file.absolute()) if target_file else None
+
+        results = list(store.query_symbol_references_filtered(
+            source_symbol=source_symbol,
+            target_symbol=target_symbol,
+            reference_type=reference_type,
+            min_confidence=min_confidence,
+            source_file=source_file_str,
+            target_file=target_file_str,
+        ))
+
+        # Limit results
+        results = results[:limit]
+
+        if json_output:
+            output = {
+                "total": len(results),
+                "references": [
+                    {
+                        "source_file": ref.source_file,
+                        "source_line": ref.source_line,
+                        "source_symbol": ref.source_symbol,
+                        "reference_type": ref.reference_type,
+                        "target_file": ref.target_file,
+                        "target_symbol": ref.target_symbol,
+                        "target_type": ref.target_type,
+                        "confidence": ref.confidence,
+                        "resolution_method": ref.resolution_method,
+                    }
+                    for ref in results
+                ]
+            }
+            typer.echo(json.dumps(output, indent=2))
+        else:
+            if not results:
+                console.print("[yellow]No symbol references found matching the filters.[/yellow]")
+                return
+
+            table = Table(title=f"Symbol References ({len(results)} found)")
+            table.add_column("Source", style="cyan")
+            table.add_column("Type", style="yellow")
+            table.add_column("Target", style="green")
+            table.add_column("Confidence", style="magenta")
+            table.add_column("Method", style="dim")
+
+            for ref in results:
+                source_str = f"{ref.source_file}:{ref.source_line} ({ref.source_symbol})"
+                target_str = f"{ref.target_symbol or 'unknown'}"
+                if ref.target_type:
+                    target_str += f" [{ref.target_type}]"
+                confidence_str = f"{ref.confidence:.2f}"
+
+                table.add_row(
+                    source_str,
+                    ref.reference_type,
+                    target_str,
+                    confidence_str,
+                    ref.resolution_method or "unknown",
+                )
+
+            console.print(table)
+
+    except Exception as e:
+        logger.error(f"Failed to query symbol references: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+
+@app.command("resolution-stats")
+def resolution_stats_cmd(
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 5] Display Phase 5 symbolic intelligence resolution statistics.
+
+    Shows health metrics for import resolution, type tracking, and symbol references.
+    Helps agents understand the quality and coverage of Phase 5 analysis.
+
+    Examples:
+      cerberus resolution-stats --json
+      cerberus resolution-stats --index project.db --json
+    """
+    from cerberus.storage import open_index
+    from cerberus.resolution import get_resolution_stats
+
+    # Default to cerberus.db in CWD
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        store = open_index(str(index_path))
+        stats = get_resolution_stats(store)
+
+        if json_output:
+            typer.echo(json.dumps(stats, indent=2))
+        else:
+            from rich.panel import Panel
+            from rich.table import Table
+
+            # Create stats table
+            table = Table.grid(padding=(0, 2))
+            table.add_column(style="cyan", justify="right")
+            table.add_column(style="bold white")
+
+            # Import resolution stats
+            resolution_rate = stats["resolution_rate"] * 100
+            table.add_row("Import Resolution Rate:", f"[green]{resolution_rate:.1f}%[/green]")
+            table.add_row("Total Import Links:", f"{stats['total_import_links']:,}")
+            table.add_row("Resolved Imports:", f"[green]{stats['resolved_import_links']:,}[/green]")
+            table.add_row("Unresolved Imports:", f"[yellow]{stats['unresolved_import_links']:,}[/yellow]")
+            table.add_row("", "")
+
+            # Method call stats
+            table.add_row("Total Method Calls:", f"{stats['total_method_calls']:,}")
+            table.add_row("Total Symbol References:", f"{stats['total_symbol_references']:,}")
+
+            panel = Panel(
+                table,
+                title="[bold magenta]Phase 5: Symbolic Intelligence Statistics[/bold magenta]",
+                border_style="magenta",
+                padding=(1, 2),
+            )
+
+            console.print()
+            console.print(panel)
+            console.print()
+
+    except Exception as e:
+        logger.error(f"Failed to get resolution stats: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        raise typer.Exit(code=1)
 
 
 # ===== Phase 2: Context Synthesis & Compaction Commands =====
