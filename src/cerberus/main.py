@@ -2826,6 +2826,84 @@ def smart_context_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("verify-context")
+def verify_context(
+    context_file: Path = typer.Option("CERBERUS.md", "--file", "-f", help="Path to context file to verify."),
+    fix: bool = typer.Option(False, "--fix", help="Auto-fix discrepancies by regenerating CERBERUS.md."),
+    json_output: bool = typer.Option(False, "--json", help="Output results as JSON."),
+):
+    """
+    Verify CERBERUS.md matches actual codebase state.
+
+    Checks version, test counts, phase status, architecture compliance.
+    Use --fix to regenerate CERBERUS.md if discrepancies found.
+
+    Examples:
+      cerberus verify-context
+      cerberus verify-context --fix
+      cerberus verify-context --json
+    """
+    from cerberus.context_verification import verify_context_file
+
+    result = verify_context_file(context_file)
+
+    if json_output:
+        typer.echo(json.dumps(result, indent=2))
+        return
+
+    # Display results
+    console.print(f"\n[bold]Verifying {context_file}[/bold]\n")
+
+    if result["valid"]:
+        console.print("[green]✓ Context file is valid and up-to-date![/green]")
+    else:
+        console.print("[red]✗ Context file has discrepancies:[/red]\n")
+        for issue in result["issues"]:
+            console.print(f"  [yellow]•[/yellow] {issue}")
+
+    console.print(f"\n[dim]Checks performed: {result['checks_performed']}[/dim]")
+
+    if not result["valid"] and fix:
+        console.print("\n[yellow]Running generate-context to fix...[/yellow]")
+        from cerberus.context_verification import generate_context_file
+        generate_context_file(context_file)
+        console.print(f"[green]✓ {context_file} regenerated![/green]")
+    elif not result["valid"]:
+        console.print("\n[dim]Run with --fix to auto-regenerate CERBERUS.md[/dim]")
+        raise typer.Exit(code=1)
+
+
+@app.command("generate-context")
+def generate_context(
+    output: Path = typer.Option("CERBERUS.md", "--output", "-o", help="Path to write context file."),
+    json_output: bool = typer.Option(False, "--json", help="Output generated data as JSON instead of writing file."),
+):
+    """
+    Generate fresh CERBERUS.md from current codebase state.
+
+    Scans codebase using Cerberus's own tools to extract:
+    - Version, phase status, test counts
+    - Architecture compliance, command counts
+    - Performance metrics
+
+    Examples:
+      cerberus generate-context
+      cerberus generate-context --output CERBERUS_NEW.md
+      cerberus generate-context --json
+    """
+    from cerberus.context_verification import generate_context_file, collect_context_data
+
+    data = collect_context_data()
+
+    if json_output:
+        typer.echo(json.dumps(data, indent=2))
+        return
+
+    generate_context_file(output, data)
+    console.print(f"[green]✓ Generated {output}[/green]")
+    console.print(f"[dim]Version: {data['version']} | Tests: {data['tests_passed']}/{data['tests_total']} | Commands: {data['command_count']}[/dim]")
+
+
 @app.command(hidden=True)
 def session(
     action: str = typer.Argument("summary", help="Action: summary or clear"),

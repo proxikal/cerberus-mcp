@@ -1,7 +1,7 @@
-# CERBERUS v0.6.0 - AI Agent Context
-# Protocol: UACP/1.0 | Tokens: ~400 | Compression: 85% | Fidelity: 100%
-# Compatible: Claude, Gemini, Copilot, Cursor, Windsurf, Aider
-# Truth: THIS_FILE | Verify: sha256(src/+tests/+docs/) | Gen: 2026-01-08
+# CERBERUS v0.5.0 - AI Agent Context
+# Protocol: UACP/1.0 | Tokens: ~756 | Compression: 99.7% | Fidelity: 100%
+# Compatible: Claude✓ Gemini✓ Codex✓ | Verified: 2026-01-08
+# Truth: THIS_FILE | Verify: cerberus verify-context
 
 ## CORE [ALWAYS_LOAD]
 id=cerberus mission=AST→symbol→context type=deterministic_engine
@@ -57,7 +57,7 @@ Forbidden:
   DO: [STOP, cite_mandate, propose_compliant_alternative]
 
 ## STATUS
-version: 0.6.0
+version: 0.5.0
 phases: P1-6(complete) P7(planned)
 tests: 167/182 passing | 15 skipped | 0 failing
 production: READY
@@ -79,9 +79,9 @@ Storage:
   primary: SQLite+ACID | vector: FAISS(optional) | arch: streaming_const_mem
 
 Compliance:
-  10/10 packages: facade.py ✅
-  10/10 packages: config.py ✅
-  4/4 aegis layers: {log,exc,trace,diag} ✅
+  8/10 packages: facade.py ⚠️ (missing: index, semantic, storage)
+  8/10 packages: config.py ⚠️ (missing: index, semantic, storage)
+  3/4 aegis layers: {log,exc,trace} ✅ (missing: diag)
 
 ## PHASES [→ROADMAP.md]
 P1(dep_intel): ✅ 18/18 | [deps,inspect]
@@ -105,14 +105,14 @@ P6(context): ✅ 14/14 | [inherit-tree,descendants,overrides,call-graph,smart-co
 P7(agent_plugins): 🔜 planned | [langchain,crewai,mcp]
   - official agent integrations, streaming API
 
-## COMMANDS [40 total → README.md#cli-reference]
+## COMMANDS [32 total → README.md#cli-reference]
 Core: index scan stats update watcher doctor bench version hello
 Search: search get-symbol deps
 P5: calls references resolution-stats
 P6: inherit-tree descendants overrides call-graph smart-context
 Synthesis: skeletonize get-context skeleton-file
 Dogfood: read inspect tree ls grep
-Utils: generate-tools
+Utils: generate-tools verify-context generate-context
 
 ## WORKFLOW [AI_AGENT_PATTERNS]
 1. index_first: cerberus index . [BEFORE any exploration]
@@ -124,8 +124,31 @@ Utils: generate-tools
 ## VERIFY [SELF_CHECK]
 tests: PYTHONPATH=src python3 -m pytest tests/ → 167/182 ✅
 dogfood: cerberus index . → 60files,209symbols ✅
-arch: find src/cerberus -name facade.py | wc -l → 10 ✅
+arch: find src/cerberus -name facade.py | wc -l → 8/10 ⚠️
 no_cross: grep -r 'from cerberus\..* import' src/cerberus → 0 ✅
+context: cerberus verify-context → valid ✅
+
+## CONTEXT_VERIFICATION [UACP_COMPLIANCE]
+Automated verification ensures CERBERUS.md matches codebase reality.
+
+Commands:
+  cerberus verify-context        # Check CERBERUS.md validity
+  cerberus verify-context --fix  # Auto-regenerate if invalid
+  cerberus generate-context      # Regenerate from current state
+
+Checks performed:
+  - Version (pyproject.toml vs CERBERUS.md)
+  - Test counts (pytest results)
+  - Package structure (facade.py, config.py counts)
+  - Command count (typer introspection)
+  - Phase status
+  - Aegis compliance
+
+Workflow:
+  1. After code changes: cerberus verify-context
+  2. If invalid: review discrepancies, then --fix or manual edit
+  3. Before commits: ensure verification passes
+  4. CI integration: add verify-context to test pipeline
 
 ## DOCS [HIERARCHY: authoritative→reference]
 Truth (absolute):
@@ -158,6 +181,6 @@ cerberus smart-context ClassName --include-bases
 
 ---
 # Schema Validation
-# IF this_file != actual_codebase THEN regenerate_with: cerberus generate-context
 # Verify: cerberus verify-context
-# Update: edit CERBERUS.md THEN cerberus convert-agent-context --generate all
+# Regenerate: cerberus generate-context
+# Fix automatically: cerberus verify-context --fix
