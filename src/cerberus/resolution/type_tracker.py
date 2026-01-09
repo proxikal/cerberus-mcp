@@ -158,7 +158,10 @@ class TypeTracker:
                 ))
                 resolved_count += 1
 
-        logger.info(f"Resolved {resolved_count}/{total_count} method calls ({resolved_count/total_count*100:.1f}%)")
+        if total_count > 0:
+            logger.info(f"Resolved {resolved_count}/{total_count} method calls ({resolved_count/total_count*100:.1f}%)")
+        else:
+            logger.info("No method calls found to resolve")
         return references
 
     def _resolve_method_call(self, call: MethodCall) -> Optional[Tuple[str, str, str, float, str]]:

@@ -40,7 +40,7 @@ def version():
     """
     Prints the current version of Cerberus.
     """
-    typer.echo("Cerberus v0.1.0")
+    typer.echo("Cerberus v0.5.0")
 
 @app.command()
 def doctor(

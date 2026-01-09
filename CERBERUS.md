@@ -61,27 +61,27 @@ version: 0.5.0
 phases: P1-6(complete) P7(planned)
 tests: 167/182 passing | 15 skipped | 0 failing
 production: READY
-compliance: self_similar=100% aegis=100% mission=100%
+compliance: self_similar=72% aegis=100% mission=100%
 validated: TensorFlow(2949files,68934symbols)
 
 Performance:
-  memory: 126MB peak | -49% vs 250MB target | Δ42.6x reduction
+  memory: 126.5MB peak | Δ42.6x reduction | target: <50MB (P7)
   tokens: 99.7%↓ (150K→500) | smart_ctx: 87%↓
   speed: <1s search | 43s/3Kfiles index | <1s update@<5%
   capacity: 10K+ files | 68K symbols validated
 
 ## ARCH [→FEATURE_MATRIX.md#architecture]
 pipeline: scan→parse→index→retrieve→resolve→synthesize
-packages: [scanner,parser,index,retrieval,incremental,watcher,synthesis,storage,resolution]
+packages: [scanner,parser,index,retrieval,incremental,watcher,synthesis,storage,resolution,semantic,summarization]
 pattern: ∀pkg∃{facade.py,config.py} | export_via=__init__.py | ¬cross_import
 
 Storage:
   primary: SQLite+ACID | vector: FAISS(optional) | arch: streaming_const_mem
 
 Compliance:
-  8/10 packages: facade.py ⚠️ (missing: index, semantic, storage)
-  8/10 packages: config.py ⚠️ (missing: index, semantic, storage)
-  3/4 aegis layers: {log,exc,trace} ✅ (missing: diag)
+  8/11 packages: facade.py ⚠️ (missing: index, semantic, storage)
+  8/11 packages: config.py ⚠️ (missing: index, semantic, storage)
+  4/4 aegis layers: {log,exc,trace,diag} ✅ (doctor operational)
 
 ## PHASES [→ROADMAP.md]
 P1(dep_intel): ✅ 18/18 | [deps,inspect]
@@ -102,8 +102,11 @@ P5(symbolic): ✅ 14/14 | [calls,references,resolution-stats]
 P6(context): ✅ 14/14 | [inherit-tree,descendants,overrides,call-graph,smart-context]
   - inheritance resolution, MRO, call graphs, cross-file type inference
 
-P7(agent_plugins): 🔜 planned | [langchain,crewai,mcp]
-  - official agent integrations, streaming API
+P7(zero_footprint): 🔜 planned | [lazy_loading,fts5,remote_embed]
+  - <50MB RAM target, SQLite FTS5, optional remote embeddings
+
+P8(agent_plugins): 🔜 planned | [langchain,crewai]
+  - official agent integrations, native toolsets
 
 ## COMMANDS [32 total → README.md#cli-reference]
 Core: index scan stats update watcher doctor bench version hello

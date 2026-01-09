@@ -6,7 +6,7 @@ Optimized for Phase 4: Transaction-based updates for SQLite indices.
 
 import time
 from pathlib import Path
-from typing import List, Set, Union
+from typing import List, Set, Union, Optional
 from loguru import logger
 
 from ..schemas import (
@@ -15,6 +15,7 @@ from ..schemas import (
     IncrementalUpdateResult,
     ScanResult,
     CodeSymbol,
+    FileObject,
 )
 from ..scanner import scan
 from ..index import load_index, save_index
@@ -108,6 +109,11 @@ def _apply_surgical_update_sqlite(
         if file_changes.added:
             logger.info(f"Parsing {len(file_changes.added)} new files")
             for added_file in file_changes.added:
+                # Create file entry first (required for foreign key)
+                file_obj = _create_file_object(added_file, project_path)
+                if file_obj:
+                    store.write_file(file_obj, conn=conn)
+
                 new_symbols = _parse_single_file(added_file, project_path)
                 if new_symbols:
                     # Write symbols to SQLite
@@ -125,6 +131,11 @@ def _apply_surgical_update_sqlite(
                 # Clean up FAISS vectors
                 if store._faiss_store and faiss_ids:
                     store._faiss_store.remove_vectors(faiss_ids)
+
+                # Re-create file entry (delete_file removes it due to CASCADE)
+                file_obj = _create_file_object(modified_file.path, project_path)
+                if file_obj:
+                    store.write_file(file_obj, conn=conn)
 
                 # Re-parse file and write new symbols
                 new_symbols = _parse_single_file(modified_file.path, project_path)
@@ -149,7 +160,7 @@ def _apply_surgical_update_sqlite(
         affected_callers=list(affected_callers),
         files_reparsed=files_reparsed,
         elapsed_time=elapsed_time,
-        strategy="incremental_sqlite",
+        strategy="incremental",
     )
 
     logger.info(
@@ -265,6 +276,35 @@ def _apply_surgical_update_json(
     )
 
     return result
+
+
+def _create_file_object(file_path: str, project_path: Path) -> Optional[FileObject]:
+    """
+    Create a FileObject for insertion into the files table.
+
+    Args:
+        file_path: Relative file path
+        project_path: Project root path
+
+    Returns:
+        FileObject or None if file doesn't exist
+    """
+    abs_path = project_path / file_path
+    if not abs_path.exists():
+        logger.warning(f"File {abs_path} does not exist")
+        return None
+
+    try:
+        stats = abs_path.stat()
+        return FileObject(
+            path=file_path,
+            abs_path=str(abs_path.resolve()),
+            size=stats.st_size,
+            last_modified=stats.st_mtime,
+        )
+    except Exception as e:
+        logger.error(f"Failed to get file stats for {abs_path}: {e}")
+        return None
 
 
 def _parse_single_file(file_path: str, project_path: Path) -> List[CodeSymbol]:
