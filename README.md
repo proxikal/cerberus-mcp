@@ -89,17 +89,17 @@ pip install -r requirements-enterprise.txt
 
 ### 🎯 Quick Start
 ```bash
-# 1. Index your project (creates project.db)
-cerberus index ./src -o project.db
+# 1. Index your project (creates cerberus.db by default)
+cerberus index .
 
-# 2. Search for logic
+# 2. Search for logic (uses cerberus.db automatically)
 cerberus search "how is auth handled"
 
 # 3. Get surgical context
 cerberus get-symbol "authenticate_user" --padding 5
 
 # 4. Start real-time sync
-cerberus watcher start --project . --index project.db
+cerberus watcher start
 ```
 
 ---

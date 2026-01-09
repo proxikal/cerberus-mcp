@@ -48,17 +48,17 @@ Example violations:
 **DO NOT read the entire codebase manually.** Use Cerberus to explore Cerberus:
 
 ```bash
-# Index the project (run once)
-PYTHONPATH=src python3 -m cerberus.main index . -o cerberus.db
+# Index the project (creates cerberus.db by default)
+PYTHONPATH=src python3 -m cerberus.main index .
 
-# Search for concepts
-PYTHONPATH=src python3 -m cerberus.main search "how does X work" --index cerberus.db
+# Search for concepts (uses cerberus.db automatically)
+PYTHONPATH=src python3 -m cerberus.main search "how does X work"
 
 # Find specific symbols
-PYTHONPATH=src python3 -m cerberus.main get-symbol "ClassName" --index cerberus.db
+PYTHONPATH=src python3 -m cerberus.main get-symbol "ClassName"
 
 # Get dependencies
-PYTHONPATH=src python3 -m cerberus.main deps --symbol "function_name" --index cerberus.db
+PYTHONPATH=src python3 -m cerberus.main deps --symbol "function_name"
 ```
 
 **Read these first:**
@@ -166,11 +166,11 @@ PYTHONPATH=src python3 -m pytest tests/ -v
 # Check specific phase tests
 PYTHONPATH=src python3 -m pytest tests/test_phase5_unit.py -v
 
-# Index Cerberus itself
-PYTHONPATH=src python3 -m cerberus.main index . -o cerberus.db
+# Index Cerberus itself (creates cerberus.db)
+PYTHONPATH=src python3 -m cerberus.main index .
 
-# Search for implementation
-PYTHONPATH=src python3 -m cerberus.main search "your query" --index cerberus.db
+# Search for implementation (uses cerberus.db automatically)
+PYTHONPATH=src python3 -m cerberus.main search "your query"
 ```
 
 ---
