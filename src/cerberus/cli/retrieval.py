@@ -81,13 +81,9 @@ def get_symbol(
             console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
             raise typer.Exit(code=1)
 
-    # Phase 9.5: Only load index if needed (not for simple exact-match with daemon)
-    # Simple exact-match case is handled by get_symbol_with_routing (which checks daemon first)
-    scan_result = None
-    if file or fuzzy or (name and not skeleton and not auto_hydrate):
-        # Need full scan_result for complex queries
-        if file or fuzzy:
-            scan_result = load_index(index_path)
+    # Phase 9.5: Load index when needed for enrichment data (calls, imports)
+    # Even with daemon routing, we need scan_result for caller/import info
+    scan_result = load_index(index_path)
 
     # Phase 2.1: Enhanced symbol finding
     if file:
