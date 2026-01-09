@@ -5,7 +5,7 @@
 
 ## CORE [ALWAYS_LOAD]
 id=cerberus mission=AST→symbol→context type=deterministic_engine firmness=REQUIRED
-status=P1-6:✅ P7:🔜 tests=167/182(0❌) prod=READY
+status=P1-7:✅ P7-mono:⏸️ tests=167/182(0❌) prod=READY
 principle=code_over_prompts forbidden=[LLM_analysis,time_est,feature_creep,proactive_docs,emojis,bypass_facade]
 
 ## IDENTITY
@@ -27,6 +27,7 @@ Forbidden:
   cross_imports → only via __init__.py exports (¬bypass_facade)
   emojis → forbidden unless user explicitly requests
   unsolicited_files → edit existing before creating new
+  standard_tools_when_indexed → PAUSE+propose cerberus enhancement OR explain gap to user
 
 ## RULES [DECISION_MATRIX]
 @mission_drift:
@@ -51,11 +52,18 @@ Forbidden:
   IF: violates_self_similarity OR violates_aegis
   DO: [STOP, cite_mandate, propose_compliant_alternative]
 
+@exploration:
+  REQUIRE: cerberus_commands_only WHEN: index_exists
+  IF: uses_grep_read_glob_tools THEN: [PAUSE, propose_cerberus_command, explain_why, ask_to_implement_or_continue]
+  IF: cerberus_cmd_missing THEN: [PAUSE, "Cerberus needs [command]. Implement? Or use workaround?", get_user_approval]
+  IF: cerberus_cmd_fails THEN: check_help_syntax NOT fallback_to_standard_tools
+  PATTERN: 100%_dogfooding_mandate + continuous_improvement
+
 ## STATUS
-version: 0.5.0 | phases: P1-6(complete) P7(planned)
+version: 0.7.0 | phases: P1-7(complete) P7-mono(deferred)
 tests: 167/182 passing | 15 skipped | 0 failing | compliance: 100%
 Performance:
-  memory: 126.5MB peak | Δ42.6x reduction | target: <50MB (P7)
+  memory: 0.22MB keyword | 227x under P7 target | lazy: 400MB semantic
   tokens: 99.7%↓ (150K→500) | smart_ctx: 87%↓
   capacity: 10K+ files | 68K symbols validated
 
@@ -73,7 +81,7 @@ Storage: primary: SQLite+ACID | vector: FAISS(optional) | arch: streaming_const_
 5. verify: cerberus verify-context
 6. commit: ONLY if requested
 
-## COMMANDS [40 total]
+## COMMANDS [32 total]
 Core: index, scan, stats, update, watcher, doctor, bench, version, hello
 Search: search, get-symbol, deps
 Symbolic: calls, references, resolution-stats, inherit-tree, descendants, overrides, call-graph, smart-context
@@ -82,12 +90,36 @@ Dogfood: read, inspect, tree, ls, grep
 Utils: generate-tools, verify-context, generate-context
 
 ## EXPLORATION [PROTOCOL]
-- Index Cerberus itself before exploration.
-- Use `search` for concepts, `get-symbol` for logic, `deps` for impact.
+- `cerberus` is in PATH - call it directly (NOT `PYTHONPATH=src python3 -m cerberus.main`)
+- Index Cerberus itself before exploration: `cerberus index .`
+- **MANDATORY:** Use Cerberus commands for ALL exploration:
+  - Pattern search: `cerberus grep "pattern" [path] -l` (files) or `-C 3` (context)
+  - Read files: `cerberus read <file> [--lines 1-100]`
+  - Find symbols: `cerberus get-symbol <name> [--file path]`
+  - Search code: `cerberus search "query" [--mode keyword]`
+  - Dependencies: `cerberus deps <symbol>`
+- **IF standard tool needed (Grep/Read/Glob):**
+  1. PAUSE execution
+  2. Explain to user: "Need to use [tool] because Cerberus lacks [feature]"
+  3. Propose: "Should I implement `cerberus [new-cmd]` first? Or proceed with workaround?"
+  4. Wait for user decision before continuing
+- **IF cerberus command fails:**
+  1. Check syntax: `cerberus <cmd> --help`
+  2. Retry with correct syntax
+  3. If still fails, explain error and ask user for guidance
 - CHALLENGE user if requested changes drift from deterministic mission.
 
 ## QUICKREF
-PYTHONPATH=src python3 -m cerberus.main index .
-PYTHONPATH=src python3 -m pytest tests/ -v
-cerberus search "your query"
-cerberus smart-context <symbol>
+# Setup
+cerberus index .                            # Index current directory
+PYTHONPATH=src python3 -m pytest tests/ -v # Run tests (needs PYTHONPATH)
+cerberus verify-context                     # Verify CERBERUS.md
+
+# Exploration (100% Dogfooding - cerberus is in PATH)
+cerberus grep "def.*parse" src/ -l          # Find files with pattern
+cerberus grep "import.*embeddings" . -C 2   # Pattern with context
+cerberus read src/cerberus/main.py --lines 1-100  # Read file range
+cerberus get-symbol SQLiteIndexStore        # Get symbol definition
+cerberus search "fts5 implementation"       # Search code
+cerberus deps hybrid_search                 # Symbol dependencies
+cerberus smart-context <symbol>             # Full context assembly

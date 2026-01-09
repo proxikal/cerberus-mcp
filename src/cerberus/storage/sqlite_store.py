@@ -64,6 +64,37 @@ CREATE INDEX IF NOT EXISTS idx_symbols_type ON symbols(type);
 CREATE INDEX IF NOT EXISTS idx_symbols_parent_class ON symbols(parent_class) WHERE parent_class IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_symbols_file_range ON symbols(file_path, start_line, end_line);
 
+-- Phase 7: FTS5 virtual table for zero-RAM keyword search
+-- Indexes symbol name, type, and signature using SQLite's full-text search engine
+CREATE VIRTUAL TABLE IF NOT EXISTS symbols_fts USING fts5(
+    name,
+    type,
+    signature,
+    file_path UNINDEXED,
+    start_line UNINDEXED,
+    end_line UNINDEXED,
+    content='symbols',
+    content_rowid='id'
+);
+
+-- Triggers to keep FTS5 table synchronized with symbols table
+CREATE TRIGGER IF NOT EXISTS symbols_ai AFTER INSERT ON symbols BEGIN
+    INSERT INTO symbols_fts(rowid, name, type, signature, file_path, start_line, end_line)
+    VALUES (new.id, new.name, new.type, COALESCE(new.signature, ''), new.file_path, new.start_line, new.end_line);
+END;
+
+CREATE TRIGGER IF NOT EXISTS symbols_ad AFTER DELETE ON symbols BEGIN
+    INSERT INTO symbols_fts(symbols_fts, rowid, name, type, signature, file_path, start_line, end_line)
+    VALUES ('delete', old.id, old.name, old.type, COALESCE(old.signature, ''), old.file_path, old.start_line, old.end_line);
+END;
+
+CREATE TRIGGER IF NOT EXISTS symbols_au AFTER UPDATE ON symbols BEGIN
+    INSERT INTO symbols_fts(symbols_fts, rowid, name, type, signature, file_path, start_line, end_line)
+    VALUES ('delete', old.id, old.name, old.type, COALESCE(old.signature, ''), old.file_path, old.start_line, old.end_line);
+    INSERT INTO symbols_fts(rowid, name, type, signature, file_path, start_line, end_line)
+    VALUES (new.id, new.name, new.type, COALESCE(new.signature, ''), new.file_path, new.start_line, new.end_line);
+END;
+
 -- Embeddings metadata table (actual vectors stored in FAISS)
 CREATE TABLE IF NOT EXISTS embeddings_metadata (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -650,6 +681,71 @@ class SQLiteIndexStore:
                         parameters=json.loads(row['parameters']) if row['parameters'] else None,
                         parent_class=row['parent_class'],
                     )
+        finally:
+            conn.close()
+
+    def fts5_search(
+        self,
+        query: str,
+        top_k: int = 20,
+        batch_size: int = 100
+    ) -> Iterator[tuple[CodeSymbol, float]]:
+        """
+        Phase 7: FTS5-based keyword search with zero RAM overhead.
+
+        Uses SQLite's native full-text search engine to rank results by BM25
+        without loading all symbols into memory. Offloads scoring to SQLite's
+        C-engine for maximum performance.
+
+        Args:
+            query: Search query (supports FTS5 syntax like "function AND parse")
+            top_k: Maximum number of results to return
+            batch_size: Rows per fetch iteration
+
+        Yields:
+            Tuples of (CodeSymbol, relevance_score) ordered by relevance
+        """
+        conn = self._get_connection()
+        try:
+            # FTS5 query with BM25 ranking
+            # The bm25() function returns negative scores (more negative = better match)
+            # We negate it to get positive scores (higher = better)
+            fts_query = """
+                SELECT
+                    s.id, s.name, s.type, s.file_path, s.start_line, s.end_line,
+                    s.signature, s.return_type, s.parameters, s.parent_class,
+                    -fts.rank as score
+                FROM symbols_fts fts
+                JOIN symbols s ON s.id = fts.rowid
+                WHERE symbols_fts MATCH ?
+                ORDER BY fts.rank
+                LIMIT ?
+            """
+
+            cursor = conn.execute(fts_query, (query, top_k))
+
+            # Yield in batches
+            while True:
+                rows = cursor.fetchmany(batch_size)
+                if not rows:
+                    break
+
+                for row in rows:
+                    symbol = CodeSymbol(
+                        name=row['name'],
+                        type=row['type'],
+                        file_path=row['file_path'],
+                        start_line=row['start_line'],
+                        end_line=row['end_line'],
+                        signature=row['signature'],
+                        return_type=row['return_type'],
+                        parameters=json.loads(row['parameters']) if row['parameters'] else None,
+                        parent_class=row['parent_class'],
+                    )
+                    # Normalize score to 0-1 range (FTS5 scores are typically 0-10)
+                    normalized_score = min(row['score'] / 10.0, 1.0)
+                    yield (symbol, normalized_score)
+
         finally:
             conn.close()
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Literal, Optional, Union
 from loguru import logger
 
-from ..schemas import ScanResult, SearchResult, HybridSearchResult, CodeSymbol
+from ..schemas import ScanResult, SearchResult, HybridSearchResult, CodeSymbol, CodeSnippet
 from ..index.index_loader import load_index
 from ..storage import ScanResultAdapter, SQLiteIndexStore, FAISSVectorStore
 from .bm25_search import BM25Index
@@ -133,29 +133,28 @@ def _hybrid_search_streaming(
     bm25_results: List[SearchResult] = []
     vector_results: List[SearchResult] = []
 
-    # BM25 keyword search (still needs to iterate all symbols for document frequency)
+    # Phase 7: FTS5 keyword search (zero RAM overhead - SQLite C-engine handles BM25)
     if mode in ["keyword", "balanced"]:
-        logger.info(f"Performing streaming BM25 search for '{query}'")
+        logger.info(f"Performing FTS5 keyword search for '{query}'")
 
-        # Stream symbols and build lightweight documents (metadata only, no file content yet)
-        documents = []
-        for symbol in store.query_symbols(batch_size=100):
-            # Use symbol metadata as "document" - signature, name, type
-            doc_text = f"{symbol.name} {symbol.type} {symbol.signature or ''}"
-            documents.append({
-                "symbol": symbol,
-                "snippet_text": doc_text,  # Lightweight metadata-based text
-            })
+        # Use SQLite FTS5 for zero-memory keyword search
+        # No need to load symbols into memory - SQLite handles everything
+        fts5_results = []
+        for symbol, score in store.fts5_search(query, top_k=top_k_per_method):
+            snippet = CodeSnippet(
+                file_path=symbol.file_path,
+                start_line=symbol.start_line,
+                end_line=symbol.end_line,
+                content="",  # Loaded lazily later
+            )
+            fts5_results.append(SearchResult(
+                symbol=symbol,
+                score=score,
+                snippet=snippet,
+            ))
 
-        logger.debug(f"Built {len(documents)} lightweight documents for BM25")
-
-        # Build BM25 index and search
-        bm25_index = BM25Index(
-            documents=documents,
-            k1=BM25_CONFIG["k1"],
-            b=BM25_CONFIG["b"],
-        )
-        bm25_results = bm25_index.search(query, top_k=top_k_per_method)
+        bm25_results = fts5_results
+        logger.debug(f"FTS5 search returned {len(bm25_results)} results")
 
     # Vector semantic search (query FAISS directly)
     if mode in ["semantic", "balanced"]:
