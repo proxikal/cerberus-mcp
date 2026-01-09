@@ -100,7 +100,7 @@
     5. **Failure:** Daemon reports error; Real File System untouched.
 - **Benefit:** Prevents "Broken State" loops that cause Agents to spin and overheat.
 
-### 6. Daemon Resource Governance (The "Tiered Intelligence" Architecture)
+### 8. Daemon Resource Governance (The "Tiered Intelligence" Architecture)
 **Mission:** Enable massive scalability (10,000+ files) without "Cache Thrashing" or RAM bloat. The Daemon manages memory using a strict Tiered Strategy.
 
 #### Tier 1: The "Skeleton Index" (Always in RAM)
@@ -122,6 +122,21 @@
 - **Cost:** **0 Bytes RAM.**
 - **Function:** The "Encyclopedia." Used for deep searches ("Find references in legacy modules") and hydration of Tier 2.
 - **Policy:** **Single Source of Truth.** SQLite FTS5 provides microsecond access, ensuring the system remains fast even when RAM is full.
+
+### 9. Security & Multi-Agent Swarm (Safety Protocol)
+**Mission:** Ensure Cerberus is secure by default and ready for multi-agent collaboration.
+- **Localhost Lock:**
+    - The Daemon binds **ONLY** to a Unix Domain Socket (Mac/Linux) or Named Pipe (Windows).
+    - **No TCP/IP.** Prevents accidental network exposure.
+    - **Benefit:** Physical security isolation.
+- **Immutability Guard:**
+    - Default State: **Read-Only**.
+    - Write operations require an explicit `--allow-write` flag or a cryptographic session token.
+    - **Benefit:** Prevents hallucinating agents from deleting project files.
+- **Swarm Intelligence:**
+    - **AsyncIO Core:** The Daemon uses `asyncio` to handle multiple concurrent connections.
+    - **Agent Namespaces:** Support for `cerberus serve --max-agents 5`.
+    - **Benefit:** Allows Claude (Frontend) and Gemini (Backend) to query the same Cortex simultaneously without blocking each other.
 
 **Result:** A 100,000-file codebase feels as light as a 10-file script. The Agent "surfs" on top of the massive archive.
 

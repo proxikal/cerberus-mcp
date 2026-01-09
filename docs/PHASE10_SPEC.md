@@ -1,7 +1,7 @@
-# Phase 10 Specification: The Silent Protocol (Industrial Optimization)
+# Phase 10 Specification: The Deterministic Interface (Agent Symbiosis)
 
 **Status:** Proposed (To Follow Phase 9)
-**Goal:** Eliminate "Presentation Bloat." Transform Cerberus from a Human-Centric CLI to an Agent-Native Protocol by removing decorative tokens (ASCII, emojis, whitespace) and enforcing strict efficiency metrics.
+**Goal:** Transform Cerberus from a CLI Tool into a **Deterministic Agent Operating System**. Eliminate "Presentation Bloat," enforce strict data protocols, and enable Self-Healing and Atomic Batching to maximize Agent efficiency.
 
 ---
 
@@ -42,6 +42,37 @@
     - **Intercept:** Stop the output.
     - **Replace:** Return a minimal warning: `[PROTOCOL] 'ls -R' blocked. Use 'cerberus index'. Output suppressed.`
 - **Benefit:** Prevents the Agent from accidentally flooding its own context window.
+
+### 5. Structured Failure (Self-Healing)
+**Mission:** Turn errors into actionable data points, eliminating "Agent Confusion."
+- **Problem:** Text errors (`Error: Symbol not found`) require the Agent to "think" and guess.
+- **Solution:** Return JSON Error Objects with actionable `suggestions`.
+- **Example:**
+    ```json
+    {
+      "status": "error",
+      "code": "SYMBOL_NOT_FOUND",
+      "input": "Usr",
+      "suggestions": ["User", "UserConfig", "Auth"],
+      "actionable_fix": "cerberus get-symbol User"
+    }
+    ```
+- **Result:** The Agent performs **Deterministic Recovery** (retries immediately using the suggestion) without reasoning overhead.
+
+### 6. The Schema Contract (Introspection)
+**Mission:** Allow the Agent to learn the tool's rules without human training.
+- **Feature:** `cerberus schema <command>`
+- **Output:** Returns strict JSON Schema for the command's *Input Arguments* and *Output Data*.
+- **Benefit:** Zero "Hallucination" of flags. The Agent knows exactly what is possible.
+
+### 7. The Batch Protocol (Atomic Efficiency)
+**Mission:** Reduce 10 turns of context switching into 1 atomic operation.
+- **Feature:** `cerberus batch --file requests.json`
+- **Mechanism:**
+    - Agent writes a list of 10 commands to a JSON file.
+    - Cerberus executes them in parallel (Daemon-side).
+    - Cerberus returns a single aggregated JSON response.
+- **Benefit:** Massive reduction in latency and context-switching tokens.
 
 ---
 
