@@ -60,31 +60,31 @@ Built-in diagnostics (`cerberus doctor`) ensure your environment is healthy, gra
 
 ## 📊 Status & Scaling
 
-| Metric | Cerberus Light (Default) | Cerberus Enterprise (Optional) |
+| Metric | Current Capability | Phase 6 Target |
 | :--- | :--- | :--- |
-| **Capacity** | 100 - 1,000 files | **10,000+ Files** |
-| **Memory** | In-memory Numpy | **< 250 MB (Constant)** |
-| **Storage** | Standard JSON | **SQLite + FAISS** |
+| **Capacity** | 100 - 10,000+ files | **Enterprise Monorepos** |
+| **Memory** | < 250 MB (Streaming) | **Constant** |
+| **Storage** | SQLite + FAISS (Optional) | **Distributed** |
 | **Integrity** | 100% Deterministic | 100% Deterministic |
 
 **Current Version:** Phase 5 Complete (v0.5.0)
-**Performance:** Validated on **TensorFlow** (2,949 files, 68,934 symbols) with a 42.6x memory reduction vs. legacy approach.
+**Performance:** Validated on **TensorFlow** (2,949 files, 68,934 symbols) with a 42.6x memory reduction using the new streaming architecture.
 
 ---
 
 ## 🛠️ Installation & Setup
 
-### 1. Core Install (Cerberus Light)
+### 1. Install Cerberus
 ```bash
 git clone https://github.com/proxikal/Cerberus.git
 cd Cerberus
 pip install -r requirements.txt
 ```
 
-### 2. Scaled Install (Cerberus Enterprise)
-For 10,000+ file projects. Enables SQLite + FAISS streaming.
+### 2. Optional: Enable FAISS (Recommended for >10k files)
+For massive codebases, installing FAISS enables ultra-fast vector search with constant memory usage.
 ```bash
-pip install -r requirements-enterprise.txt
+pip install faiss-cpu>=1.7.4
 ```
 
 ### 🎯 Quick Start
