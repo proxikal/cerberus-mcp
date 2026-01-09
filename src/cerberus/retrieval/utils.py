@@ -10,6 +10,7 @@ from typing import List
 from loguru import logger
 
 from ..schemas import CodeSnippet, CodeSymbol, ScanResult
+from .config import AUTO_SKELETONIZE_CONFIG
 
 
 def find_symbol(name: str, scan_result: ScanResult) -> List[CodeSymbol]:
@@ -115,3 +116,23 @@ def read_range(
         end_line=end_idx + 1 if end_idx >= 0 else 0,
         content=content,
     )
+
+
+def estimate_tokens(text: str, chars_per_token: int = None) -> int:
+    """
+    Estimate the token count for a given text.
+
+    Uses a simple heuristic: ~4 characters per token (GPT-3 standard).
+    This is a rough approximation without needing a tokenizer library.
+
+    Args:
+        text: Text to estimate tokens for
+        chars_per_token: Characters per token (defaults to config value)
+
+    Returns:
+        Estimated token count
+    """
+    if chars_per_token is None:
+        chars_per_token = AUTO_SKELETONIZE_CONFIG["chars_per_token"]
+
+    return max(1, len(text) // chars_per_token)

@@ -38,6 +38,78 @@ Use `deps` to map relationships.
 cerberus deps --symbol "handle_request" --json
 ```
 
+### 📁 File Operations
+Use these commands for direct file exploration and pattern matching.
+
+#### Read Files
+```bash
+# Read entire file
+cerberus read src/auth.py --json
+
+# Read specific line range
+cerberus read src/auth.py --lines 10-50 --json
+
+# Get skeleton view (signatures only)
+cerberus read src/auth.py --skeleton --json
+```
+
+#### Inspect Files
+```bash
+# Quick overview: file stats + all symbols
+cerberus inspect src/auth.py --json
+```
+
+#### Directory Structure
+```bash
+# Show directory tree
+cerberus tree ./src --depth 3 --json
+
+# Tree with symbol counts per file
+cerberus tree ./src --symbols --json
+
+# Filter by extensions
+cerberus tree ./src --ext ".py,.js" --json
+```
+
+#### List Files
+```bash
+# List files in directory
+cerberus ls ./src --json
+
+# Recursive listing
+cerberus ls ./src --recursive --json
+
+# Filter by extensions
+cerberus ls ./src --ext ".py" --json
+```
+
+#### Pattern Search
+```bash
+# Search for pattern in files
+cerberus grep "class.*Auth" --json
+
+# Search specific directory
+cerberus grep "def login" --path ./src/auth --json
+
+# Case-insensitive search
+cerberus grep "todo" --ignore-case --json
+
+# Filter by file extensions
+cerberus grep "import.*jwt" --extensions ".py" --json
+```
+
+#### Enhanced Symbol Retrieval
+```bash
+# Fuzzy symbol search (substring matching)
+cerberus get-symbol "login" --fuzzy --json
+
+# Get all symbols in a file
+cerberus get-symbol --file src/auth.py --json
+
+# Filter by symbol type
+cerberus get-symbol "User" --type class --json
+```
+
 ### 🔄 Incremental Updates
 Use `update` to keep your index fresh without full reparse (10x faster).
 ```bash

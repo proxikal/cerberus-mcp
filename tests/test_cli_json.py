@@ -90,7 +90,10 @@ def test_search_json(tmp_path):
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert len(payload) <= 2
-    assert all("score" in item for item in payload)
+    # Phase 3: hybrid search returns hybrid_score, bm25_score, vector_score
+    assert all("hybrid_score" in item for item in payload)
+    assert all("bm25_score" in item for item in payload)
+    assert all("vector_score" in item for item in payload)
 
 
 def test_incremental_index(tmp_path, monkeypatch):

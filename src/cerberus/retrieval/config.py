@@ -39,3 +39,12 @@ QUERY_DETECTION = {
     ],
     "short_query_threshold": 3,  # Queries with ≤3 words are likely keyword searches
 }
+
+# Auto-skeletonization for search results (Phase 4 TODO Item C)
+AUTO_SKELETONIZE_CONFIG = {
+    "enabled": True,  # Enable skeleton-first search by default
+    "token_threshold": 2000,  # Total tokens across all results before triggering
+    "chars_per_token": 4,  # Approximate characters per token (GPT-3 standard)
+    "per_result_threshold": 500,  # Skeletonize individual results exceeding this
+    "preserve_small_results": True,  # Don't skeletonize results under per_result_threshold
+}

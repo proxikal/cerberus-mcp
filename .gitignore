@@ -43,3 +43,5 @@ AGENT_INSTRUCTIONS.md
 test_data/
 cerberus_agent.log
 .logs/
+.cerberus_session.json
+.cerberus_dev_session.json
