@@ -24,9 +24,10 @@ from rich.markup import escape
 from cerberus.logging_config import logger
 from cerberus.index import load_index, compute_stats
 from cerberus.benchmark import run_benchmark
+from .output import get_console
 
 app = typer.Typer()
-console = Console()
+console = get_console()
 
 
 @app.command()

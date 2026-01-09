@@ -15,9 +15,10 @@ from rich.markup import escape
 
 from cerberus.logging_config import logger
 from cerberus.agent_session import display_session_summary, get_session_tracker, clear_session
+from .output import get_console
 
 app = typer.Typer()
-console = Console()
+console = get_console()
 
 
 @app.command()

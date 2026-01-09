@@ -1,11 +1,11 @@
-# CERBERUS v0.5.0 - AI Agent Context
-# Protocol: UACP/1.0 | Tokens: ~850 | Compression: 99.8% | Fidelity: 100%
-# Compatible: Claude✓ Gemini✓ Codex✓ | Verified: 2026-01-08
+# CERBERUS v0.10.0 - AI Agent Context
+# Protocol: UACP/1.0 | Tokens: ~900 | Compression: 99.8% | Fidelity: 100%
+# Compatible: Claude✓ Gemini✓ Codex✓ | Verified: 2026-01-09
 # Truth: THIS_FILE | Verify: cerberus verify-context
 
 ## CORE [ALWAYS_LOAD]
 id=cerberus mission=AST→symbol→context type=deterministic_engine firmness=REQUIRED
-status=P1-7:✅ P7-mono:⏸️ tests=167/182(0❌) prod=READY
+status=P1-10:✅ P7-mono:⏸️ tests=176/191(0❌) prod=READY
 principle=code_over_prompts forbidden=[LLM_analysis,time_est,feature_creep,proactive_docs,emojis,bypass_facade]
 
 ## IDENTITY
@@ -66,8 +66,8 @@ Forbidden:
   GOAL: Minimal token diff.
 
 ## STATUS
-version: 0.9.0 | phases: P1-9(complete) P7-mono(deferred)
-tests: 167/182 passing | 15 skipped | 0 failing | compliance: 100%
+version: 0.10.0 | phases: P1-10(complete) P7-mono(deferred)
+tests: 176/191 passing | 15 skipped | 0 failing | compliance: 100%
 Performance:
   memory: 0.22MB keyword | 227x under P7 target | lazy: 400MB semantic
   tokens: 99.7%↓ (150K→500) | smart_ctx: 87%↓
@@ -84,6 +84,13 @@ Phase 9 (Active Cortex - COMPLETE ✓):
   9.6: Filesystem watcher (auto-index updates) ✓
   9.7: Session management (automatic cleanup) ✓
   9.8: Three-tier memory (hot/warm/cold) ✓
+Phase 10 (Deterministic Interface - COMPLETE ✓):
+  10.1: Global --machine mode (pure data, zero noise) ✓
+  10.2: Configurable token ledger (--show-turn-savings, --silent-metrics) ✓
+  10.3: MachineAwareConsole (strips rich markup/emojis) ✓
+  10.4: Structured failure (JSON errors + actionable fixes) ✓
+  10.5: Schema contract (introspect command interfaces) ✓
+  10.6: Batch protocol (in-process parallel execution) ✓
 
 ## ARCH
 pipeline: scan→parse→index→retrieve→resolve→synthesize
@@ -99,9 +106,9 @@ Storage: primary: SQLite+ACID | vector: FAISS(optional) | arch: streaming_const_
 5. verify: cerberus verify-context
 6. commit: ONLY if requested
 
-## COMMANDS [37 total]
+## COMMANDS [39 total]
 Core: hello, version, doctor, scan, index, update, watcher
-Utils: stats, bench, generate-tools, summarize, verify-context, generate-context
+Utils: stats, bench, generate-tools, summarize, verify-context, generate-context, schema, batch
 Retrieval: get-symbol (--auto-hydrate), search, skeleton-file, skeletonize, blueprint, get-context
 Symbolic: deps, calls, references, resolution-stats, inherit-tree, descendants, overrides, call-graph, smart-context, trace-path
 Dogfood: read, inspect, tree, ls, grep, timeline
@@ -148,3 +155,10 @@ cerberus retrieval blueprint src/cerberus/main.py       # Whole-file AST (index-
 cerberus dogfood timeline --commits 3                   # Changed symbols (last 3 commits)
 cerberus retrieval get-symbol User --auto-hydrate       # Auto-fetch referenced types
 cerberus symbolic trace-path api_endpoint db_save       # Execution flow mapping
+
+# Phase 10 Features (Agent Symbiosis)
+cerberus --machine retrieval get-symbol Foo --json      # Machine mode: pure data, no markup
+cerberus --silent-metrics utils stats                   # Suppress all metrics
+cerberus utils schema --list                            # List all command schemas
+cerberus utils schema get-symbol                        # Get command interface schema
+cerberus utils batch --file requests.json               # Atomic batch execution (parallel)

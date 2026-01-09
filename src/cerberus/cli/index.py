@@ -14,9 +14,10 @@ from rich.table import Table
 
 from cerberus.scanner import scan as perform_scan
 from cerberus.index import build_index
+from .output import get_console
 
 app = typer.Typer()
-console = Console()
+console = get_console()
 
 
 @app.command()

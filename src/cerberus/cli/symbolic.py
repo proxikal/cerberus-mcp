@@ -21,9 +21,10 @@ from cerberus.index import (
     read_range,
     semantic_search,
 )
+from .output import get_console
 
 app = typer.Typer()
-console = Console()
+console = get_console()
 
 @app.command("deps")
 def deps(

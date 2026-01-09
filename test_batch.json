@@ -1,0 +1,26 @@
+{
+  "requests": [
+    {
+      "command": "get-symbol",
+      "args": {
+        "name": "SQLiteIndexStore",
+        "json": true
+      }
+    },
+    {
+      "command": "search",
+      "args": {
+        "query": "parse",
+        "mode": "keyword",
+        "top-k": 3,
+        "json": true
+      }
+    },
+    {
+      "command": "stats",
+      "args": {
+        "json": true
+      }
+    }
+  ]
+}

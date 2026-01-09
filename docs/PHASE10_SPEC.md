@@ -7,15 +7,16 @@
 
 ## 🎯 Core Objectives
 
-### 1. The Global `--machine` Protocol
-**Mission:** Ensure 100% Signal / 0% Noise.
-- **Problem:** Current commands output Markdown tables, emojis ("🌟"), and whitespace for human readability. This wastes tokens.
+### 1. The Global "Machine-First" Protocol
+**Mission:** Ensure 100% Signal / 0% Noise by default.
+- **Problem:** Conventional tools default to human-readable output (tables, colors), forcing agents to opt-out of bloat.
 - **Solution:**
-    - Implement a global `CERBERUS_MACHINE_MODE` environment variable (and `--machine` flag).
-    - When active, ALL commands bypass `rich.console` and return raw, minified text or JSON.
+    - **Machine Mode is the DEFAULT.** All commands return minified JSON or raw text unless specified otherwise.
+    - Implement a `--human` (or `-H`) flag to opt-in to "Pretty" output (Markdown tables, emojis, colors).
+    - **Result:** The Agent never has to remember to be efficient; the tool is efficient by design.
 - **Example:**
-    - *Human:* `| Symbol | Type | ...` (100 tokens)
-    - *Machine:* `User:Class:src/user.py` (5 tokens)
+    - *Default (Agent):* `User:Class:src/user.py` (5 tokens)
+    - *Opt-in (--human):* `| Symbol | Type | ...` (100 tokens)
 
 ### 2. Configurable "Token Ledger" (Metrics)
 **Mission:** Provide precise, optional feedback on efficiency without polluting the output.
@@ -67,12 +68,13 @@
 
 ### 7. The Batch Protocol (Atomic Efficiency)
 **Mission:** Reduce 10 turns of context switching into 1 atomic operation.
-- **Feature:** `cerberus batch --file requests.json`
-- **Mechanism:**
-    - Agent writes a list of 10 commands to a JSON file.
-    - Cerberus executes them in parallel (Daemon-side).
-    - Cerberus returns a single aggregated JSON response.
-- **Benefit:** Massive reduction in latency and context-switching tokens.
+- **Architecture:** **Serverless / In-Process**.
+    - **Rule:** Batch commands MUST NOT communicate with the Daemon (avoids single-threaded deadlocks/hangs).
+    - **Mechanism:**
+        1. `cerberus batch` loads the SQLite Index *once* into its own process memory (paying the startup tax once).
+        2. It uses `ThreadPoolExecutor` to execute requests in parallel against the local DB.
+        3. It aggregates results into a single JSON response.
+- **Benefit:** Massive throughput, zero network overhead, and immunity to Daemon hangs.
 
 ---
 

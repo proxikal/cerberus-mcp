@@ -174,7 +174,7 @@ cerberus/resolution/
     *   **Machine Mode:** JSON-only output (no markdown/emojis).
     *   **Structured Failure:** Self-healing error objects with suggestions.
     *   **Schema Contract:** Introspection for command arguments.
-    *   **Batch Protocol:** Atomic execution of multiple commands.
+    *   **Batch Protocol:** In-Process Parallel Execution (Serverless).
 
 **Goal:** Perfect Agent-Tool Symbiosis. See [PHASE10_SPEC.md](./PHASE10_SPEC.md).
 

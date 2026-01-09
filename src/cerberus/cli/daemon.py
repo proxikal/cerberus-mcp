@@ -20,9 +20,10 @@ from ..daemon import (
     send_rpc_request,
 )
 from ..logging_config import logger
+from .output import get_console
 
 app = typer.Typer()
-console = Console()
+console = get_console()
 
 
 @app.command("start")

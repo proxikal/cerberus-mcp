@@ -11,5 +11,6 @@ from rich.console import Console
 from rich.table import Table
 
 from cerberus.logging_config import logger
+from .output import get_console
 
-console = Console()
+console = get_console()
