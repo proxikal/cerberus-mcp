@@ -1,6 +1,6 @@
 # Cerberus: The Autonomous Context Engine
 
-**Cerberus** is an intelligent "Context Management Layer" that bridges the gap between autonomous AI agents and massive software engineering projects. It solves the **"Context Wall"** problem by pre-processing, indexing, and serving only the most relevant, compacted context to agents on-demand.
+**Cerberus** is an intelligent "Context Management Layer" that bridges the gap between autonomous AI agents and massive software engineering projects. It solves the **"Context Wall"** problem by serving high-precision, compacted context to agents on-demand.
 
 [![Status: Production](https://img.shields.io/badge/status-production-green.svg)](#)
 [![Tests: 146/156 Passing](https://img.shields.io/badge/tests-146%2F156%20passing-brightgreen.svg)](#)
@@ -12,786 +12,133 @@
 ## 📖 Documentation
 
 ### User Documentation
-- **[README.md](./README.md)** - This file
 - **[Quick Start](#-quick-start)** - Get started in 5 minutes
 - **[CLI Reference](#-complete-cli-reference)** - All commands
 - **[Competitor Comparison](#-competitor-comparison)** - How Cerberus stacks up
 
-### Developer Documentation
-- **[VISION.md](./docs/VISION.md)** - Architectural philosophy
-- **[MANDATES.md](./docs/MANDATES.md)** - Development rules
-- **[ROADMAP.md](./docs/ROADMAP.md)** - Current status and future plans
-- **[AGENT_GUIDE.md](./docs/AGENT_GUIDE.md)** - AI agent integration guide
-
-### Phase Documentation
-- **[PHASE3_COMPLETE.md](./PHASE3_COMPLETE.md)** - Phase 3 completion report
-- **[PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md)** - Performance benchmarks
-- **[PHASE4_ENHANCEMENTS.md](./docs/PHASE4_ENHANCEMENTS.md)** - Planned enhancements
+### Developer & Architecture
+- **[Architectural Vision](./docs/VISION.md)** - Philosophy & Strategy
+- **[Development Mandates](./docs/MANDATES.md)** - Reliability rules
+- **[Project Roadmap](./docs/ROADMAP.md)** - Phases 1-6
+- **[AI Agent Guide](./docs/AGENT_GUIDE.md)** - Integration instructions
 
 ---
 
-## 🚨 The Problem: The Context Wall
+## 🚨 The Challenge: The Context Wall
 
-Autonomous AI agents face a critical limitation when working with large codebases:
+Autonomous AI agents face a critical limitation: **Context Waste**. Reading entire files to find a single function burns tokens, causes "hallucinations" due to context noise, and slows down the engineering loop.
 
-- **Context Limits:** Projects often exceed LLM context windows, causing agents to "forget" architecture
-- **Token Waste:** Reading entire files to find a single function burns through tokens (150K+ tokens wasted)
-- **Slow Retrieval:** Manual file searching and grepping is inefficient and error-prone
-- **Lost Context:** Agents lose the "big picture" when forced to operate on isolated text chunks
+**Cerberus** provides a deterministic **"Mental Map"** of your codebase using Abstract Syntax Trees (AST) and hybrid search.
 
-**Example: Without Cerberus**
-```
-Agent needs: "How does user authentication work?"
-→ grep -r "auth" → 50 files matched
-→ Read all 50 files → 500 KB of code
-→ Token usage: ~150,000 tokens
-→ Time: Minutes of manual searching
-→ Result: Overwhelmed agent, wasted context
-```
+### 💡 Why Cerberus?
 
-**Example: With Cerberus**
-```
-Agent: cerberus search "user authentication logic"
-→ Hybrid search finds 5 relevant functions
-→ Returns 2 KB of precise code
-→ Token usage: ~500 tokens (300x reduction!)
-→ Time: 7 seconds automated
-→ Result: Perfect context, efficient retrieval
-```
+Cerberus is built with an **"Agent-First"** philosophy:
+
+- **🧠 Surgical Precision:** Unlike standard RAG that treats code as raw text chunks, Cerberus indexes by **Symbol Boundaries**. Logic units are always retrieved whole.
+- **💓 Git-Native Sync:** By parsing `git diff`, Cerberus only re-parses affected symbols. Your index stays fresh in real-time, even during massive refactors.
+- **📉 Token Economy:** With **Skeletonization**, Cerberus can strip logic and send only signatures. Agents "see" the entire structure for 1/100th of the cost.
+- **🕸️ Symbolic Intelligence:** Beyond text, it understands **relationships**. It resolves method calls to definitions and tracks types across file boundaries.
 
 ---
 
-## 🚀 Key Features
+## 🚀 Core Capabilities
 
-### 🧩 AST-Based Chunking
-Unlike simple text splitters, Cerberus uses **Tree-Sitter** to parse code into a structural map of functions, classes, methods, and variables. It understands the difference between a comment and a class definition.
+### 🧩 AST-Based Mapping
+Uses **Tree-Sitter** to parse code into a structural map. It understands symbol boundaries, parameters, and return types.
+**Supports:** Python, JS, TS, JSX, TSX, Go (Rust coming in Phase 6).
 
-**Supports:** Python, JavaScript, TypeScript, JSX, TSX (Go, Rust, Java coming in Phase 4)
+### 🔍 Hybrid Retrieval
+Combines **BM25 keyword search** with **vector semantic search**. Automatically detects if your query is technical (CamelCase) or conceptual and adjusts the strategy.
 
-### 🔍 Hybrid Search (Phase 3 ✅)
-Combines **BM25 keyword search** with **vector semantic search** for best-in-class retrieval:
+### ⚡ Background Watcher
+An invisible daemon keeps your index synchronized with filesystem changes. It auto-starts on index commands and uses debounced updates to remain lightweight.
 
-- **BM25:** Perfect for exact matches (function names, class names)
-- **Vector:** Excellent for conceptual searches ("error handling logic")
-- **RRF Fusion:** Merges both rankings for optimal results
+### 🩺 Aegis Reliability
+Built-in diagnostics (`cerberus doctor`) ensure your environment is healthy, grammars are compiled, and the index is ready for production.
 
-**Automatic query type detection:** Cerberus detects whether you're searching for exact symbols or concepts and adjusts weights automatically.
+---
 
-**Performance:** <8 seconds for all query types (including model loading)
+## 📊 Status & Scaling
 
-### ⚡ Incremental Updates (Phase 3 ✅)
-Git-aware surgical index updates that re-parse **only changed symbols** instead of the entire codebase.
+| Metric | Cerberus Light (Default) | Cerberus Enterprise (Optional) |
+| :--- | :--- | :--- |
+| **Capacity** | 100 - 1,000 files | **10,000+ Files** |
+| **Memory** | In-memory Numpy | **< 250 MB (Constant)** |
+| **Storage** | Standard JSON | **SQLite + FAISS** |
+| **Integrity** | 100% Deterministic | 100% Deterministic |
 
-**Speed:** 10x faster than full reparse for <20% file changes
-- Small changes (<5%): <1 second
-- Medium changes (5-20%): 1-5 seconds
-- Large changes (>30%): Auto-fallback to full reparse
+**Current Version:** Phase 5 Complete (v0.5.0)
+**Performance:** Validated on **TensorFlow** (2,949 files, 68,934 symbols) with a 42.6x memory reduction vs. legacy approach.
 
-**Smart features:**
-- Detects changes via `git diff`
-- Re-parses affected symbols and their callers
-- Tracks commit hashes in index metadata
+---
 
-### 👁️ Background Watcher (Phase 3 ✅)
-Invisible filesystem monitoring daemon that keeps your index synchronized in real-time.
+## 🛠️ Installation & Setup
 
-**Features:**
-- Auto-starts with CLI commands (optional)
-- Debounced updates (waits 2s after last change)
-- Cross-platform (macOS, Linux, Windows)
-- Graceful shutdown and PID management
-
-**Usage:**
+### 1. Core Install (Cerberus Light)
 ```bash
-cerberus watcher status    # Check daemon status
-cerberus watcher start     # Start monitoring
-cerberus watcher logs      # View real-time logs
-```
-
-### 📉 Context Compaction
-Optimized retrieval ensures agents receive only what they need:
-
-- **Padded Snippets:** Get function with N lines of context
-- **Skeletonization:** Show signatures without implementation details
-- **Import Resolution:** Automatically include definitions of referenced types
-
-### 🤖 Agent-Native CLI
-Every command supports `--json` output for seamless machine integration:
-
-```bash
-cerberus search "auth" --json
-{
-  "results": [
-    {
-      "name": "authenticate_user",
-      "file": "src/auth.py",
-      "lines": [42, 67],
-      "score": 0.856,
-      "match_type": "both"
-    }
-  ]
-}
-```
-
----
-
-## 💡 Why Cerberus?
-
-Cerberus occupies a specialized niche between "Code Search Engines" and "RAG Frameworks." While there are tools that overlap with its functionality, Cerberus is built with a specific **"Agent-First"** philosophy.
-
-### 🧠 Surgical vs. Chunk-based Indexing
-Most RAG tools split code into arbitrary "chunks" of 500-1000 tokens, often cutting functions in half. Cerberus understands **Abstract Syntax Trees (AST)**. It indexes by **Symbol Boundaries**, ensuring that functions, classes, and methods are always retrieved as complete, logical units.
-
-### 💓 The Git-Native Heartbeat
-Unlike indexers that re-scan the entire project or use basic file-hash checking, Cerberus hooks directly into the **Git lifecycle**. By parsing `git diff`, it performs surgical updates. If you change 3 lines in a 5,000-line file, Cerberus only re-parses the specific symbols affected by those lines, keeping the index in sync in real-time.
-
-### 📉 Skeletonization (Token Economy)
-When an agent needs to understand a massive file, most tools send either the whole file (wasting tokens) or a tiny snippet (losing context). Cerberus can generate a **Skeleton**—stripping the logic out and sending only the signatures. This allows an agent to "see" the entire structure of a massive project for a fraction of the cost.
-
-### 🩺 Built-in "Doctor" Protocol
-Cerberus isn't just for reading; it's for **reliable engineering**. The inclusion of `doctor.py` and the **Aegis Autonomous Debugging Protocol** means Cerberus is designed to help an agent diagnose its own environment, ensuring grammars are compiled and the index is healthy before it starts working.
-
----
-
-## 📊 Performance Metrics (Phase 3 Baseline)
-
-Tested on production-scale project (TheCookBook: 1.1GB, 24,810 files):
-
-| Metric | Phase 3 Value | Phase 4 Target (Aegis-Scale) |
-|--------|-------| :--- |
-| Files Indexed | 428 TypeScript/JavaScript files | **10,000+ Files** |
-| Symbols Extracted | 1,199 symbols | **25,000+ Symbols** |
-| Index Time | 2.1 minutes (126s) | **< 30 minutes** |
-| Index Format | Monolithic JSON | **SQLite (Disk-First)** |
-| Peak Memory | 522 MB | **< 250 MB (Constant)** |
-| **Token Savings** | **99.7%** (150K → 500 tokens) | **99.7%** |
-
-> **Note:** Phase 4 is actively transitioning to a streaming, disk-first architecture to break the "Context Wall" for enterprise-scale projects while maintaining absolute data integrity.
-
-See [PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md) for detailed baseline benchmarks.
-
----
-
-## 🛠️ Installation
-
-### Prerequisites
-- Python 3.10+
-- Git (for incremental updates)
-- 500MB+ disk space for embedding models
-
-### Install Dependencies
-
-```bash
-# Clone repository
 git clone https://github.com/proxikal/Cerberus.git
 cd Cerberus
-
-# Install Python dependencies (Cerberus Light)
 pip install -r requirements.txt
-
-# Verify installation
-PYTHONPATH=src python3 -m cerberus.main version
 ```
 
-### Cerberus Light vs. Enterprise
-
-**Cerberus Light** (Default - No FAISS)
-- Perfect for small-medium projects (100-1,000 files)
-- Zero heavy dependencies (no C++ compilation)
-- In-memory vector search with numpy
-- Fast installation and setup
-
-**Cerberus Enterprise** (Optional FAISS)
-- For massive codebases (10,000+ files like TensorFlow)
-- Install FAISS for production-scale performance:
-  ```bash
-  pip install -r requirements-enterprise.txt
-  # or: pip install faiss-cpu>=1.7.4
-  ```
-- Streaming FAISS queries with constant memory
-- 42.6x memory reduction vs. in-memory approach
-
-**When to use Enterprise:**
-- Codebases with 10,000+ files
-- Production deployments requiring constant memory
-- Large-scale semantic search operations
-
-### Core Dependencies
-- `tree-sitter` - AST parsing
-- `sentence-transformers` - Semantic embeddings
-- `rank-bm25` - Keyword search
-- `watchdog` - Filesystem monitoring
-- `typer` - CLI framework
-- `pydantic` - Schema validation
-
-### Optional Dependencies
-- `faiss-cpu` - Vector search for enterprise scale (install separately)
-
----
-
-## 🎯 Quick Start
-
-### 1. Index a Project
-
+### 2. Scaled Install (Cerberus Enterprise)
+For 10,000+ file projects. Enables SQLite + FAISS streaming.
 ```bash
-# Basic indexing
-cerberus index ./path/to/project -o project.db
-
-# With file type filters
-cerberus index ./src --ext .py --ext .ts -o project.db
-
-# JSON output for automation
-cerberus index ./project -o project.db --json
+pip install -r requirements-enterprise.txt
 ```
 
-**Output:**
-```
-Indexed 428 files and 1199 symbols to project.db.
-```
-
-### 2. Search for Code
-
+### 🎯 Quick Start
 ```bash
-# Auto mode (detects query type)
-cerberus search "database connection logic"
+# 1. Index your project (creates project.db)
+cerberus index ./src -o project.db
 
-# Keyword mode (exact matches)
-cerberus search "DatabaseConnection" --mode keyword
+# 2. Search for logic
+cerberus search "how is auth handled"
 
-# Semantic mode (conceptual)
-cerberus search "how is auth handled" --mode semantic
+# 3. Get surgical context
+cerberus get-symbol "authenticate_user" --padding 5
 
-# Balanced hybrid
-cerberus search "user login" --mode balanced --keyword-weight 0.7
-
-# JSON output
-cerberus search "auth" --json --limit 5
-```
-
-**Output:**
-```
-                    Hybrid Search: 'auth' (mode: auto)
-┏━━━━━━┳━━━━━━━┳━━━━━━┳━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━┓
-┃ Rank ┃ Score ┃ Type ┃ Name            ┃ Symbol     ┃ File       ┃ Lines ┃
-┡━━━━━━╇━━━━━━━╇━━━━━━╇━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━┩
-│    1 │ 0.856 │  ⚡  │ authenticate    │ function   │ auth.py    │ 42-67 │
-│    2 │ 0.742 │  🔤  │ AuthService     │ class      │ service.py │ 15-89 │
-│    3 │ 0.623 │  🧠  │ verify_token    │ function   │ jwt.py     │ 23-45 │
-└──────┴───────┴──────┴─────────────────┴────────────┴────────────┴───────┘
-
-Match types: 🔤 Keyword  🧠 Semantic  ⚡ Both
-```
-
-### 3. Get Specific Symbol
-
-```bash
-# Retrieve exact function code
-cerberus get-symbol "authenticate_user" --padding 3
-
-# With import information
-cerberus get-symbol "AuthService" --show-imports
-
-# JSON output
-cerberus get-symbol "verify_token" --json
-```
-
-### 4. Incremental Updates
-
-```bash
-# Update index after code changes (git-aware)
-cerberus update --index project.db
-
-# Dry-run (show what would change)
-cerberus update --index project.db --dry-run
-
-# With detailed statistics
-cerberus update --index project.db --stats
-
-# Force full reparse
-cerberus update --index project.db --full
-```
-
-**Output:**
-```
-Detecting changes...
-Updating index incrementally...
-
-✓ Index updated successfully
-  Strategy: incremental
-  Files re-parsed: 3
-  Symbols updated: 12
-  Symbols removed: 0
-  Time: 0.8s
-```
-
-### 5. Background Watcher
-
-```bash
-# Check watcher status
-cerberus watcher status
-
-# Start watching (real-time sync)
-cerberus watcher start --project ./my-project --index project.db
-
-# View logs
-cerberus watcher logs --follow
-
-# Stop watcher
-cerberus watcher stop
-```
-
-**Output:**
-```
-✅ Watcher running (PID: 12345)
-   Watching: /Users/dev/my-project
-   Index: project.db
-   Uptime: 2h 34m
-   Last update: 45s ago
-   Events processed: 127
-```
-
-### 6. View Statistics
-
-```bash
-cerberus stats --index project.db
-```
-
-**Output:**
-```
-       Index Stats for
-    'project.db'
-┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━┓
-┃ Metric            ┃ Value ┃
-┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━┩
-│ Total Files       │ 428   │
-│ Total Symbols     │ 1199  │
-│ Avg Symbols/File  │ 2.80  │
-│ Total Calls       │ 111K  │
-│ Type Info Entries │ 1078  │
-└───────────────────┴───────┘
+# 4. Start real-time sync
+cerberus watcher start --project . --index project.db
 ```
 
 ---
 
 ## 🏗️ Architecture
 
-Cerberus follows the **Self-Similarity Mandate**: every package has the same clean structure.
-
-```
-cerberus/
-├── scanner/          # The "Legs" - Filesystem traversal
-│   ├── facade.py     # Public API
-│   ├── walker.py     # Directory walking
-│   └── config.py     # Scanner configuration
-│
-├── parser/           # The "Eyes" - AST extraction
-│   ├── facade.py     # Public API
-│   ├── python_parser.py
-│   ├── typescript_parser.py
-│   └── config.py
-│
-├── index/            # The "Memory" - Persistence
-│   ├── facade.py     # Public API
-│   ├── index_builder.py
-│   ├── index_loader.py
-│   └── sqlite_store.py   # Disk-first Aegis-Scale Storage (Phase 4)
-│
-├── retrieval/        # The "Brain" - Hybrid search (Phase 3)
-│   ├── facade.py     # Public API (hybrid_search)
-│   ├── bm25_search.py      # Keyword search
-│   ├── vector_search.py    # Semantic search
-│   ├── hybrid_ranker.py    # RRF fusion
-│   └── config.py
-│
-├── incremental/      # Git-aware updates (Phase 3)
-│   ├── facade.py     # Public API
-│   ├── git_diff.py   # Change detection
-│   ├── change_analyzer.py
-│   ├── surgical_update.py
-│   └── config.py
-│
-├── watcher/          # Background daemon (Phase 3)
-│   ├── facade.py     # Public API
-│   ├── daemon.py     # Process management
-│   ├── filesystem_monitor.py
-│   └── config.py
-│
-├── synthesis/        # Context compaction (Phase 2)
-│   ├── facade.py     # Public API
-│   ├── skeletonizer.py
-│   └── payload.py
-│
-└── main.py           # The "Mouth" - CLI (Typer)
-```
-
-**Design Principles:**
-- Every package exposes a clean `facade.py` API
-- Internal implementation details are hidden
-- Configuration centralized in `config.py`
-- Self-documenting structure (agent can navigate using Cerberus itself!)
-
----
-
-## 📚 Complete CLI Reference
-
-### Core Commands
-
-```bash
-# Indexing
-cerberus index <path> -o <output>         # Create index
-cerberus stats --index <file>             # Show statistics
-
-# Search & Retrieval
-cerberus search <query> [--mode auto|keyword|semantic|balanced]
-cerberus get-symbol <name> [--padding N] [--show-imports]
-cerberus get-context <symbol>             # Get synthesized context
-
-# Updates (Phase 3)
-cerberus update --index <file> [--dry-run|--stats|--full]
-
-# Watcher (Phase 3)
-cerberus watcher status                   # Check daemon status
-cerberus watcher start [--project <path>] # Start monitoring
-cerberus watcher stop                     # Stop daemon
-cerberus watcher restart                  # Restart daemon
-cerberus watcher logs [--follow]          # View logs
-
-# Context Operations
-cerberus skeleton-file <path>             # Show skeletonized view
-cerberus skeletonize <file>               # AST-aware pruning
-cerberus deps --symbol <name> [--recursive] # Show dependencies
-
-# Utilities
-cerberus doctor                           # Run diagnostics
-cerberus generate-tools                   # Generate agent manifest
-cerberus bench                            # Run benchmarks
-```
-
-### Global Flags
-
-```bash
---json          # Machine-readable JSON output (all commands)
---help          # Show command help
-```
-
----
-
-## 🧪 Testing
-
-Cerberus has comprehensive test coverage:
-
-```bash
-# Run all tests
-PYTHONPATH=src python3 -m pytest tests/ -v
-
-# Run specific test suites
-PYTHONPATH=src python3 -m pytest tests/test_phase3_unit.py -v
-PYTHONPATH=src python3 -m pytest tests/test_phase3_retrieval.py -v
-PYTHONPATH=src python3 tests/test_phase3_integration.py
-```
-
-**Test Results:** 34/34 passing (100%) ✅
-
----
-
----
-
-## 🤖 AI Agent Integration
-
-Cerberus is designed to be **agent-native**. Here's how to integrate:
-
-### 1. Generate Tool Manifest
-
-```bash
-cerberus generate-tools > tools.json
-```
-
-This creates a JSON manifest describing all Cerberus capabilities for your agent framework (LangChain, CrewAI, AutoGPT).
-
-### 2. Use JSON Output
-
-Every command supports `--json` for structured output:
-
-```python
-import subprocess
-import json
-
-# Search for code
-result = subprocess.run(
-    ["cerberus", "search", "authentication", "--json"],
-    capture_output=True,
-    text=True
-)
-data = json.loads(result.stdout)
-
-for item in data["results"]:
-    print(f"Found: {item['name']} in {item['file']}")
-```
-
-### 3. Monitor Agent Logs
-
-```bash
-tail -f cerberus_agent.log
-```
-
-Structured JSON logs include:
-- Performance metrics
-- Error messages
-- Trace events
-
-### 4. Token Optimization
-
-**Before Cerberus:**
-```
-Agent prompt: "Fix the authentication bug"
-→ Reads 50 files (500 KB)
-→ Context: 150,000 tokens
-→ Cost: High
-```
-
-**With Cerberus:**
-```
-Agent prompt: "Fix the authentication bug"
-→ cerberus search "authentication" --json
-→ Returns 5 precise functions (2 KB)
-→ Context: 500 tokens (300x reduction)
-→ Cost: Minimal
-```
-
----
-
-## 🎯 Use Cases
-
-### 1. Code Review Agents
-```bash
-# Agent reviews changes
-git diff main | cerberus update --index review.db --dry-run
-cerberus search "modified functions" --json
-# Agent gets only changed code for review
-```
-
-### 2. Documentation Generators
-```bash
-# Agent generates docs
-cerberus get-symbol "MyClass" --show-imports
-# Gets class with all type definitions
-```
-
-### 3. Bug Fixing Agents
-```bash
-# Agent searches for error handling
-cerberus search "error handling for database connections"
-# Finds all relevant error handlers
-```
-
-### 4. Refactoring Agents
-```bash
-# Agent finds all callers
-cerberus deps --symbol "old_function" --recursive
-# Gets complete call graph for safe refactoring
-```
-
----
-
-## 🔧 Configuration
-
-### Scanner Configuration (`cerberus/scanner/config.py`)
-
-```python
-DEFAULT_EXTENSIONS = [".py", ".js", ".ts", ".tsx", ".jsx"]
-DEFAULT_IGNORE_PATTERNS = [
-    "node_modules/**",
-    "__pycache__/**",
-    ".venv/**",
-    "*.pyc"
-]
-```
-
-### Hybrid Search Configuration (`cerberus/retrieval/config.py`)
-
-```python
-HYBRID_SEARCH_CONFIG = {
-    "default_mode": "auto",
-    "keyword_weight": 0.5,
-    "semantic_weight": 0.5,
-    "top_k_per_method": 20,
-    "final_top_k": 10,
-}
-
-BM25_CONFIG = {
-    "k1": 1.5,  # Term frequency saturation
-    "b": 0.75,  # Length normalization
-}
-```
-
-### Watcher Configuration (`cerberus/watcher/config.py`)
-
-```python
-WATCHER_CONFIG = {
-    "auto_start": False,  # Auto-start on CLI commands
-    "debounce_delay": 2.0,  # Seconds to wait after last change
-}
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Issue: "Tree-sitter grammar not found"
-
-**Solution:**
-```bash
-# Compile grammars manually
-python3 compile_grammars.py
-```
-
-### Issue: "Embedding model download slow"
-
-**Solution:** First-time model download takes ~4 seconds. Subsequent uses are instant (cached in memory).
-
-### Issue: "Path not found in incremental update"
-
-**Solution:** This is a known edge case with git diff path normalization. Use `--full` flag to force full reparse:
-```bash
-cerberus update --index project.db --full
-```
-
-### Issue: "Watcher not starting"
-
-**Solution:** Check if another watcher is already running:
-```bash
-cerberus watcher status
-cerberus watcher stop  # Stop existing watcher
-cerberus watcher start # Start fresh
-```
-
-### Need Help?
-
-Run diagnostics:
-```bash
-cerberus doctor
-```
-
-This checks:
-- Python version
-- Dependencies
-- Tree-sitter grammars
-- Embedding model availability
-- Git integration
+Every package exposes a clean `facade.py` API (Self-Similarity Mandate).
+
+- `scanner/` - Generator-based streaming traversal.
+- `parser/` - AST extraction (Tree-Sitter).
+- `index/` - Persistence (SQLite + FAISS).
+- `retrieval/` - Hybrid search (BM25 + Vector).
+- `resolution/` - Symbolic intelligence (Phase 5).
+- `synthesis/` - Context compaction (Skeletonization).
 
 ---
 
 ## 🗺️ Roadmap
 
-### ✅ Phase 1: Foundation (Complete)
-- AST-based parsing
-- Basic indexing and retrieval
-- Symbol resolution
+### ✅ Phases 1-5 (Complete)
+- AST Parsing, Hybrid Search, Background Watcher.
+- Aegis-Scale (SQLite) streaming architecture.
+- Symbolic Intelligence (Method/Type resolution).
 
-### ✅ Phase 2: Context Synthesis (Complete)
-- Skeletonization
-- Payload synthesis
-- Import resolution
-
-### ✅ Phase 3: Operational Excellence (Complete)
-- Git-native incrementalism
-- Background watcher
-- Hybrid retrieval (BM25 + Vector)
-
-### ✅ Phase 4: Aegis-Scale Performance (Complete)
-- Streaming SQLite + FAISS architecture
-- 42.6x memory reduction (1.2GB → 28MB)
-- Constant memory usage under 250MB
-- 10,000+ file support validated
-
-### ✅ Phase 5: Symbolic Intelligence (Complete)
-- Method call extraction with receiver tracking
-- Import resolution to internal definitions
-- Type tracking and method→definition resolution
-- Symbol reference graph for cross-codebase navigation
-
-### 🔮 Phase 6: Advanced Context Synthesis (Planned)
-- Official agent plugins (LangChain, CrewAI, AutoGPT)
-- Web UI for visual exploration
-- Security scanning (PII/secrets detection)
-- Multi-language support enhancements
-
-See [ROADMAP.md](./docs/ROADMAP.md) and [PHASE4_ENHANCEMENTS.md](./docs/PHASE4_ENHANCEMENTS.md) for details.
-
----
-
-## 🤝 Contributing
-
-Cerberus follows strict development mandates for maintainability. See [MANDATES.md](./docs/MANDATES.md).
-
-**Key principles:**
-- Self-similarity in architecture
-- Deterministic code over prompts
-- Comprehensive testing (aim for 100%)
-- Agent-native design
-
----
-
-## 📄 License
-
-MIT License - See LICENSE file for details.
-
----
-
-## 🙏 Acknowledgments
-
-**Philosophy:** Aegis robustness mandates
-
-**Implementation:** Claude Sonnet 4.5 (Anthropic)
-
-**Testing:** Automated test suite + production validation
-
-**Inspiration:** The need for better AI agent tooling in software engineering
-
----
-
-## 📊 Project Status
-
-**Current Version:** Phase 5 Complete (v0.5.0)
-
-**Status:** ✅ Production Ready
-
-**Tests:** 146/156 Passing (94%)
-
-**Benchmarks:** Validated on TensorFlow (2,949 files, 68,934 symbols)
-
-**Next:** Phase 6 (agent plugins, web UI, security scanning)
-
----
-
-## 🔗 Links
-
-- **Documentation:** [./docs/](./docs/)
-- **Tests:** [./tests/](./tests/)
-- **Benchmarks:** [PHASE3_BENCHMARK_RESULTS.md](./PHASE3_BENCHMARK_RESULTS.md)
-- **Completion Report:** [PHASE3_COMPLETE.md](./PHASE3_COMPLETE.md)
-- **Future Plans:** [PHASE4_ENHANCEMENTS.md](./docs/PHASE4_ENHANCEMENTS.md)
+### 🔮 Phase 6: Advanced Context Synthesis (Active)
+- **Inheritance Resolution:** Track method inheritance through class hierarchies.
+- **Cross-File Inference:** Advanced dataflow analysis for deeper context.
+- **Native Plugins:** Official tool-sets for LangChain, CrewAI, and AutoGPT.
 
 ---
 
 ## 🏁 Competitor Comparison
 
-Cerberus occupies a specialized niche between "Code Search Engines" and "RAG Frameworks." Here is how it stacks up against the current landscape:
-
-| Feature | Cerberus | Cursor / Copilot | Sourcegraph | Aider | Bloop / Greptile |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Parsing** | **AST-Based (Surgical)** | Text-Based (Chunks) | LSIF (Heavy) | Simple Map | Chunk-based |
-| **Infrastructure** | **100% Local** | Cloud-Dependent | Enterprise/Cloud | Local | Cloud API |
-| **Git Integration** | **Native (Surgical)** | Basic Hash | Repository Sync | None/Manual | Webhook Sync |
-| **Agent-Native** | **Yes (JSON-First)** | IDE-Locked | Partial (API) | Yes | Yes (API) |
-| **Context Tooling** | **Skeletonizer** | Snippets | Full File | Repomap | Snippets |
-
-### Key Differentiators
-
-*   **vs. Cursor / GitHub Copilot:** These are closed-source "black boxes" locked to specific IDEs. Cerberus is an open **Context Layer** that any autonomous agent, CLI tool, or custom script can leverage.
-*   **vs. Sourcegraph:** While Sourcegraph is powerful for enterprise-scale code intelligence, it is "Heavy" (often requiring build-server setups). Cerberus is **"Light"**—using Tree-sitter to get deep intelligence with zero configuration.
-*   **vs. Aider:** Aider’s "repomap" is excellent for quick overviews. Cerberus provides a **persistent, queryable graph database** (JSON/Vector) that supports complex semantic searches and tracks symbol-level changes over time.
-*   **vs. Standard RAG:** Most RAG apps treat code as raw text chunks. Cerberus understands **code structure**. It knows the difference between a function signature and its implementation, allowing for advanced techniques like **Skeletonization**.
+| Feature | Cerberus | Cursor / Copilot | Sourcegraph | Aider |
+| :--- | :--- | :--- | :--- | :--- |
+| **Parsing** | **AST-Based (Surgical)** | Text Chunks | LSIF (Heavy) | Simple Map |
+| **Infrastructure** | **100% Local** | Cloud-Dependent | Enterprise | Local |
+| **Git Integration** | **Native (Surgical)** | Basic Hash | Repository Sync | Manual |
+| **Context Tooling** | **Skeletonizer** | Snippets | Full File | Repomap |
 
 ---
 
