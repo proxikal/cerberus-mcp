@@ -1,16 +1,77 @@
 """
-Common imports and utilities for CLI commands.
+Common CLI helpers to reduce duplication across command modules.
+
+Extracted from Phase 7 Track B de-monolithization.
+Contains shared utilities for index handling, error formatting, and output.
 """
 
-import json
-import typer
 from pathlib import Path
-from typing import List, Optional
-
-from rich.console import Console
-from rich.table import Table
-
-from cerberus.logging_config import logger
+from typing import Optional
+import typer
+from cerberus.index import load_index, ScanResult
 from .output import get_console
 
 console = get_console()
+
+
+def get_default_index(index_path: Optional[Path] = None) -> Path:
+    """
+    Get default index path, checking existence.
+
+    Args:
+        index_path: Optional explicit index path
+
+    Returns:
+        Path to index file (defaults to cerberus.db in CWD)
+
+    Raises:
+        typer.Exit: If index file doesn't exist
+    """
+    if index_path is None:
+        index_path = Path("cerberus.db")
+
+    if not index_path.exists():
+        console.print("[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+        console.print("[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+        raise typer.Exit(code=1)
+
+    return index_path
+
+
+def load_index_or_exit(index_path: Optional[Path] = None) -> ScanResult:
+    """
+    Load index from path or exit with error message.
+
+    Args:
+        index_path: Optional explicit index path (defaults to cerberus.db)
+
+    Returns:
+        Loaded ScanResult
+
+    Raises:
+        typer.Exit: If index not found or fails to load
+    """
+    validated_path = get_default_index(index_path)
+
+    try:
+        return load_index(validated_path)
+    except Exception as e:
+        from rich.markup import escape
+        console.print(f"[red]Error loading index: {escape(str(e))}[/red]")
+        raise typer.Exit(code=1)
+
+
+def format_file_location(file_path: str, line: Optional[int] = None) -> str:
+    """
+    Format file location consistently across commands.
+
+    Args:
+        file_path: Path to file
+        line: Optional line number
+
+    Returns:
+        Formatted string like "path/to/file.py:123"
+    """
+    if line is not None:
+        return f"{file_path}:{line}"
+    return file_path

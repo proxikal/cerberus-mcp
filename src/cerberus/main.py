@@ -33,10 +33,11 @@ atexit.register(display_session_summary)
 # Global CLI callback for flags that apply to all commands
 @app.callback()
 def global_options(
-    machine: bool = typer.Option(
+    human: bool = typer.Option(
         False,
-        "--machine",
-        help="Enable machine mode: pure data output, no formatting (also via CERBERUS_MACHINE_MODE env var)"
+        "--human",
+        "-H",
+        help="Enable human mode: pretty output with tables, colors, emojis (also via CERBERUS_HUMAN_MODE env var)"
     ),
     show_turn_savings: bool = typer.Option(
         False,
@@ -63,11 +64,14 @@ def global_options(
     Cerberus: Deterministic Context Layer for AI Agents
 
     Global flags apply to all commands.
+    Machine mode is DEFAULT (pure data, no formatting).
+    Use --human/-H for pretty output.
     """
-    # Configure machine mode
-    if machine:
-        CLIConfig.set_machine_mode(True)
-        # Reconfigure logging to suppress console output in machine mode
+    # Configure machine mode (default is True, disable if --human is passed)
+    if human:
+        CLIConfig.set_machine_mode(False)
+    else:
+        # Machine mode is default - suppress console logging
         setup_logging(suppress_console=True)
 
     # Configure metrics display

@@ -85,7 +85,7 @@ Phase 9 (Active Cortex - COMPLETE ✓):
   9.7: Session management (automatic cleanup) ✓
   9.8: Three-tier memory (hot/warm/cold) ✓
 Phase 10 (Deterministic Interface - COMPLETE ✓):
-  10.1: Global --machine mode (pure data, zero noise) ✓
+  10.1: Machine-First Protocol (machine mode is DEFAULT, --human to opt-in) ✓
   10.2: Configurable token ledger (--show-turn-savings, --silent-metrics) ✓
   10.3: MachineAwareConsole (strips rich markup/emojis) ✓
   10.4: Structured failure (JSON errors + actionable fixes) ✓
@@ -116,6 +116,7 @@ Dogfood: read, inspect, tree, ls, grep, timeline
 ## EXPLORATION [PROTOCOL]
 - `cerberus` is in PATH - call it directly (NOT `PYTHONPATH=src python3 -m cerberus.main`)
 - Index Cerberus itself before exploration: `cerberus index .`
+- **Machine mode is DEFAULT:** Pure data output, no rich formatting. Use `--human` for pretty tables.
 - **MANDATORY:** Use Cerberus commands for ALL exploration:
   - Pattern search: `cerberus dogfood grep "pattern" [path] -l` (files) or `-C 3` (context)
   - Read files: `cerberus dogfood read <file> [--lines 1-100]`
@@ -156,9 +157,10 @@ cerberus dogfood timeline --commits 3                   # Changed symbols (last 
 cerberus retrieval get-symbol User --auto-hydrate       # Auto-fetch referenced types
 cerberus symbolic trace-path api_endpoint db_save       # Execution flow mapping
 
-# Phase 10 Features (Agent Symbiosis)
-cerberus --machine retrieval get-symbol Foo --json      # Machine mode: pure data, no markup
-cerberus --silent-metrics utils stats                   # Suppress all metrics
-cerberus utils schema --list                            # List all command schemas
-cerberus utils schema get-symbol                        # Get command interface schema
-cerberus utils batch --file requests.json               # Atomic batch execution (parallel)
+# Phase 10 Features (Agent Symbiosis - Machine-First)
+cerberus retrieval get-symbol Foo --json               # Default: machine mode (pure data)
+cerberus --human retrieval get-symbol Foo              # Opt-in to human mode (rich tables)
+cerberus --silent-metrics utils stats                  # Suppress all metrics
+cerberus utils schema --list                           # List all command schemas
+cerberus utils schema get-symbol                       # Get command interface schema
+cerberus utils batch --file requests.json              # Atomic batch execution (parallel)

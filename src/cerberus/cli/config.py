@@ -38,11 +38,20 @@ class CLIConfig:
 
     @classmethod
     def is_machine_mode(cls) -> bool:
-        """Check if machine mode is active (env var or explicit setting)"""
+        """
+        Check if machine mode is active.
+
+        Machine mode is the DEFAULT (Phase 10 spec).
+        Returns False only if human mode is explicitly requested.
+        """
         if cls._machine_mode is not None:
             return cls._machine_mode
-        # Check environment variable
-        return os.getenv("CERBERUS_MACHINE_MODE", "").lower() in ("1", "true", "yes")
+        # Check environment variable for human mode opt-in
+        # If CERBERUS_HUMAN_MODE is set, disable machine mode
+        if os.getenv("CERBERUS_HUMAN_MODE", "").lower() in ("1", "true", "yes"):
+            return False
+        # Default to machine mode (Phase 10: Machine-First Protocol)
+        return True
 
     @classmethod
     def set_show_turn_savings(cls, enabled: bool) -> None:

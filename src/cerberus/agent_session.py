@@ -136,6 +136,12 @@ class SessionTracker:
         # Import config to check machine mode and metric settings
         from cerberus.cli.config import CLIConfig
 
+        # Protocol Enforcement (Phase 10 - Symbiosis Check)
+        # Warn if human mode is being used during an agent session
+        if not CLIConfig.is_machine_mode():
+            print("\n[PROTOCOL] Warning: Human mode active. This burns tokens.")
+            print("[PROTOCOL] Machine mode is default. Remove --human flag or set CERBERUS_HUMAN_MODE=0\n")
+
         # Check if metrics should be suppressed
         if CLIConfig.is_silent_metrics():
             return
@@ -148,6 +154,9 @@ class SessionTracker:
             # Only show what's requested
             if CLIConfig.show_session_savings():
                 print(f"[Meta] Session Saved: {self.metrics.tokens_saved:,} tokens")
+            if CLIConfig.show_turn_savings():
+                # Show turn-level savings if requested
+                pass  # Turn-level tracking would require per-command tracking
             return
 
         # Human mode: rich output

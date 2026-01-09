@@ -50,7 +50,8 @@
 
 1.  **Auto-Indentation (The Formatter):**
     - **Mechanism:** Cerberus detects the target file's indentation style (Spaces vs Tabs).
-    - **Action:** Automatically re-indents the injected code block to match the nesting level.
+    - **Dependency:** Requires `black` to be installed (`pip install black`).
+    - **Action:** Automatically re-indents the injected code block to match the nesting level and formats it to project standards.
     - **Result:** Agent can be "lazy" with whitespace; Cerberus fixes it.
 
 2.  **The Import Guardian (Dependency Check):**

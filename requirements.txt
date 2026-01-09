@@ -22,6 +22,9 @@ watchdog>=3.0.0  # Filesystem monitoring for background watcher
 rank-bm25>=0.2.2  # BM25 keyword search for hybrid retrieval
 psutil>=5.9.0  # Process management for daemon
 
+# Phase 11: The Surgical Writer
+black>=23.0.0  # Required for auto-formatting injected code blocks
+
 # Phase 4: Aegis-Scale Performance (SQLite + FAISS)
 # Note: FAISS is OPTIONAL for Cerberus Light (small-medium projects)
 # For Cerberus Enterprise (10K+ files), install with:

@@ -22,6 +22,7 @@ from cerberus.index import (
     semantic_search,
 )
 from .output import get_console
+from .common import load_index_or_exit, get_default_index
 
 app = typer.Typer()
 console = get_console()
@@ -48,14 +49,7 @@ def deps(
     Supports recursive call graph analysis with --recursive flag.
     Use --show-resolution with --file to see Phase 5 import resolution results.
     """
-    # Default to cerberus.db in CWD if not provided
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
-
+    index_path = get_default_index(index_path)  # Validate path
     scan_result = load_index(index_path)
     response: dict = {}
 
@@ -192,13 +186,7 @@ def calls_cmd(
     """
     from cerberus.storage import open_index
 
-    # Default to cerberus.db in CWD
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         store = open_index(str(index_path))
@@ -298,13 +286,7 @@ def references_cmd(
     """
     from cerberus.storage import open_index
 
-    # Default to cerberus.db in CWD
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         store = open_index(str(index_path))
@@ -406,13 +388,7 @@ def resolution_stats_cmd(
     from cerberus.storage import open_index
     from cerberus.resolution import get_resolution_stats
 
-    # Default to cerberus.db in CWD
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         store = open_index(str(index_path))
@@ -494,13 +470,7 @@ def inherit_tree_cmd(
     from cerberus.index import load_index
     from cerberus.resolution import compute_class_mro
 
-    # Default to cerberus.db in CWD if not provided
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         scan_result = load_index(index_path)
@@ -587,13 +557,7 @@ def descendants_cmd(
     from cerberus.index import load_index
     from cerberus.resolution import get_class_descendants
 
-    # Default to cerberus.db in CWD if not provided
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         scan_result = load_index(index_path)
@@ -658,13 +622,7 @@ def overrides_cmd(
     from cerberus.index import load_index
     from cerberus.resolution import get_overridden_methods
 
-    # Default to cerberus.db in CWD if not provided
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         scan_result = load_index(index_path)
@@ -746,13 +704,7 @@ def call_graph_cmd(
     from cerberus.index import load_index
     from cerberus.resolution import build_call_graph
 
-    # Default to cerberus.db in CWD if not provided
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         scan_result = load_index(index_path)
@@ -868,13 +820,7 @@ def smart_context_cmd(
     from cerberus.index import load_index
     from cerberus.resolution import assemble_context
 
-    # Default to cerberus.db in CWD if not provided
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         scan_result = load_index(index_path)
@@ -941,13 +887,7 @@ def trace_path_cmd(
     from cerberus.index import load_index
     from cerberus.resolution.call_graph_builder import CallGraphBuilder
 
-    # Default to cerberus.db in CWD if not provided
-    if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
-            raise typer.Exit(code=1)
+    index_path = get_default_index(index_path)
 
     try:
         # Load index
