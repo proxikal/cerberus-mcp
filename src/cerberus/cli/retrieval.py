@@ -21,6 +21,8 @@ from cerberus.index import (
     read_range,
     semantic_search,
 )
+# Phase 9.5: Thin Client Routing
+from .retrieval_routing import get_symbol_with_routing
 
 app = typer.Typer()
 console = Console()
@@ -79,7 +81,13 @@ def get_symbol(
             console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
             raise typer.Exit(code=1)
 
-    scan_result = load_index(index_path)
+    # Phase 9.5: Only load index if needed (not for simple exact-match with daemon)
+    # Simple exact-match case is handled by get_symbol_with_routing (which checks daemon first)
+    scan_result = None
+    if file or fuzzy or (name and not skeleton and not auto_hydrate):
+        # Need full scan_result for complex queries
+        if file or fuzzy:
+            scan_result = load_index(index_path)
 
     # Phase 2.1: Enhanced symbol finding
     if file:
@@ -98,8 +106,8 @@ def get_symbol(
         # Sort by name length (shorter = better match)
         matches = sorted(matches, key=lambda s: len(s.name))
     elif name:
-        # Exact matching (original behavior)
-        matches = find_symbol(name, scan_result)
+        # Exact matching with Phase 9.5 daemon routing
+        matches = get_symbol_with_routing(name, index_path, use_daemon=True)
     else:
         console.print("[red]Error: Provide either a symbol name or use --file flag.[/red]")
         console.print("Examples:")

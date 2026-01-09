@@ -21,7 +21,7 @@ from cerberus.index import (
     read_range,
     semantic_search,
 )
-from cerberus.cli import utils, retrieval, symbolic, dogfood
+from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon
 
 app = typer.Typer()
 console = Console()
@@ -30,6 +30,7 @@ console = Console()
 atexit.register(display_session_summary)
 
 # Register CLI submodules
+app.add_typer(daemon.app, name="daemon", help="Daemon management commands (start, stop, status, health)")
 app.add_typer(utils.app, name="utils", help="Utility commands (stats, bench, generate-tools, etc.)")
 app.add_typer(retrieval.app, name="retrieval", help="Search and retrieval commands")
 app.add_typer(symbolic.app, name="symbolic", help="Symbolic intelligence commands")

@@ -58,18 +58,32 @@ Forbidden:
   DO: Use `cerberus get-symbol` OR `cerberus read --lines` to satisfy the tool's read-requirement.
   GOAL: Minimal tokens to satisfy safety check.
 
+@parsimony:
+  CONTEXT: Write/Edit operations
+  RULE: solution_complexity <= problem_complexity
+  FORBIDDEN: [over_engineering, speculative_features, rewriting_unchanged_logic]
+  MANDATE: "Atomic edits only. Do not rewrite full files if search/replace works."
+  GOAL: Minimal token diff.
+
 ## STATUS
-version: 0.8.0 | phases: P1-7(complete) P8(active) P7-mono(deferred)
+version: 0.9.0 | phases: P1-9(complete) P7-mono(deferred)
 tests: 167/182 passing | 15 skipped | 0 failing | compliance: 100%
 Performance:
   memory: 0.22MB keyword | 227x under P7 target | lazy: 400MB semantic
   tokens: 99.7%↓ (150K→500) | smart_ctx: 87%↓
   capacity: 10K+ files | 68K symbols validated
-Phase 8:
+  daemon: 7.2ms avg query | <50ms target ✓ | zero cold start
+Phase 8 (Context Amplification):
   blueprint: index-backed whole-file AST (faster than disk)
   timeline: git-aware symbol change tracking
   auto-hydrate: automatic type dependency injection
   trace-path: execution flow mapping (BFS pathfinding)
+Phase 9 (Active Cortex - COMPLETE ✓):
+  9.1-9.4: Daemon server + JSON-RPC 2.0 protocol ✓
+  9.5: Thin client routing (7ms avg, 227x faster) ✓
+  9.6: Filesystem watcher (auto-index updates) ✓
+  9.7: Session management (automatic cleanup) ✓
+  9.8: Three-tier memory (hot/warm/cold) ✓
 
 ## ARCH
 pipeline: scan→parse→index→retrieve→resolve→synthesize
