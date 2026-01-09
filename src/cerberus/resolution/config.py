@@ -35,3 +35,28 @@ MODULE_PATTERNS = {
     "relative_import": r"^\.+",  # Matches relative imports like ".module" or "..utils"
     "package_import": r"^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z0-9_]+)*$",  # Matches standard package paths
 }
+
+# Phase 6: Inheritance Resolution Configuration
+INHERITANCE_CONFIG = {
+    "max_mro_depth": 50,         # Maximum depth for method resolution order
+    "track_multiple_inheritance": True,  # Support multiple inheritance (Python, C++)
+    "resolve_mixins": True,      # Attempt to resolve mixin classes
+    "confidence_direct": 1.0,    # Direct inheritance in same file
+    "confidence_imported": 0.95,  # Inherited from imported class
+    "confidence_external": 0.7,   # Inherited from external library
+}
+
+# Phase 6: Call Graph Configuration
+CALL_GRAPH_CONFIG = {
+    "max_depth": 10,             # Maximum recursion depth for call graphs
+    "include_external": False,    # Include external library calls
+    "track_dynamic_calls": True,  # Track dynamic method calls
+}
+
+# Phase 6: Context Assembly Configuration
+CONTEXT_ASSEMBLY_CONFIG = {
+    "include_base_classes": True,     # Include base class definitions
+    "include_overridden_methods": True,  # Show methods that override base
+    "max_inheritance_depth": 3,       # How many levels up to include
+    "skeletonize_bases": True,        # Skeletonize base class bodies
+}

@@ -104,8 +104,9 @@ def test_incremental_index(tmp_path, monkeypatch):
     workdir.mkdir()
     # Copy test files to a writable location
     for path in TEST_FILES_DIR.iterdir():
-        target = workdir / path.name
-        target.write_text(path.read_text())
+        if path.is_file():  # Only copy files, not directories
+            target = workdir / path.name
+            target.write_text(path.read_text())
 
     index_path = tmp_path / "cli_index.json"
     first = runner.invoke(app, ["index", str(workdir), "--output", str(index_path), "--json"])

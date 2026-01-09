@@ -297,6 +297,15 @@ def _build_sqlite_index(
         logger.warning(f"Phase 5.3: Type tracking failed: {e}")
         # Continue anyway - resolution is optional enhancement
 
+    # Phase 6.1: Post-processing - Inheritance resolution
+    try:
+        from ..resolution import resolve_inheritance
+        inheritance_count = resolve_inheritance(sqlite_store, project_root)
+        logger.info(f"Phase 6.1: Created {inheritance_count} inheritance references")
+    except Exception as e:
+        logger.warning(f"Phase 6.1: Inheritance resolution failed: {e}")
+        # Continue anyway - resolution is optional enhancement
+
     # Return adapter
     return ScanResultAdapter(sqlite_store)
 

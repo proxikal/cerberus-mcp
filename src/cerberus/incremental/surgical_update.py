@@ -254,7 +254,7 @@ def _apply_surgical_update_json(
         removed_symbols=removed_symbols,
         affected_callers=list(affected_callers),
         files_reparsed=files_reparsed,
-        strategy="incremental_json",
+        strategy="incremental",
     )
 
     logger.info(

@@ -2384,6 +2384,448 @@ def watcher_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("inherit-tree")
+def inherit_tree_cmd(
+    class_name: str = typer.Argument(..., help="Class name to show inheritance tree for."),
+    file_path: Optional[Path] = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="File path to disambiguate (if multiple classes with same name).",
+    ),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 6] Show inheritance hierarchy (MRO) for a class.
+
+    Displays the Method Resolution Order (MRO) showing which base classes
+    are inherited and in what order methods are resolved.
+
+    Examples:
+      cerberus inherit-tree ParserError
+      cerberus inherit-tree CodeSymbol --file src/cerberus/schemas.py
+    """
+    from cerberus.index import load_index
+    from cerberus.resolution import compute_class_mro
+
+    # Default to cerberus.db in CWD if not provided
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        scan_result = load_index(index_path)
+        store = scan_result._store  # Access SQLite store
+
+        mro = compute_class_mro(store, class_name, str(file_path) if file_path else None)
+
+        if not mro:
+            console.print(f"[red]No inheritance found for class '{class_name}'[/red]")
+            raise typer.Exit(code=1)
+
+        if json_output:
+            mro_data = [
+                {
+                    "class_name": node.class_name,
+                    "file_path": node.file_path,
+                    "base_classes": node.base_classes,
+                    "depth": node.depth,
+                    "confidence": node.confidence,
+                }
+                for node in mro
+            ]
+            typer.echo(json.dumps(mro_data, indent=2))
+            return
+
+        # Pretty print MRO
+        console.print(f"\n[bold]Method Resolution Order for {class_name}:[/bold]\n")
+
+        for i, node in enumerate(mro):
+            indent = "  " * node.depth
+            arrow = "↳ " if node.depth > 0 else ""
+            confidence_color = "green" if node.confidence == 1.0 else "yellow" if node.confidence > 0.8 else "dim"
+
+            console.print(f"{indent}{arrow}[{confidence_color}]{node.class_name}[/{confidence_color}]", end="")
+
+            if node.file_path:
+                console.print(f" [dim]({node.file_path})[/dim]", end="")
+
+            if node.base_classes:
+                console.print(f" [dim]extends: {', '.join(node.base_classes)}[/dim]")
+            else:
+                console.print()
+
+        console.print(f"\n[dim]Total depth: {max(n.depth for n in mro)}[/dim]")
+
+    except Exception as e:
+        logger.error(f"Failed to compute inheritance tree: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
+@app.command("descendants")
+def descendants_cmd(
+    class_name: str = typer.Argument(..., help="Base class name to find descendants of."),
+    file_path: Optional[Path] = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="File path to disambiguate (if multiple classes with same name).",
+    ),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 6] Show all classes that inherit from a base class.
+
+    Finds all direct and indirect descendants (subclasses) of the given class.
+
+    Examples:
+      cerberus descendants CerberusError
+      cerberus descendants BaseModel
+    """
+    from cerberus.index import load_index
+    from cerberus.resolution import get_class_descendants
+
+    # Default to cerberus.db in CWD if not provided
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        scan_result = load_index(index_path)
+        store = scan_result._store
+
+        descendants = get_class_descendants(store, class_name, str(file_path) if file_path else None)
+
+        if json_output:
+            typer.echo(json.dumps({"base_class": class_name, "descendants": descendants}, indent=2))
+            return
+
+        if not descendants:
+            console.print(f"[yellow]No descendants found for class '{class_name}'[/yellow]")
+            return
+
+        console.print(f"\n[bold]Descendants of {class_name}:[/bold] ({len(descendants)} classes)\n")
+
+        for desc in sorted(descendants):
+            console.print(f"  • {desc}")
+
+        console.print()
+
+    except Exception as e:
+        logger.error(f"Failed to find descendants: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
+@app.command("overrides")
+def overrides_cmd(
+    class_name: str = typer.Argument(..., help="Class name to find overridden methods for."),
+    file_path: Optional[Path] = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="File path to disambiguate (if multiple classes with same name).",
+    ),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 6] Show methods that override base class methods.
+
+    Identifies which methods in the class override methods from base classes,
+    helping understand polymorphism and method resolution.
+
+    Examples:
+      cerberus overrides ParserError
+      cerberus overrides Skeletonizer
+    """
+    from cerberus.index import load_index
+    from cerberus.resolution import get_overridden_methods
+
+    # Default to cerberus.db in CWD if not provided
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        scan_result = load_index(index_path)
+        store = scan_result._store
+
+        overrides = get_overridden_methods(store, class_name, str(file_path) if file_path else None)
+
+        if json_output:
+            typer.echo(json.dumps({"class": class_name, "overrides": overrides}, indent=2))
+            return
+
+        if not overrides:
+            console.print(f"[yellow]No overridden methods found for class '{class_name}'[/yellow]")
+            return
+
+        console.print(f"\n[bold]Overridden methods in {class_name}:[/bold]\n")
+
+        for method_name, override_info in overrides.items():
+            console.print(f"  [cyan]{method_name}()[/cyan]")
+            for info in override_info:
+                confidence_color = "green" if info["confidence"] == 1.0 else "yellow"
+                console.print(f"    ↳ overrides [{confidence_color}]{info['base_class']}[/{confidence_color}]", end="")
+                if info["base_file"]:
+                    console.print(f" [dim]({info['base_file']}:{info['base_line']})[/dim]")
+                else:
+                    console.print(f" [dim](external)[/dim]")
+
+        console.print()
+
+    except Exception as e:
+        logger.error(f"Failed to find overrides: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
+@app.command("call-graph")
+def call_graph_cmd(
+    symbol_name: str = typer.Argument(..., help="Function/method name to analyze."),
+    direction: str = typer.Option(
+        "forward",
+        "--direction",
+        "-d",
+        help="Graph direction: 'forward' (what does it call?) or 'reverse' (what calls it?)"
+    ),
+    file_path: Optional[Path] = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="File path to disambiguate (if multiple symbols with same name).",
+    ),
+    max_depth: int = typer.Option(
+        5,
+        "--depth",
+        help="Maximum call depth to traverse."
+    ),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    [PHASE 6] Generate call graph showing execution paths.
+
+    Shows what functions/methods are called (forward) or what calls them (reverse).
+
+    Examples:
+      cerberus call-graph build_index --direction forward
+      cerberus call-graph parse_file --direction reverse --depth 3
+    """
+    from cerberus.index import load_index
+    from cerberus.resolution import build_call_graph
+
+    # Default to cerberus.db in CWD if not provided
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        scan_result = load_index(index_path)
+        store = scan_result._store
+
+        graph = build_call_graph(
+            store,
+            symbol_name,
+            str(file_path) if file_path else None,
+            direction,
+            max_depth
+        )
+
+        if json_output:
+            import json as json_lib
+            graph_data = {
+                "root_symbol": graph.root_symbol,
+                "root_file": graph.root_file,
+                "nodes": [
+                    {
+                        "symbol": node.symbol_name,
+                        "file": node.file_path,
+                        "line": node.line,
+                        "depth": node.depth,
+                        "type": node.call_type
+                    }
+                    for node in graph.nodes
+                ],
+                "edges": [[caller, callee] for caller, callee in graph.edges],
+                "max_depth": graph.max_depth_reached,
+                "truncated": graph.truncated
+            }
+            typer.echo(json_lib.dumps(graph_data, indent=2))
+            return
+
+        # Pretty print call graph
+        console.print(f"\n[bold]Call Graph for {symbol_name} ({direction}):[/bold]\n")
+
+        if not graph.nodes:
+            console.print(f"[yellow]No calls found for '{symbol_name}'[/yellow]")
+            return
+
+        # Group nodes by depth
+        by_depth: Dict[int, List] = {}
+        for node in graph.nodes:
+            if node.depth not in by_depth:
+                by_depth[node.depth] = []
+            by_depth[node.depth].append(node)
+
+        # Display by depth
+        for depth in sorted(by_depth.keys()):
+            nodes = by_depth[depth]
+            indent = "  " * depth
+            arrow = "→ " if depth > 0 else ""
+
+            console.print(f"[dim]Depth {depth}:[/dim]")
+            for node in nodes:
+                console.print(f"{indent}{arrow}[cyan]{node.symbol_name}[/cyan] [dim]({node.file_path}:{node.line})[/dim]")
+
+        console.print(f"\n[dim]Total nodes: {len(graph.nodes)}, edges: {len(graph.edges)}, max depth: {graph.max_depth_reached}[/dim]")
+        if graph.truncated:
+            console.print(f"[yellow]Graph truncated at depth {max_depth}[/yellow]")
+
+    except Exception as e:
+        logger.error(f"Failed to generate call graph: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
+@app.command("smart-context")
+def smart_context_cmd(
+    symbol_name: str = typer.Argument(..., help="Symbol name to get context for."),
+    file_path: Optional[Path] = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="File path to disambiguate (if multiple symbols with same name).",
+    ),
+    include_bases: bool = typer.Option(
+        True,
+        "--include-bases/--no-bases",
+        help="Include base class context for classes."
+    ),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    output_file: Optional[Path] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Write context to file instead of stdout."
+    ),
+):
+    """
+    [PHASE 6] Assemble smart context with inheritance awareness.
+
+    Provides AI-optimized context including the symbol's code,
+    skeletonized base classes, and related imports.
+
+    Examples:
+      cerberus smart-context Skeletonizer --include-bases
+      cerberus smart-context build_index --output context.txt
+    """
+    from cerberus.index import load_index
+    from cerberus.resolution import assemble_context
+
+    # Default to cerberus.db in CWD if not provided
+    if index_path is None:
+        index_path = Path("cerberus.db")
+        if not index_path.exists():
+            console.print(f"[red]Error: Index file 'cerberus.db' not found.[/red]")
+            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+            raise typer.Exit(code=1)
+
+    try:
+        scan_result = load_index(index_path)
+        store = scan_result._store
+
+        context = assemble_context(
+            store,
+            symbol_name,
+            str(file_path) if file_path else None,
+            include_bases
+        )
+
+        if not context:
+            console.print(f"[red]Symbol '{symbol_name}' not found.[/red]")
+            raise typer.Exit(code=1)
+
+        # Format context
+        from cerberus.resolution.context_assembler import ContextAssembler
+        assembler = ContextAssembler(store)
+        formatted = assembler.format_context(context)
+
+        # Output
+        if output_file:
+            output_file.write_text(formatted)
+            console.print(f"[green]Context written to {output_file}[/green]")
+            console.print(f"[dim]Lines: {context.total_lines}, Compression: {context.compression_ratio:.1%}[/dim]")
+        else:
+            console.print(formatted)
+
+    except Exception as e:
+        logger.error(f"Failed to assemble context: {e}")
+        console.print(f"[red]Error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
+        raise typer.Exit(code=1)
+
+
 @app.command(hidden=True)
 def session(
     action: str = typer.Argument("summary", help="Action: summary or clear"),
