@@ -1,55 +1,50 @@
 # CERBERUS v0.5.0 - AI Agent Context
-# Protocol: UACP/1.0 | Tokens: ~756 | Compression: 99.7% | Fidelity: 100%
+# Protocol: UACP/1.0 | Tokens: ~850 | Compression: 99.8% | Fidelity: 100%
 # Compatible: Claude✓ Gemini✓ Codex✓ | Verified: 2026-01-08
 # Truth: THIS_FILE | Verify: cerberus verify-context
 
 ## CORE [ALWAYS_LOAD]
-id=cerberus mission=AST→symbol→context type=deterministic_engine
+id=cerberus mission=AST→symbol→context type=deterministic_engine firmness=REQUIRED
 status=P1-6:✅ P7:🔜 tests=167/182(0❌) prod=READY
-principle=code_over_prompts forbidden=[LLM_analysis,time_est,feature_creep]
+principle=code_over_prompts forbidden=[LLM_analysis,time_est,feature_creep,proactive_docs,emojis,bypass_facade]
 
 ## IDENTITY
-Cerberus: deterministic context management layer for AI agents
-Core: surgical AST parsing → symbolic intelligence → compressed context
-NOT: LLM-based analysis, prompt engineering, RAG chunking
+Cerberus: deterministic context layer for AI agents. 
+Core: AST parsing → symbolic intelligence → compressed context.
+NOT: LLM-based analysis, prompt engineering, RAG chunking.
 
 Principles:
   code>prompts: tree-sitter AST | SQLite | FAISS → ∅LLM
-  self_similar: ∀pkg∃{facade.py,config.py,__init__.py} ∧ ¬cross_import
+  self_similar: ∀pkg∃{facade.py,config.py,__init__.py} ∧ ¬internal_cross_import
   aegis: {log:struct, exc:custom, trace:@, diag:doctor}
   dogfood: cerberus.index(cerberus)==REQUIRED
 
 Forbidden:
-  LLM_code_analysis → use tree-sitter AST instead
+  LLM_code_analysis → use tree-sitter AST (deterministic)
   time_estimates → say WHAT not WHEN
   feature_creep → IF !context_mgmt THEN reject+explain
-  proactive_docs → user_explicit_request REQUIRED
-  cross_imports → only via __init__.py exports
-  emojis → unless user requests
-  commit → ONLY when user requests
+  proactive_docs → explicit_user_request REQUIRED
+  cross_imports → only via __init__.py exports (¬bypass_facade)
+  emojis → forbidden unless user explicitly requests
+  unsolicited_files → edit existing before creating new
 
 ## RULES [DECISION_MATRIX]
-@new_feature:
-  IF: !serves_context_management
-  DO: [STOP, explain_mission_violation, propose_alternative]
-  FIRM: mission_integrity > feature_requests
+@mission_drift:
+  IF: violates_mandates OR !serves_context_management
+  DO: [STOP, explain_violation, propose_alternative, BE_FIRM]
+  MSG: "Conflicts with core mission. Violation: [cite]. Alternative: [propose]."
 
 @new_package:
   REQUIRE: [facade.py, config.py, __init__.py]
   TEST: can_cerberus_index_itself()
   PATTERN: self_similarity_mandate
 
-@code_analysis:
-  IF: suggest_LLM
-  REJECT: "use tree-sitter AST parsing (deterministic)"
-
 @documentation:
   IF: proactive
-  REJECT: "explicit user request required (no unsolicited docs)"
+  REJECT: "explicit user request required"
 
 @commit:
-  WHEN: user_explicitly_requests OR pre_commit_hook_modified_files
-  NEVER: proactive OR uncommitted_changes
+  WHEN: user_explicitly_requests
   STYLE: conventional_commits + "Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 
 @architecture:
@@ -57,133 +52,42 @@ Forbidden:
   DO: [STOP, cite_mandate, propose_compliant_alternative]
 
 ## STATUS
-version: 0.5.0
-phases: P1-6(complete) P7(planned)
-tests: 167/182 passing | 15 skipped | 0 failing
-production: READY
-compliance: self_similar=72% aegis=100% mission=100%
-validated: TensorFlow(2949files,68934symbols)
-
+version: 0.5.0 | phases: P1-6(complete) P7(planned)
+tests: 167/182 passing | 15 skipped | 0 failing | compliance: 100%
 Performance:
   memory: 126.5MB peak | Δ42.6x reduction | target: <50MB (P7)
   tokens: 99.7%↓ (150K→500) | smart_ctx: 87%↓
-  speed: <1s search | 43s/3Kfiles index | <1s update@<5%
   capacity: 10K+ files | 68K symbols validated
 
-## ARCH [→FEATURE_MATRIX.md#architecture]
+## ARCH
 pipeline: scan→parse→index→retrieve→resolve→synthesize
 packages: [scanner,parser,index,retrieval,incremental,watcher,synthesis,storage,resolution,semantic,summarization]
 pattern: ∀pkg∃{facade.py,config.py} | export_via=__init__.py | ¬cross_import
-
-Storage:
-  primary: SQLite+ACID | vector: FAISS(optional) | arch: streaming_const_mem
-
-Compliance:
-  8/11 packages: facade.py ⚠️ (missing: index, semantic, storage)
-  8/11 packages: config.py ⚠️ (missing: index, semantic, storage)
-  4/4 aegis layers: {log,exc,trace,diag} ✅ (doctor operational)
-
-## PHASES [→ROADMAP.md]
-P1(dep_intel): ✅ 18/18 | [deps,inspect]
-  - recursive call graphs, type resolution, import linkage
-
-P2(synthesis): ✅ 12/13 | [skeletonize,get-context]
-  - AST skeletonization (Python), payload synthesis, token budget
-
-P3(ops): ✅ 34/34 | [update,watcher,search]
-  - git-diff incremental, background daemon, BM25+vector hybrid
-
-P4(perf): ✅ mem:42.6x↓ | [index,stats,bench]
-  - streaming arch, SQLite+FAISS, TensorFlow validated
-
-P5(symbolic): ✅ 14/14 | [calls,references,resolution-stats]
-  - method call extraction, import resolution, type tracking
-
-P6(context): ✅ 14/14 | [inherit-tree,descendants,overrides,call-graph,smart-context]
-  - inheritance resolution, MRO, call graphs, cross-file type inference
-
-P7(zero_footprint): 🔜 planned | [lazy_loading,fts5,remote_embed]
-  - <50MB RAM target, SQLite FTS5, optional remote embeddings
-
-P8(agent_plugins): 🔜 planned | [langchain,crewai]
-  - official agent integrations, native toolsets
-
-## COMMANDS [32 total → README.md#cli-reference]
-Core: index scan stats update watcher doctor bench version hello
-Search: search get-symbol deps
-P5: calls references resolution-stats
-P6: inherit-tree descendants overrides call-graph smart-context
-Synthesis: skeletonize get-context skeleton-file
-Dogfood: read inspect tree ls grep
-Utils: generate-tools verify-context generate-context
+Storage: primary: SQLite+ACID | vector: FAISS(optional) | arch: streaming_const_mem
 
 ## WORKFLOW [AI_AGENT_PATTERNS]
-1. index_first: cerberus index . [BEFORE any exploration]
-2. search_before_read: cerberus search 'X' [BEFORE reading files]
-3. use_dogfood_tools: cerberus {inspect,deps,grep} [INSTEAD OF manual]
-4. test_after_code: pytest tests/ [AFTER writing code]
-5. commit_when_asked: git commit [ONLY when user requests]
+1. understand: search/inspect/deps [DO NOT read full files manually]
+2. plan: approach_fit(self_similar, aegis)
+3. implement: facade_pattern + tests
+4. test: PYTHONPATH=src python3 -m pytest tests/ -v
+5. verify: cerberus verify-context
+6. commit: ONLY if requested
 
-## VERIFY [SELF_CHECK]
-tests: PYTHONPATH=src python3 -m pytest tests/ → 167/182 ✅
-dogfood: cerberus index . → 60files,209symbols ✅
-arch: find src/cerberus -name facade.py | wc -l → 8/10 ⚠️
-no_cross: grep -r 'from cerberus\..* import' src/cerberus → 0 ✅
-context: cerberus verify-context → valid ✅
+## COMMANDS [40 total]
+Core: index, scan, stats, update, watcher, doctor, bench, version, hello
+Search: search, get-symbol, deps
+Symbolic: calls, references, resolution-stats, inherit-tree, descendants, overrides, call-graph, smart-context
+Synthesis: skeletonize, get-context, skeleton-file
+Dogfood: read, inspect, tree, ls, grep
+Utils: generate-tools, verify-context, generate-context
 
-## CONTEXT_VERIFICATION [UACP_COMPLIANCE]
-Automated verification ensures CERBERUS.md matches codebase reality.
-
-Commands:
-  cerberus verify-context        # Check CERBERUS.md validity
-  cerberus verify-context --fix  # Auto-regenerate if invalid
-  cerberus generate-context      # Regenerate from current state
-
-Checks performed:
-  - Version (pyproject.toml vs CERBERUS.md)
-  - Test counts (pytest results)
-  - Package structure (facade.py, config.py counts)
-  - Command count (typer introspection)
-  - Phase status
-  - Aegis compliance
-
-Workflow:
-  1. After code changes: cerberus verify-context
-  2. If invalid: review discrepancies, then --fix or manual edit
-  3. Before commits: ensure verification passes
-  4. CI integration: add verify-context to test pipeline
-
-## DOCS [HIERARCHY: authoritative→reference]
-Truth (absolute):
-  1. CERBERUS.md ← THIS FILE
-  2. CERBERUS_AUDIT_2026-01-08.md ← current state verification
-  3. FEATURE_MATRIX.md ← complete feature catalog
-
-Current:
-  README.md ← user overview
-  ROADMAP.md ← phase status
-  docs/VISION.md ← philosophy
-  docs/MANDATES.md ← development rules
-  docs/AGENT_GUIDE.md ← integration guide
-
-Ignore:
-  docs/archive/* ← historical only
-  PHASE*_COMPLETE.md ← superseded by ROADMAP.md
-
-## EXPLORATION [USE_CERBERUS_TOOLS]
-DO_NOT: read entire codebase manually, grep without index, find without index
-DO: cerberus search "concept" | cerberus inspect file.py | cerberus deps symbol
-Dogfooding: Cerberus must analyze itself using its own tools
+## EXPLORATION [PROTOCOL]
+- Index Cerberus itself before exploration.
+- Use `search` for concepts, `get-symbol` for logic, `deps` for impact.
+- CHALLENGE user if requested changes drift from deterministic mission.
 
 ## QUICKREF
 PYTHONPATH=src python3 -m cerberus.main index .
 PYTHONPATH=src python3 -m pytest tests/ -v
-cerberus search "how does X work"
-cerberus deps --symbol Y --recursive
-cerberus smart-context ClassName --include-bases
-
----
-# Schema Validation
-# Verify: cerberus verify-context
-# Regenerate: cerberus generate-context
-# Fix automatically: cerberus verify-context --fix
+cerberus search "your query"
+cerberus smart-context <symbol>
