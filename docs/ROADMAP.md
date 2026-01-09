@@ -147,7 +147,18 @@ cerberus/resolution/
 
 ---
 
-### Phase 8: Agent Ecosystem Integration
+### Phase 8: Predictive Context Assembly 🔜 NEXT
+*   **Agent Cortex Finalization:** Eliminate exploration loops via predictive intelligence.
+    *   **Blueprint Command:** Token-safe `cat` replacement for whole-file architectural views.
+    *   **Timeline Intelligence:** Recent symbol-level changes (`git diff` aware).
+    *   **Auto-Hydration:** Injected definitions for referenced internal types in signatures.
+    *   **Redundancy Filtering:** Session-aware caching to prevent duplicate context transmission.
+
+**Goal:** Reach < 5% token usage vs. legacy tools and achieve 100% agent autonomy. See [PHASE8_SPEC.md](./PHASE8_SPEC.md) for details.
+
+---
+
+### Phase 9: Agent Ecosystem Integration
 *   **Official Agent Plugins:** Native tool-sets for LangChain, CrewAI, and AutoGPT
     *   LangChain Tools wrapper for all Cerberus commands
     *   CrewAI integration with automatic context injection
