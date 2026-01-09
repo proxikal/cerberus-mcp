@@ -54,7 +54,7 @@ def test_skeleton_file_cli(tmp_path):
     """
     skeleton-file command should emit skeleton content.
     """
-    result = runner.invoke(app, ["skeleton-file", str(TEST_FILES_DIR / "sample.py"), "--json"])
+    result = runner.invoke(app, ["retrieval", "skeleton-file", str(TEST_FILES_DIR / "sample.py"), "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert "Skeleton" not in payload["content"]  # sanity
@@ -70,7 +70,7 @@ def test_get_symbol_cli(tmp_path):
 
     result = runner.invoke(
         app,
-        ["get-symbol", "MyClass", "--index", str(index_path), "--padding", "0"],
+        ["retrieval", "get-symbol", "MyClass", "--index", str(index_path), "--padding", "0"],
     )
 
     assert result.exit_code == 0

@@ -17,7 +17,7 @@ def test_doctor_json():
 
 def test_generate_tools(tmp_path):
     output = tmp_path / "tools.json"
-    result = runner.invoke(app, ["generate-tools", "--output", str(output)])
+    result = runner.invoke(app, ["utils", "generate-tools", "--output", str(output)])
     assert result.exit_code == 0
     assert output.exists()
     manifest = json.loads(output.read_text())

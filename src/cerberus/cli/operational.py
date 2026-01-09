@@ -1,39 +1,24 @@
+"""
+CLI Operational Commands
+
+System operational commands: hello, version, doctor, update, watcher, session.
+"""
+
 import json
 import typer
-import atexit
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from rich.console import Console
 from rich.table import Table
 from rich.markup import escape
 
 from cerberus.logging_config import logger
-from cerberus.agent_session import display_session_summary, record_operation
-from cerberus.schemas import ScanResult
-from cerberus.scanner import scan as perform_scan
-from cerberus.benchmark import run_benchmark
-from cerberus.index import (
-    build_index,
-    load_index,
-    compute_stats,
-    find_symbol,
-    read_range,
-    semantic_search,
-)
-from cerberus.cli import utils, retrieval, symbolic, dogfood
+from cerberus.agent_session import display_session_summary, get_session_tracker, clear_session
 
 app = typer.Typer()
 console = Console()
 
-# Register session summary display at exit (for agent dogfooding metrics)
-atexit.register(display_session_summary)
-
-# Register CLI submodules
-app.add_typer(utils.app, name="utils", help="Utility commands (stats, bench, generate-tools, etc.)")
-app.add_typer(retrieval.app, name="retrieval", help="Search and retrieval commands")
-app.add_typer(symbolic.app, name="symbolic", help="Symbolic intelligence commands")
-app.add_typer(dogfood.app, name="dogfood", help="Dogfooding commands (read, inspect, tree, ls, grep)")
 
 @app.command()
 def hello():
@@ -43,12 +28,14 @@ def hello():
     logger.info("Cerberus Active. The Gatekeeper is ready.")
     typer.echo("Cerberus Active. The Gatekeeper is ready.")
 
+
 @app.command()
 def version():
     """
     Prints the current version of Cerberus.
     """
     typer.echo("Cerberus v0.5.0")
+
 
 @app.command()
 def doctor(
@@ -66,7 +53,7 @@ def doctor(
     Runs a diagnostic check on the Cerberus environment.
     """
     logger.info("Running diagnostic checks...")
-    
+
     # Default to cerberus.db in CWD if not provided
     if index_path is None:
         default_db = Path("cerberus.db")
@@ -95,107 +82,6 @@ def doctor(
     console.print("🩺 Running Cerberus Doctor...")
     console.print(table)
 
-@app.command()
-def scan(
-    directory: Path = typer.Argument(
-        ".", help="The directory to scan.", exists=True, file_okay=False, readable=True
-    ),
-    no_gitignore: bool = typer.Option(
-        False, "--no-gitignore", help="Do not respect .gitignore files."
-    ),
-    ext: Optional[List[str]] = typer.Option(
-        None, "--ext", help="File extensions to include (e.g., .py, .md). Can be used multiple times."
-    ),
-    max_bytes: Optional[int] = typer.Option(
-        None, "--max-bytes", help="Skip files larger than this size (in bytes)."
-    ),
-    json_output: bool = typer.Option(
-        False, "--json", help="Output results as JSON for agents."
-    ),
-):
-    """
-    Scans a directory to map its file structure and metadata.
-    """
-    respect_gitignore = not no_gitignore
-    
-    scan_result = perform_scan(directory, respect_gitignore, extensions=ext, max_bytes=max_bytes)
-
-    if json_output:
-        typer.echo(json.dumps(scan_result.model_dump(), indent=2))
-        return
-
-    table = Table(title=f"Scan Results for '{directory}'")
-    table.add_column("File Path", style="cyan", no_wrap=True)
-    table.add_column("Size (Bytes)", justify="right", style="magenta")
-    table.add_column("Last Modified", justify="right", style="green")
-
-    for file_obj in scan_result.files:
-        table.add_row(
-            file_obj.path,
-            str(file_obj.size),
-            str(round(file_obj.last_modified))
-        )
-
-    console.print(table)
-    console.print(f"Found [bold blue]{scan_result.total_files}[/bold blue] files in [bold yellow]{scan_result.scan_duration:.4f}s[/bold yellow].")
-    console.print(f"Extracted [bold green]{len(scan_result.symbols)}[/bold green] symbols from supported files.")
-
-@app.command()
-def index(
-    directory: Path = typer.Argument(
-        ".", help="The directory to index.", exists=True, file_okay=False, readable=True
-    ),
-    output: Path = typer.Option(
-        "cerberus.db", "--output", "-o", help="Path to save the index file."
-    ),
-    no_gitignore: bool = typer.Option(
-        False, "--no-gitignore", help="Do not respect .gitignore files."
-    ),
-    ext: Optional[List[str]] = typer.Option(
-        None, "--ext", help="File extensions to include (e.g., .py, .md). Can be used multiple times."
-    ),
-    incremental: bool = typer.Option(
-        False, "--incremental", help="Reuse existing index to skip unchanged files."
-    ),
-    store_embeddings: bool = typer.Option(
-        False, "--store-embeddings/--no-store-embeddings", help="Persist embeddings in the index for faster search."
-    ),
-    model_name: str = typer.Option(
-        "all-MiniLM-L6-v2", "--model-name", help="Embedding model name when storing embeddings."
-    ),
-    max_bytes: Optional[int] = typer.Option(
-        None, "--max-bytes", help="Skip files larger than this size (in bytes)."
-    ),
-    json_output: bool = typer.Option(
-        False, "--json", help="Output results as JSON for agents."
-    ),
-):
-    """
-    Runs a scan and writes the results to a SQLite index.
-    """
-    respect_gitignore = not no_gitignore
-    scan_result = build_index(
-        directory,
-        output,
-        respect_gitignore=respect_gitignore,
-        extensions=ext,
-        incremental=incremental,
-        store_embeddings=store_embeddings,
-        model_name=model_name,
-        max_bytes=max_bytes,
-    )
-
-    if json_output:
-        payload = {
-            "index_path": str(output),
-            "total_files": scan_result.total_files,
-            "total_symbols": len(scan_result.symbols),
-            "scan_duration": scan_result.scan_duration,
-        }
-        typer.echo(json.dumps(payload, indent=2))
-        return
-
-    console.print(f"Indexed [bold blue]{scan_result.total_files}[/bold blue] files and [bold green]{len(scan_result.symbols)}[/bold green] symbols to [bold]{output}[/bold].")
 
 @app.command("update")
 def update(
@@ -239,6 +125,7 @@ def update(
     10x faster than full re-indexing for small changes.
     """
     from cerberus.incremental import detect_changes, update_index_incrementally
+    from cerberus.index import load_index
 
     # Default to cerberus.db in CWD if not provided
     if index_path is None:
@@ -392,12 +279,6 @@ def watcher_cmd(
     # Default to cerberus.db in CWD if not provided
     if index_path is None:
         index_path = Path("cerberus.db")
-        # For 'start' we will create it if needed, for others we check existence
-        if action in ["start", "restart"] and not index_path.exists():
-             logger.info(f"Index not found at {index_path}, watcher will initialize it.")
-        elif action not in ["start", "restart"] and not index_path.exists():
-             # For status/stop/logs, we might just be checking based on PID file, but index path is used in status display
-             pass
 
     try:
         if action == "start":
@@ -496,8 +377,6 @@ def session(
       cerberus session summary  # Show accumulated metrics
       cerberus session clear    # Reset session tracking
     """
-    from cerberus.agent_session import display_session_summary, clear_session, get_session_tracker
-
     tracker = get_session_tracker()
 
     if not tracker.enabled:
@@ -514,7 +393,3 @@ def session(
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print("Valid actions: summary, clear")
         raise typer.Exit(code=1)
-
-
-if __name__ == "__main__":
-    app()

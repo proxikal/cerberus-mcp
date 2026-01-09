@@ -13,7 +13,7 @@ def test_bench_json(tmp_path):
     index_path = tmp_path / "bench_index.json"
     result = runner.invoke(
         app,
-        ["bench", str(TEST_FILES_DIR), "--output", str(index_path), "--query", "greeting", "--json"],
+        ["utils", "bench", str(TEST_FILES_DIR), "--output", str(index_path), "--query", "greeting", "--json"],
     )
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
