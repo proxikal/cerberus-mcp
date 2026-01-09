@@ -147,7 +147,7 @@ cerberus/resolution/
 
 ---
 
-### Phase 8: Predictive Context Assembly 🔜 NEXT
+### Phase 8: Predictive Context Assembly 🟢 ACTIVE
 *   **Agent Cortex Finalization:** Eliminate exploration loops via predictive intelligence.
     *   **Blueprint Command:** Token-safe `cat` replacement for whole-file architectural views.
     *   **Timeline Intelligence:** Recent symbol-level changes (`git diff` aware).
@@ -158,19 +158,39 @@ cerberus/resolution/
 
 ---
 
-### Phase 9: Agent Ecosystem Integration
-*   **Official Agent Plugins:** Native tool-sets for LangChain, CrewAI, and AutoGPT
-    *   LangChain Tools wrapper for all Cerberus commands
-    *   CrewAI integration with automatic context injection
-    *   AutoGPT plugin for autonomous code navigation
-*   **Agent Tool Manifest:** JSON schema for MCP (Model Context Protocol) servers
-*   **Streaming API:** HTTP/WebSocket API for remote agent access
+### Phase 9: The Cerberus Daemon (Cortex Architecture) 🔜 PLANNED
+*   **Headless Intelligence:** Transition from CLI to persistent Server.
+    *   **Daemon Process:** Zero-latency symbol lookups (< 50ms).
+    *   **Tiered Intelligence:** RAM/SSD caching strategy for 100k+ file scalability.
+    *   **Security:** Unix Domain Sockets + Read-Only Default.
+    *   **Swarm Support:** Multi-agent concurrency.
 
-**Goal:** Make Cerberus the standard context layer for autonomous AI coding agents.
+**Goal:** Eliminate the "Startup Tax" and offload memory state from the Agent. See [PHASE9_SPEC.md](./PHASE9_SPEC.md).
 
 ---
 
-### Phase 9: Visual Intelligence (Optional)
+### Phase 10: The Deterministic Interface (Symbiosis) 🔜 PLANNED
+*   **Protocol Optimization:** 100% Signal, 0% Noise.
+    *   **Machine Mode:** JSON-only output (no markdown/emojis).
+    *   **Structured Failure:** Self-healing error objects with suggestions.
+    *   **Schema Contract:** Introspection for command arguments.
+    *   **Batch Protocol:** Atomic execution of multiple commands.
+
+**Goal:** Perfect Agent-Tool Symbiosis. See [PHASE10_SPEC.md](./PHASE10_SPEC.md).
+
+---
+
+### Phase 11: The Surgical Writer (Symbolic Editing) 🔜 PLANNED
+*   **Safe Code Modification:** Edit by Concept, not Line Number.
+    *   **Symbolic Edit:** `cerberus edit --symbol` (Replace function/class).
+    *   **Safety Pillars:** Auto-Indentation, Import Guardian, Syntax Verification.
+    *   **Diff Ledger:** Track write efficiency.
+
+**Goal:** Safer, faster code modification with 0% regression risk. See [PHASE11_SPEC.md](./PHASE11_SPEC.md).
+
+---
+
+### Phase 12: Visual Intelligence (Optional/Future)
 *   **Web UI:** Lightweight local dashboard for visual exploration
     *   Interactive call graph visualization
     *   Inheritance hierarchy tree view
@@ -180,14 +200,14 @@ cerberus/resolution/
 
 ---
 
-### Phase 10: Enhanced Security & Compliance
+### Phase 13: Enhanced Security & Compliance
 *   **Security Scanning:** Automated PII and secret detection within the indexing pipeline
 *   **Compliance Reporting:** Generate security audit reports
 *   **Safe Context Assembly:** Automatic redaction of sensitive data from AI context
 
 ---
 
-### Phase 11: Multi-Language Expansion
+### Phase 14: Multi-Language Expansion
 *   **Full TypeScript Support:** Complete skeletonization and advanced parsing
 *   **Rust Support:** Full parsing, type inference, trait resolution
 *   **Java Support:** Class hierarchies, interface resolution
@@ -204,6 +224,7 @@ Cerberus maintains these core principles across all phases:
 3. **Operational Transparency:** Agents can monitor their own context layer's health
 4. **Self-Similarity:** Every package follows facade + config pattern
 5. **Aegis Robustness:** Structured logging, custom exceptions, performance tracing, diagnostics
+6. **Parsimony:** Surgical edits and atomic changes over full-file rewrites
 
 ---
 
@@ -217,10 +238,11 @@ Cerberus maintains these core principles across all phases:
 | 0.4.0 | Phase 4 | ✅ Complete | 2026-01-08 |
 | 0.5.0 | Phase 5 | ✅ Complete | 2026-01-08 |
 | 0.6.0 | Phase 6 | ✅ Complete | 2026-01-08 |
-| 0.7.0 | Phase 7 | 🔜 Planned | 2026-01-08 |
+| 0.7.0 | Phase 7 | ✅ Complete | 2026-01-09 |
+| 0.8.0 | Phase 8 | 🟢 Active | 2026-01-09 |
 
 ---
 
-**Roadmap Last Updated:** 2026-01-08
-**Current Focus:** Memory optimization (Phase 7)
-**Status:** Cerberus is a fully functional Deep Context Synthesis Engine ready for real-world use.
+**Roadmap Last Updated:** 2026-01-09
+**Current Focus:** Predictive Context Assembly (Phase 8)
+**Status:** Cerberus is evolving into a comprehensive AI Operating System.
