@@ -133,63 +133,53 @@ cerberus/resolution/
 
 ## Planned Future Phases
 
-### Phase 7: Agent Ecosystem Integration 🔜 NEXT
+### Phase 7: Zero-Footprint Retrieval 🔜 NEXT
+*   **Aegis-Scale Memory Reduction:** Reduce constant RAM footprint to < 50MB.
+    *   **Lazy Model Loading:** Initialize the Vector Brain only on-demand for semantic queries.
+    *   **SQLite FTS5 Integration:** Replace in-memory BM25 with high-speed SQLite full-text search.
+    *   **Remote Embeddings:** Optional support for API-based vectors (Gemini/OpenAI) to eliminate local model RAM usage.
+    *   **AST Memory Streaming:** Optimize Tree-sitter processing to prevent memory accumulation in giant files.
+
+**Goal:** Beat Aider's memory efficiency while maintaining 100% AST integrity.
+
+**Estimated Scope:** 2 weeks implementation. See [PHASE7_SPEC.md](./PHASE7_SPEC.md) for details.
+
+---
+
+### Phase 8: Agent Ecosystem Integration
 *   **Official Agent Plugins:** Native tool-sets for LangChain, CrewAI, and AutoGPT
     *   LangChain Tools wrapper for all Cerberus commands
     *   CrewAI integration with automatic context injection
     *   AutoGPT plugin for autonomous code navigation
 *   **Agent Tool Manifest:** JSON schema for MCP (Model Context Protocol) servers
 *   **Streaming API:** HTTP/WebSocket API for remote agent access
-*   **Context Streaming:** Real-time context delivery for long-running agent sessions
 
 **Goal:** Make Cerberus the standard context layer for autonomous AI coding agents.
 
-**Estimated Scope:** 3-4 weeks implementation
-
 ---
 
-### Phase 8: Visual Intelligence (Optional)
+### Phase 9: Visual Intelligence (Optional)
 *   **Web UI:** Lightweight local dashboard for visual exploration
     *   Interactive call graph visualization
     *   Inheritance hierarchy tree view
     *   Search interface with highlighting
-    *   Symbol dependency graphs
 *   **VS Code Extension:** Native IDE integration
-    *   Inline context popups
-    *   Symbol navigation
-    *   Real-time index updates
 *   **Export Formats:** SVG/PNG call graphs, Mermaid diagrams
-
-**Goal:** Provide visual tools for developers and agents to explore codebases.
-
-**Priority:** Medium (CLI is primary interface)
 
 ---
 
-### Phase 9: Enhanced Security & Compliance
+### Phase 10: Enhanced Security & Compliance
 *   **Security Scanning:** Automated PII and secret detection within the indexing pipeline
-    *   Pattern-based secret detection (API keys, passwords)
-    *   PII identification (emails, phone numbers, SSNs)
-    *   Configurable ignore patterns
 *   **Compliance Reporting:** Generate security audit reports
 *   **Safe Context Assembly:** Automatic redaction of sensitive data from AI context
 
-**Goal:** Ensure Cerberus is safe for enterprise codebases with sensitive data.
-
-**Priority:** High for enterprise adoption
-
 ---
 
-### Phase 10: Multi-Language Expansion
+### Phase 11: Multi-Language Expansion
 *   **Full TypeScript Support:** Complete skeletonization and advanced parsing
 *   **Rust Support:** Full parsing, type inference, trait resolution
 *   **Java Support:** Class hierarchies, interface resolution
-*   **C++ Support:** Header parsing, namespace resolution
 *   **Generic Language Protocol:** Plugin system for adding new languages
-
-**Goal:** Support all major programming languages with consistent feature parity.
-
-**Priority:** Medium (Python/JS/TS cover 80% of use cases)
 
 ---
 
@@ -215,10 +205,10 @@ Cerberus maintains these core principles across all phases:
 | 0.4.0 | Phase 4 | ✅ Complete | 2026-01-08 |
 | 0.5.0 | Phase 5 | ✅ Complete | 2026-01-08 |
 | 0.6.0 | Phase 6 | ✅ Complete | 2026-01-08 |
-| 0.7.0 | Phase 7 | 🔜 Planned | TBD |
+| 0.7.0 | Phase 7 | 🔜 Planned | 2026-01-08 |
 
 ---
 
 **Roadmap Last Updated:** 2026-01-08
-**Current Focus:** Production deployment and Phase 7 planning
+**Current Focus:** Memory optimization (Phase 7)
 **Status:** Cerberus is a fully functional Deep Context Synthesis Engine ready for real-world use.
