@@ -667,12 +667,7 @@ cerberus ledger show --filter anchors --stats
 **Deferred:**
 - Accuracy tracking (whether agents followed suggestions) - requires user action correlation
 
-### Phase 14.4: Advanced Analytics & Integration (Future)
-- [ ] **Prediction Accuracy Tracking** (deferred from 14.3)
-  - Track correlation between predictions and subsequent agent actions
-  - Detect if agents followed suggestions within temporal window
-  - Calculate accuracy metrics (% of predictions acted upon)
-  - Surface insights: `cerberus ledger show --filter predictions --stats`
+### Phase 14.4: Integration & Safety (Future)
 - [ ] Integrate Style Guard with --verify workflow
 - [ ] Integrate predictions with undo history
 - [ ] Add safety metadata to all anchors
@@ -685,17 +680,26 @@ cerberus ledger show --filter anchors --stats
 - Total latency <250ms per operation
 - Zero regressions in existing functionality
 
-### Phase 14.5: Polish & Documentation (Week 7)
+### Phase 14.5: Analytics & Polish (Future)
+- [ ] **Prediction Accuracy Tracking** (deferred from 14.3)
+  - Track correlation between predictions and subsequent agent actions
+  - Detect if agents followed suggestions within temporal window
+  - Calculate accuracy metrics (% of predictions acted upon)
+  - Surface insights: `cerberus ledger show --filter predictions --stats`
+- [ ] Benchmark: measure turn reduction in 50 workflows
+  - Quantify productivity gains from predictive editing
+  - Measure style guard turn savings
+  - Validate context anchor hallucination reduction
 - [ ] Update CERBERUS.md with Phase 14 commands
 - [ ] Add formal output schemas to documentation
 - [ ] Write agent-facing guide: "Phase 14 Usage Patterns"
-- [ ] Benchmark: measure turn reduction in 50 workflows
 - [ ] Dogfood: use Phase 14 features to complete Phase 14
 - [ ] Final compliance audit: verify 100% mission alignment
 
 **Success Criteria:**
-- Documentation complete with examples
+- Prediction accuracy tracking shows >90% useful suggestions
 - Turn reduction measured: 25-50% in complex workflows
+- Documentation complete with examples
 - 100% mission compliance verified
 - Ledger shows all operations tracked correctly
 
