@@ -1,6 +1,7 @@
 """Blueprint generation facade - orchestrates all components.
 
 Phase 13.1: High-level API for generating enriched blueprints with caching.
+Phase 13.2: Intelligence layer with churn, coverage, and stability.
 """
 
 import time
@@ -20,6 +21,9 @@ from .schemas import (
 from .cache_manager import BlueprintCache
 from .dependency_overlay import DependencyOverlay
 from .complexity_analyzer import ComplexityAnalyzer
+from .churn_analyzer import ChurnAnalyzer
+from .coverage_analyzer import CoverageAnalyzer
+from .stability_scorer import StabilityScorer
 from .formatter import BlueprintFormatter
 
 
@@ -37,6 +41,9 @@ class BlueprintGenerator:
         self.cache = BlueprintCache(conn)
         self.dep_overlay = DependencyOverlay(conn)
         self.complexity_analyzer = ComplexityAnalyzer()
+        # Phase 13.2 analyzers
+        self.churn_analyzer = ChurnAnalyzer()
+        self.coverage_analyzer = CoverageAnalyzer()
 
     def generate(self, request: BlueprintRequest) -> Blueprint:
         """
@@ -56,6 +63,9 @@ class BlueprintGenerator:
             "deps": request.show_deps,
             "meta": request.show_meta,
             "fast": request.fast_mode,
+            "churn": request.show_churn,
+            "coverage": request.show_coverage,
+            "stability": request.show_stability,
         }
 
         # Try cache first
@@ -104,12 +114,15 @@ class BlueprintGenerator:
         nodes = self._build_hierarchy(symbols)
 
         # Apply overlays
-        if request.show_deps or request.show_meta:
+        if request.show_deps or request.show_meta or request.show_churn or request.show_coverage or request.show_stability:
             self._apply_overlays(
                 nodes,
                 symbols,
                 show_deps=request.show_deps,
                 show_meta=request.show_meta,
+                show_churn=request.show_churn,
+                show_coverage=request.show_coverage,
+                show_stability=request.show_stability,
                 fast_mode=request.fast_mode
             )
 
@@ -253,10 +266,13 @@ class BlueprintGenerator:
         symbols: List[CodeSymbol],
         show_deps: bool,
         show_meta: bool,
+        show_churn: bool,
+        show_coverage: bool,
+        show_stability: bool,
         fast_mode: bool
     ) -> None:
         """
-        Apply overlays (dependencies, complexity) to nodes.
+        Apply overlays (dependencies, complexity, churn, coverage, stability) to nodes.
 
         Modifies nodes in place.
 
@@ -265,6 +281,9 @@ class BlueprintGenerator:
             symbols: Original CodeSymbol list (for queries)
             show_deps: Whether to add dependency overlay
             show_meta: Whether to add complexity overlay
+            show_churn: Whether to add git churn overlay
+            show_coverage: Whether to add test coverage overlay
+            show_stability: Whether to add stability score overlay
             fast_mode: Skip expensive analysis
         """
         # Build symbol lookup
@@ -277,6 +296,9 @@ class BlueprintGenerator:
                 symbol_map,
                 show_deps=show_deps,
                 show_meta=show_meta,
+                show_churn=show_churn,
+                show_coverage=show_coverage,
+                show_stability=show_stability,
                 fast_mode=fast_mode
             )
 
@@ -286,6 +308,9 @@ class BlueprintGenerator:
         symbol_map: dict,
         show_deps: bool,
         show_meta: bool,
+        show_churn: bool,
+        show_coverage: bool,
+        show_stability: bool,
         fast_mode: bool
     ) -> None:
         """
@@ -296,6 +321,9 @@ class BlueprintGenerator:
             symbol_map: Map of symbol names to CodeSymbol objects
             show_deps: Add dependencies
             show_meta: Add complexity
+            show_churn: Add git churn
+            show_coverage: Add test coverage
+            show_stability: Add stability score
             fast_mode: Skip expensive operations
         """
         # Get original symbol
@@ -303,16 +331,49 @@ class BlueprintGenerator:
         if not symbol:
             return
 
-        # Dependencies overlay
+        # Dependencies overlay (Phase 13.1)
         if show_deps and not fast_mode:
             deps = self.dep_overlay.get_dependencies(symbol)
             if deps:
                 node.overlay.dependencies = deps
 
-        # Complexity overlay
+        # Complexity overlay (Phase 13.1)
         if show_meta and not fast_mode:
             complexity = self.complexity_analyzer.analyze(symbol)
             node.overlay.complexity = complexity
+
+        # Churn overlay (Phase 13.2)
+        if show_churn and not fast_mode:
+            churn = self.churn_analyzer.analyze(symbol)
+            if churn:
+                node.overlay.churn = churn
+
+        # Coverage overlay (Phase 13.2)
+        if show_coverage and not fast_mode:
+            coverage = self.coverage_analyzer.analyze(symbol)
+            if coverage:
+                node.overlay.coverage = coverage
+
+        # Stability score overlay (Phase 13.2)
+        # Note: Stability requires complexity, churn, and coverage
+        if show_stability and not fast_mode:
+            # Ensure we have the prerequisite metrics
+            if not node.overlay.complexity and show_meta:
+                node.overlay.complexity = self.complexity_analyzer.analyze(symbol)
+            if not node.overlay.churn and show_churn:
+                node.overlay.churn = self.churn_analyzer.analyze(symbol)
+            if not node.overlay.coverage and show_coverage:
+                node.overlay.coverage = self.coverage_analyzer.analyze(symbol)
+
+            # Calculate stability score
+            stability = StabilityScorer.calculate(
+                complexity=node.overlay.complexity,
+                churn=node.overlay.churn,
+                coverage=node.overlay.coverage,
+                dependencies=node.overlay.dependencies
+            )
+            if stability:
+                node.overlay.stability = stability
 
         # Recursively process children
         for child in node.children:
@@ -321,6 +382,9 @@ class BlueprintGenerator:
                 symbol_map,
                 show_deps=show_deps,
                 show_meta=show_meta,
+                show_churn=show_churn,
+                show_coverage=show_coverage,
+                show_stability=show_stability,
                 fast_mode=fast_mode
             )
 

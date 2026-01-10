@@ -52,6 +52,56 @@ class DependencyInfo(BaseModel):
     )
 
 
+class ChurnMetrics(BaseModel):
+    """Git churn analysis for a symbol (Phase 13.2)."""
+
+    last_modified: Optional[str] = Field(None, description="Human-readable last modification time (e.g., '2h ago')")
+    last_modified_timestamp: Optional[float] = Field(None, description="Unix timestamp of last modification")
+    edit_frequency: int = Field(0, description="Number of edits in the last 7 days")
+    unique_authors: int = Field(0, description="Number of unique contributors")
+    last_author: Optional[str] = Field(None, description="Most recent author username")
+
+
+class CoverageMetrics(BaseModel):
+    """Test coverage information for a symbol (Phase 13.2)."""
+
+    percent: float = Field(0.0, description="Coverage percentage (0-100)")
+    covered_lines: int = Field(0, description="Number of covered lines")
+    total_lines: int = Field(0, description="Total executable lines")
+    test_files: List[str] = Field(default_factory=list, description="Test files covering this symbol")
+    assertion_count: int = Field(0, description="Number of assertions in tests")
+
+
+class StabilityScore(BaseModel):
+    """Composite stability score for risk assessment (Phase 13.2)."""
+
+    score: float = Field(description="Composite stability score (0.0-1.0, higher is safer)")
+    level: Literal["🟢 SAFE", "🟡 MEDIUM", "🔴 HIGH RISK"] = Field(
+        description="Risk level classification"
+    )
+    factors: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Contributing factors (coverage, complexity, churn, deps)"
+    )
+
+    @classmethod
+    def calculate_level(cls, score: float) -> Literal["🟢 SAFE", "🟡 MEDIUM", "🔴 HIGH RISK"]:
+        """
+        Determine risk level from score.
+
+        Thresholds:
+        - SAFE: > 0.75
+        - MEDIUM: 0.50-0.75
+        - HIGH RISK: < 0.50
+        """
+        if score > 0.75:
+            return "🟢 SAFE"
+        elif score >= 0.50:
+            return "🟡 MEDIUM"
+        else:
+            return "🔴 HIGH RISK"
+
+
 class SymbolOverlay(BaseModel):
     """Overlays (metadata) attached to a symbol in blueprint."""
 
@@ -61,10 +111,10 @@ class SymbolOverlay(BaseModel):
     complexity: Optional[ComplexityMetrics] = Field(
         None, description="Complexity metrics"
     )
-    # Future Phase 13.2 fields (placeholders for schema evolution):
-    # churn: Optional[ChurnMetrics] = None
-    # coverage: Optional[CoverageMetrics] = None
-    # stability: Optional[StabilityScore] = None
+    # Phase 13.2 fields:
+    churn: Optional[ChurnMetrics] = Field(None, description="Git churn analysis")
+    coverage: Optional[CoverageMetrics] = Field(None, description="Test coverage metrics")
+    stability: Optional[StabilityScore] = Field(None, description="Composite stability score")
 
 
 class BlueprintNode(BaseModel):
@@ -147,10 +197,13 @@ class BlueprintRequest(BaseModel):
     fast_mode: bool = Field(False, description="Skip expensive analysis")
     output_format: Literal["tree", "json"] = Field("json", description="Output format")
 
-    # Future flags (Phase 13.2+):
-    # show_churn: bool = False
-    # show_coverage: bool = False
-    # show_stability: bool = False
+    # Phase 13.2 flags:
+    show_churn: bool = Field(False, description="Include git churn analysis")
+    show_coverage: bool = Field(False, description="Include test coverage metrics")
+    show_stability: bool = Field(False, description="Include composite stability score")
+
+    # Phase 13.2 diff mode:
+    diff_ref: Optional[str] = Field(None, description="Git ref to compare against (e.g., 'HEAD~1', 'main')")
 
 
 # Enable forward references for recursive models

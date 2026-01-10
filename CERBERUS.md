@@ -238,7 +238,7 @@ P13 [PREDICTIVE]:
   - Intelligence: Complexity Metrics (cyclomatic, nesting, branches). ✅ (Phase 13.1)
   - Caching: Mtime-based with TTL + cache invalidation. ✅ (Phase 13.1)
   - JSON Export: Machine-readable blueprint format. ✅ (Phase 13.1)
-  - Stability: Git Churn + Test Coverage + Composite Risk Scoring. 🔜 (Phase 13.2)
+  - Stability: Git Churn + Test Coverage + Composite Risk Scoring. ✅ (Phase 13.2)
   - Analysis: Structural Diffs + Cycle Detection + Auto-Hydration. 🔜 (Phase 13.3+)
 
 ## 🛠 COMMAND QUICKREF
@@ -252,10 +252,12 @@ cerberus retrieval blueprint src/main.py --format json      # Machine-readable J
 cerberus retrieval blueprint src/main.py --no-cache         # Skip cache ✅
 cerberus retrieval blueprint src/main.py --fast             # Skip expensive analysis ✅
 
-# Phase 13.2+ - Future:
-cerberus retrieval blueprint src/main.py --stability        # + Risk score (🟢🟡🔴) 🔜
-cerberus retrieval blueprint src/main.py --coverage         # + Test coverage 🔜
-cerberus retrieval blueprint src/main.py --churn            # + Recent changes 🔜
+# Phase 13.2 - Implemented:
+cerberus retrieval blueprint src/main.py --churn            # + Git churn (edits/week, authors, recency) ✅
+cerberus retrieval blueprint src/main.py --coverage         # + Test coverage (percent, test files) ✅
+cerberus retrieval blueprint src/main.py --stability        # + Risk score (🟢 SAFE/🟡 MEDIUM/🔴 HIGH RISK) ✅
+
+# Phase 13.3+ - Future:
 cerberus retrieval blueprint src/main.py --diff HEAD~5      # Structural changes 🔜
 cerberus retrieval blueprint src/ --aggregate               # Package-level view 🔜
 

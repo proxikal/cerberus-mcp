@@ -124,6 +124,32 @@ class BlueprintFormatter:
                 "nesting": overlay.complexity.nesting
             }
 
+        # Phase 13.2 overlays
+        if overlay.churn:
+            result["churn"] = {
+                "last_modified": overlay.churn.last_modified,
+                "last_modified_timestamp": overlay.churn.last_modified_timestamp,
+                "edit_frequency": overlay.churn.edit_frequency,
+                "unique_authors": overlay.churn.unique_authors,
+                "last_author": overlay.churn.last_author
+            }
+
+        if overlay.coverage:
+            result["coverage"] = {
+                "percent": overlay.coverage.percent,
+                "covered_lines": overlay.coverage.covered_lines,
+                "total_lines": overlay.coverage.total_lines,
+                "test_files": overlay.coverage.test_files,
+                "assertion_count": overlay.coverage.assertion_count
+            }
+
+        if overlay.stability:
+            result["stability"] = {
+                "score": overlay.stability.score,
+                "level": overlay.stability.level,
+                "factors": overlay.stability.factors
+            }
+
         # Add children (methods for classes)
         if node.children:
             result["methods" if node.type == "class" else "children"] = [

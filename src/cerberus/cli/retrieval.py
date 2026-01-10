@@ -608,6 +608,10 @@ def blueprint_cmd(
     # Overlay flags (Phase 13.1)
     deps: bool = typer.Option(False, "--deps", help="Show dependencies with confidence scores"),
     meta: bool = typer.Option(False, "--meta", help="Show complexity metrics"),
+    # Overlay flags (Phase 13.2)
+    churn: bool = typer.Option(False, "--churn", help="Show git churn analysis (edits, authors, recency)"),
+    coverage: bool = typer.Option(False, "--coverage", help="Show test coverage metrics"),
+    stability: bool = typer.Option(False, "--stability", help="Show composite stability score (risk assessment)"),
     # Output flags
     format_type: str = typer.Option(None, "--format", help="Output format: tree or json (default: json in machine mode, tree in human mode)"),
     # Performance flags
@@ -624,14 +628,21 @@ def blueprint_cmd(
     ),
 ):
     """
-    [PHASE 13.1] Architectural blueprint with dependencies, complexity, and caching.
+    [PHASE 13.1/13.2] Architectural blueprint with dependencies, complexity, churn, coverage, and stability.
 
     Generates token-efficient visual hierarchy with optional overlays:
+
+    Phase 13.1:
     - --deps: Show function/method dependencies with Phase 5 confidence scores
     - --meta: Show complexity metrics (lines, cyclomatic complexity, nesting)
     - --format: Output as ASCII tree or JSON
     - --cached/--no-cache: Enable/disable caching (default: enabled)
     - --fast: Skip expensive analysis for faster results
+
+    Phase 13.2:
+    - --churn: Show git churn (edits/week, authors, last modified)
+    - --coverage: Show test coverage (percent, test files, assertions)
+    - --stability: Show composite stability score (🟢 SAFE / 🟡 MEDIUM / 🔴 HIGH RISK)
     """
     from cerberus.index import load_index
     from cerberus.blueprint import BlueprintGenerator, BlueprintRequest, TreeRenderOptions
@@ -669,6 +680,9 @@ def blueprint_cmd(
             file_path=str(file_path),
             show_deps=deps,
             show_meta=meta,
+            show_churn=churn,
+            show_coverage=coverage,
+            show_stability=stability,
             use_cache=cached,
             fast_mode=fast,
             output_format=format_type

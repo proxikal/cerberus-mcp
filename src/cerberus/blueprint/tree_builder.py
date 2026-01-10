@@ -185,7 +185,7 @@ class TreeBuilder:
         parent_prefixes: List[bool]
     ) -> List[str]:
         """
-        Format overlay information (dependencies, complexity).
+        Format overlay information (dependencies, complexity, churn, coverage, stability).
 
         Args:
             node: Node with overlay data
@@ -202,15 +202,30 @@ class TreeBuilder:
         # Calculate indent for overlay lines (align under node content)
         indent = self._calculate_overlay_indent(depth, is_last, parent_prefixes)
 
-        # Dependencies overlay
+        # Dependencies overlay (Phase 13.1)
         if overlay.dependencies:
             deps_str = self._format_dependencies(overlay.dependencies)
             lines.append(f"{indent}[Calls: {deps_str}]")
 
-        # Complexity overlay
+        # Complexity overlay (Phase 13.1)
         if overlay.complexity:
             complexity_str = self._format_complexity(overlay.complexity)
             lines.append(f"{indent}{complexity_str}")
+
+        # Churn overlay (Phase 13.2)
+        if overlay.churn:
+            churn_str = self._format_churn(overlay.churn)
+            lines.append(f"{indent}{churn_str}")
+
+        # Coverage overlay (Phase 13.2)
+        if overlay.coverage:
+            coverage_str = self._format_coverage(overlay.coverage)
+            lines.append(f"{indent}{coverage_str}")
+
+        # Stability overlay (Phase 13.2)
+        if overlay.stability:
+            stability_str = self._format_stability(overlay.stability)
+            lines.append(f"{indent}{stability_str}")
 
         return lines
 
@@ -276,3 +291,71 @@ class TreeBuilder:
             f"[Nesting: {complexity.nesting}]"
         ]
         return " ".join(parts)
+
+    def _format_churn(self, churn) -> str:
+        """
+        Format git churn metrics.
+
+        Args:
+            churn: ChurnMetrics object
+
+        Returns:
+            Formatted churn string
+        """
+        parts = []
+
+        if churn.last_modified:
+            parts.append(f"[Modified: {churn.last_modified}]")
+
+        if churn.edit_frequency > 0:
+            parts.append(f"[Edits: {churn.edit_frequency}/week]")
+
+        if churn.unique_authors > 0:
+            parts.append(f"[Authors: {churn.unique_authors}]")
+
+        if churn.last_author:
+            parts.append(f"[Last: {churn.last_author}]")
+
+        return " ".join(parts) if parts else "[Churn: no data]"
+
+    def _format_coverage(self, coverage) -> str:
+        """
+        Format test coverage metrics.
+
+        Args:
+            coverage: CoverageMetrics object
+
+        Returns:
+            Formatted coverage string
+        """
+        parts = []
+
+        # Coverage percentage with indicator
+        if coverage.percent >= 80:
+            indicator = "✓"
+        elif coverage.percent >= 50:
+            indicator = "⚠"
+        else:
+            indicator = "⚠️"
+
+        parts.append(f"[Coverage: {coverage.percent:.1f}% {indicator}]")
+
+        if coverage.test_files:
+            test_count = len(coverage.test_files)
+            parts.append(f"[Tests: {test_count}]")
+        else:
+            parts.append("[Tests: none]")
+
+        return " ".join(parts)
+
+    def _format_stability(self, stability) -> str:
+        """
+        Format stability score.
+
+        Args:
+            stability: StabilityScore object
+
+        Returns:
+            Formatted stability string
+        """
+        return f"[Stability: {stability.level} ({stability.score:.2f})]"

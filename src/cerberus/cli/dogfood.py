@@ -24,6 +24,7 @@ from cerberus.index import (
     semantic_search,
 )
 from .output import get_console
+from .config import CLIConfig
 # Phase 12.5: JIT Guidance
 from .guidance import GuidanceProvider
 # Phase 12.5: Context Anchoring
