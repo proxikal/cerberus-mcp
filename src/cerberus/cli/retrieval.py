@@ -617,6 +617,10 @@ def blueprint_cmd(
     cycles: bool = typer.Option(False, "--cycles", help="Detect circular dependencies"),
     aggregate: bool = typer.Option(False, "--aggregate", help="Aggregate package-level view (directory input)"),
     aggregate_depth: Optional[int] = typer.Option(None, "--aggregate-depth", help="Max directory depth for aggregation"),
+    # Phase 13.5 flags:
+    hydrate: bool = typer.Option(False, "--hydrate", help="Auto-hydrate heavily-referenced internal dependencies"),
+    max_width: Optional[int] = typer.Option(None, "--max-width", help="Maximum line width before truncation (tree format only)"),
+    collapse_private: bool = typer.Option(False, "--collapse-private", help="Collapse private symbols (starting with _)"),
     # Output flags
     format_type: str = typer.Option(None, "--format", help="Output format: tree or json (default: json in machine mode, tree in human mode)"),
     # Performance flags
@@ -633,7 +637,7 @@ def blueprint_cmd(
     ),
 ):
     """
-    [PHASE 13.1/13.2/13.3] Architectural blueprint with dependencies, complexity, churn, coverage, stability, diffs, and cycles.
+    [PHASE 13.1/13.2/13.3/13.5] Architectural blueprint with dependencies, complexity, churn, coverage, stability, diffs, cycles, hydration, and width management.
 
     Generates token-efficient visual hierarchy with optional overlays:
 
@@ -654,6 +658,11 @@ def blueprint_cmd(
     - --cycles: Detect circular dependencies (import cycles, call cycles, inheritance cycles)
     - --aggregate: Generate package-level aggregated view (requires directory input)
     - --aggregate-depth: Limit directory depth for aggregation
+
+    Phase 13.5:
+    - --hydrate: Auto-hydrate heavily-referenced internal dependencies (requires --deps)
+    - --max-width: Maximum line width before truncation (tree format only)
+    - --collapse-private: Collapse private symbols (starting with _) for cleaner output
     """
     from cerberus.index import load_index
     from cerberus.blueprint import BlueprintGenerator, BlueprintRequest, TreeRenderOptions
@@ -698,6 +707,7 @@ def blueprint_cmd(
             show_cycles=cycles,
             aggregate=aggregate,
             aggregate_max_depth=aggregate_depth,
+            show_hydrate=hydrate,
             use_cache=cached,
             fast_mode=fast,
             output_format=format_type
@@ -717,7 +727,9 @@ def blueprint_cmd(
             # Tree format
             tree_options = TreeRenderOptions(
                 show_line_numbers=True,
-                show_signatures=True
+                show_signatures=True,
+                collapse_private=collapse_private,
+                max_width=max_width
             )
             output = generator.format_output(blueprint, "tree", tree_options)
             # Use typer.echo for plain text output

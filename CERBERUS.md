@@ -245,8 +245,10 @@ P13 [PREDICTIVE]:
   - Cycle Detection: Circular dependency analysis. ✅ (Phase 13.3)
   - Watcher Integration: Auto cache invalidation on file changes. ✅ (Phase 13.4)
   - Cache Metrics: Hit rate tracking + `watcher health --blueprints`. ✅ (Phase 13.4)
-  - Auto-Hydration: Smart dependency inclusion. 🔜 (Phase 13.4+)
-  - Background Regeneration: Auto-rebuild hot blueprints. 🔜 (Phase 13.4+)
+  - Auto-Hydration: Smart dependency inclusion. ✅ (Phase 13.5)
+  - External Dependency Marking: Internal/external/stdlib classification. ✅ (Phase 13.5)
+  - Width Management: Smart truncation for terminal display. ✅ (Phase 13.5)
+  - Background Regeneration: Auto-rebuild hot blueprints. ✅ (Phase 13.5)
 
 ## 🛠 COMMAND QUICKREF
 # 1. ORIENT (Map - Use This First)
@@ -270,7 +272,11 @@ cerberus retrieval blueprint src/main.py --cycles           # Circular dependenc
 cerberus retrieval blueprint src/ --aggregate               # Package-level aggregated view ✅
 cerberus retrieval blueprint src/ --aggregate --aggregate-depth 2  # Limited depth aggregation ✅
 
-# Phase 13.4+ - Future:
+# Phase 13.5 - Implemented:
+cerberus retrieval blueprint src/main.py --hydrate          # Auto-include mini-blueprints of hot dependencies ✅
+cerberus retrieval blueprint src/main.py --max-width 120    # Smart truncation for terminal width ✅
+cerberus retrieval blueprint src/main.py --collapse-private # Hide private symbols (single underscore) ✅
+cerberus operational watcher --auto-blueprint               # Enable background blueprint regeneration ✅
 
 # Other orientation commands:
 cerberus dogfood tree --depth 2                             # File Hierarchy

@@ -50,6 +50,10 @@ class DependencyInfo(BaseModel):
     reference_type: Optional[str] = Field(
         None, description="Type of reference (method_call, instance_of, etc.)"
     )
+    # Phase 13.5: Dependency classification
+    dependency_type: Optional[Literal["internal", "external", "stdlib"]] = Field(
+        None, description="Classification: internal (project code), external (third-party), or stdlib"
+    )
 
 
 class ChurnMetrics(BaseModel):
@@ -120,6 +124,14 @@ class SymbolOverlay(BaseModel):
     cycle_info: Optional[str] = Field(None, description="Description of cycle (if in_cycle is True)")
 
 
+class HydratedFile(BaseModel):
+    """Information about an auto-hydrated file (Phase 13.5)."""
+
+    file_path: str = Field(description="Path to hydrated file")
+    reference_count: int = Field(description="Number of references from main file")
+    blueprint: "Blueprint" = Field(description="Mini-blueprint of hydrated file")
+
+
 class BlueprintNode(BaseModel):
     """A node in the blueprint tree (represents a symbol)."""
 
@@ -167,6 +179,12 @@ class Blueprint(BaseModel):
     cached: bool = Field(False, description="Whether this blueprint was served from cache")
     generated_at: Optional[float] = Field(None, description="Timestamp of generation")
 
+    # Phase 13.5: Auto-hydration
+    hydrated_files: List[HydratedFile] = Field(
+        default_factory=list,
+        description="Auto-hydrated dependencies (Phase 13.5)"
+    )
+
     def count_symbols(self) -> int:
         """Recursively count all symbols including nested ones."""
         count = len(self.nodes)
@@ -189,7 +207,9 @@ class TreeRenderOptions(BaseModel):
     show_line_numbers: bool = Field(True, description="Show line ranges")
     show_signatures: bool = Field(True, description="Show function signatures")
     indent_size: int = Field(4, description="Spaces per indentation level")
-    collapse_private: bool = Field(False, description="Collapse private symbols (Phase 13.3)")
+    collapse_private: bool = Field(False, description="Collapse private symbols (Phase 13.5)")
+    max_width: Optional[int] = Field(None, description="Maximum line width before truncation (Phase 13.5)")
+    truncate_threshold: int = Field(5, description="Show first N items before truncating (Phase 13.5)")
 
 
 class BlueprintRequest(BaseModel):
@@ -214,6 +234,9 @@ class BlueprintRequest(BaseModel):
     show_cycles: bool = Field(False, description="Include cycle detection (circular dependencies)")
     aggregate: bool = Field(False, description="Aggregate multiple files (package-level view)")
     aggregate_max_depth: Optional[int] = Field(None, description="Max directory depth for aggregation")
+
+    # Phase 13.5 flags:
+    show_hydrate: bool = Field(False, description="Auto-hydrate heavily-referenced internal dependencies")
 
 
 # Enable forward references for recursive models

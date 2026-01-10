@@ -1,10 +1,12 @@
 """ASCII tree builder for blueprint visualization.
 
 Phase 13.1: Token-efficient visual hierarchy using indentation and tree characters.
+Phase 13.5: Added dependency type markers (internal/external/stdlib).
 """
 
 from typing import List
 from .schemas import Blueprint, BlueprintNode, TreeRenderOptions
+from .dependency_classifier import DependencyClassifier
 
 
 class TreeBuilder:
@@ -40,6 +42,17 @@ class TreeBuilder:
             is_last = i == len(blueprint.nodes) - 1
             lines.extend(self._render_node(node, depth=0, is_last=is_last, parent_prefixes=[]))
 
+        # Phase 13.5: Render hydrated dependencies
+        if blueprint.hydrated_files:
+            lines.append("")  # Blank line separator
+            for hf in blueprint.hydrated_files:
+                lines.append(f"[Auto-Hydrated: {hf.file_path}] (Referenced {hf.reference_count}x above)")
+                # Render hydrated file's symbols
+                for i, node in enumerate(hf.blueprint.nodes):
+                    is_last = i == len(hf.blueprint.nodes) - 1
+                    lines.extend(self._render_node(node, depth=0, is_last=is_last, parent_prefixes=[]))
+                lines.append("")  # Blank line after each hydrated file
+
         return "\n".join(lines)
 
     def _render_node(
@@ -73,8 +86,9 @@ class TreeBuilder:
         # Build node label
         label = self._format_node_label(node)
 
-        # Add main node line
-        lines.append(f"{prefix}{label}")
+        # Add main node line (with truncation if needed)
+        main_line = f"{prefix}{label}"
+        lines.append(self._truncate_line(main_line))
 
         # Add overlay information (dependencies, complexity)
         overlay_lines = self._format_overlays(node, depth, is_last, parent_prefixes)
@@ -82,17 +96,41 @@ class TreeBuilder:
 
         # Render children
         if node.children:
-            new_parent_prefixes = parent_prefixes + [is_last]
-            for i, child in enumerate(node.children):
-                is_last_child = i == len(node.children) - 1
-                lines.extend(
-                    self._render_node(
-                        child,
-                        depth=depth + 1,
-                        is_last=is_last_child,
-                        parent_prefixes=new_parent_prefixes
+            # Phase 13.5: Collapse private symbols if requested
+            if self.options.collapse_private:
+                public_children = [c for c in node.children if not self._is_private_symbol(c.name)]
+                private_count = len(node.children) - len(public_children)
+
+                # Render public children
+                new_parent_prefixes = parent_prefixes + [is_last]
+                for i, child in enumerate(public_children):
+                    is_last_child = i == len(public_children) - 1 and private_count == 0
+                    lines.extend(
+                        self._render_node(
+                            child,
+                            depth=depth + 1,
+                            is_last=is_last_child,
+                            parent_prefixes=new_parent_prefixes
+                        )
                     )
-                )
+
+                # Add collapsed private summary
+                if private_count > 0:
+                    prefix = self._calculate_prefix(depth + 1, True, new_parent_prefixes)
+                    lines.append(f"{prefix}[Private: {private_count} symbols collapsed]")
+            else:
+                # Render all children normally
+                new_parent_prefixes = parent_prefixes + [is_last]
+                for i, child in enumerate(node.children):
+                    is_last_child = i == len(node.children) - 1
+                    lines.extend(
+                        self._render_node(
+                            child,
+                            depth=depth + 1,
+                            is_last=is_last_child,
+                            parent_prefixes=new_parent_prefixes
+                        )
+                    )
 
         return lines
 
@@ -205,27 +243,32 @@ class TreeBuilder:
         # Dependencies overlay (Phase 13.1)
         if overlay.dependencies:
             deps_str = self._format_dependencies(overlay.dependencies)
-            lines.append(f"{indent}[Calls: {deps_str}]")
+            line = f"{indent}[Calls: {deps_str}]"
+            lines.append(self._truncate_line(line))
 
         # Complexity overlay (Phase 13.1)
         if overlay.complexity:
             complexity_str = self._format_complexity(overlay.complexity)
-            lines.append(f"{indent}{complexity_str}")
+            line = f"{indent}{complexity_str}"
+            lines.append(self._truncate_line(line))
 
         # Churn overlay (Phase 13.2)
         if overlay.churn:
             churn_str = self._format_churn(overlay.churn)
-            lines.append(f"{indent}{churn_str}")
+            line = f"{indent}{churn_str}"
+            lines.append(self._truncate_line(line))
 
         # Coverage overlay (Phase 13.2)
         if overlay.coverage:
             coverage_str = self._format_coverage(overlay.coverage)
-            lines.append(f"{indent}{coverage_str}")
+            line = f"{indent}{coverage_str}"
+            lines.append(self._truncate_line(line))
 
         # Stability overlay (Phase 13.2)
         if overlay.stability:
             stability_str = self._format_stability(overlay.stability)
-            lines.append(f"{indent}{stability_str}")
+            line = f"{indent}{stability_str}"
+            lines.append(self._truncate_line(line))
 
         return lines
 
@@ -258,21 +301,40 @@ class TreeBuilder:
 
     def _format_dependencies(self, dependencies: List) -> str:
         """
-        Format dependency list with confidence scores.
+        Format dependency list with confidence scores and type markers.
 
         Args:
             dependencies: List of DependencyInfo objects
 
         Returns:
             Formatted dependency string
+
+        Phase 13.5: Added dependency type markers and smart truncation
         """
         dep_strs = []
+        classifier = DependencyClassifier()  # For marker lookup
+
         for dep in dependencies:
-            # Format: "target ✓confidence"
-            dep_str = f"{dep.target} ✓{dep.confidence:.1f}"
+            # Format: "target ✓confidence marker"
+            parts = [f"{dep.target} ✓{dep.confidence:.1f}"]
+
+            # Phase 13.5: Add dependency type marker
+            if dep.dependency_type:
+                marker = classifier.get_marker(dep.dependency_type)
+                parts.append(marker)
+
+            dep_str = " ".join(parts)
             dep_strs.append(dep_str)
 
-        return ", ".join(dep_strs)
+        # Phase 13.5: Smart truncation for long dependency lists
+        if len(dep_strs) > self.options.truncate_threshold:
+            # Show first N dependencies, then indicate more
+            shown = dep_strs[:self.options.truncate_threshold]
+            remaining = len(dep_strs) - self.options.truncate_threshold
+            shown.append(f"... and {remaining} more")
+            return ", ".join(shown)
+        else:
+            return ", ".join(dep_strs)
 
     def _format_complexity(self, complexity) -> str:
         """
@@ -359,3 +421,39 @@ class TreeBuilder:
             Formatted stability string
         """
         return f"[Stability: {stability.level} ({stability.score:.2f})]"
+
+    def _is_private_symbol(self, name: str) -> bool:
+        """
+        Check if a symbol is private (starts with underscore).
+
+        Args:
+            name: Symbol name
+
+        Returns:
+            True if symbol is private
+
+        Phase 13.5: Used for collapse_private option
+        """
+        return name.startswith('_') and not name.startswith('__')
+
+    def _truncate_line(self, line: str) -> str:
+        """
+        Truncate a line if it exceeds max_width.
+
+        Args:
+            line: Line to truncate
+
+        Returns:
+            Truncated line with ellipsis if needed
+
+        Phase 13.5: Width management
+        """
+        if self.options.max_width is None:
+            return line
+
+        if len(line) <= self.options.max_width:
+            return line
+
+        # Truncate with ellipsis
+        truncated = line[:self.options.max_width - 3] + "..."
+        return truncated

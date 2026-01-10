@@ -1,27 +1,33 @@
 """Dependency overlay for blueprint enrichment.
 
 Phase 13.1: Integrates Phase 5 confidence scores to show symbol dependencies.
+Phase 13.5: Adds dependency classification (internal/external/stdlib).
 """
 
 from typing import List, Optional
+from pathlib import Path
 import sqlite3
 
 from cerberus.logging_config import logger
 from cerberus.schemas import CodeSymbol
 from .schemas import DependencyInfo
+from .dependency_classifier import DependencyClassifier
 
 
 class DependencyOverlay:
     """Enriches blueprint with dependency information from symbol_references."""
 
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, project_root: Optional[Path] = None):
         """
         Initialize dependency overlay.
 
         Args:
             conn: SQLite connection to database with symbol_references table
+            project_root: Optional project root for dependency classification (Phase 13.5)
         """
         self.conn = conn
+        # Phase 13.5: Initialize dependency classifier
+        self.classifier = DependencyClassifier(project_root or Path.cwd())
 
     def get_dependencies(self, symbol: CodeSymbol) -> List[DependencyInfo]:
         """
@@ -58,13 +64,20 @@ class DependencyOverlay:
                 if not target_symbol:
                     continue
 
+                # Phase 13.5: Classify dependency type
+                dep_type = self.classifier.classify_dependency(
+                    target_symbol=target_symbol,
+                    target_file=target_file
+                )
+
                 dependencies.append(
                     DependencyInfo(
                         target=target_symbol,
                         target_file=target_file,
                         confidence=confidence or 1.0,
                         resolution_method=resolution_method,
-                        reference_type=reference_type
+                        reference_type=reference_type,
+                        dependency_type=dep_type
                     )
                 )
 
@@ -142,13 +155,20 @@ class DependencyOverlay:
                     if source_symbol not in result:
                         result[source_symbol] = []
 
+                    # Phase 13.5: Classify dependency type
+                    dep_type = self.classifier.classify_dependency(
+                        target_symbol=target_symbol,
+                        target_file=target_file
+                    )
+
                     result[source_symbol].append(
                         DependencyInfo(
                             target=target_symbol,
                             target_file=target_file,
                             confidence=confidence or 1.0,
                             resolution_method=resolution_method,
-                            reference_type=reference_type
+                            reference_type=reference_type,
+                            dependency_type=dep_type
                         )
                     )
 

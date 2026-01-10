@@ -1,6 +1,7 @@
 """Blueprint cache manager for performance optimization.
 
 Phase 13.1: Mtime-based caching with TTL and invalidation.
+Phase 13.5: Access tracking for background regeneration.
 """
 
 import hashlib
@@ -30,6 +31,8 @@ class BlueprintCache:
         # Phase 13.4: Track cache hit rate
         self._cache_hits = 0
         self._cache_misses = 0
+        # Phase 13.5: Ensure access tracking columns exist
+        self._ensure_access_tracking_schema()
 
     def get(self, file_path: str, flags: Dict[str, Any]) -> Optional[Blueprint]:
         """
@@ -91,6 +94,10 @@ class BlueprintCache:
             blueprint.cached = True
             logger.debug(f"Blueprint cache hit: {file_path}")
             self._cache_hits += 1
+
+            # Phase 13.5: Track access for background regeneration
+            self._track_access(cache_key)
+
             return blueprint
 
         except Exception as e:
@@ -235,6 +242,92 @@ class BlueprintCache:
         except Exception as e:
             logger.warning(f"Error getting blueprint cache stats: {e}")
             return {"total_entries": 0, "valid_entries": 0, "expired_entries": 0}
+
+    def _ensure_access_tracking_schema(self):
+        """
+        Ensure access tracking columns exist in blueprint_cache table.
+
+        Phase 13.5: Adds access_count and last_accessed for background regeneration.
+        """
+        try:
+            # Check if columns exist
+            cursor = self.conn.execute("PRAGMA table_info(blueprint_cache)")
+            columns = {row[1] for row in cursor.fetchall()}
+
+            # Add access_count if missing
+            if 'access_count' not in columns:
+                self.conn.execute(
+                    "ALTER TABLE blueprint_cache ADD COLUMN access_count INTEGER DEFAULT 0"
+                )
+                logger.debug("Added access_count column to blueprint_cache")
+
+            # Add last_accessed if missing
+            if 'last_accessed' not in columns:
+                self.conn.execute(
+                    "ALTER TABLE blueprint_cache ADD COLUMN last_accessed REAL DEFAULT 0"
+                )
+                logger.debug("Added last_accessed column to blueprint_cache")
+
+            self.conn.commit()
+
+        except Exception as e:
+            logger.warning(f"Error ensuring access tracking schema: {e}")
+
+    def _track_access(self, cache_key: str):
+        """
+        Track access to a cached blueprint.
+
+        Args:
+            cache_key: Cache key for the blueprint
+
+        Phase 13.5: Background blueprint regeneration
+        """
+        try:
+            current_time = time.time()
+            self.conn.execute(
+                """
+                UPDATE blueprint_cache
+                SET access_count = access_count + 1,
+                    last_accessed = ?
+                WHERE cache_key = ?
+                """,
+                (current_time, cache_key)
+            )
+            self.conn.commit()
+        except Exception as e:
+            logger.debug(f"Error tracking access: {e}")
+
+    def get_hot_files(self, min_access_count: int = 5, limit: int = 20) -> list[tuple[str, int]]:
+        """
+        Get frequently accessed files for background regeneration.
+
+        Args:
+            min_access_count: Minimum access count to be considered "hot"
+            limit: Maximum number of files to return
+
+        Returns:
+            List of (file_path, access_count) tuples
+
+        Phase 13.5: Background blueprint regeneration
+        """
+        try:
+            cursor = self.conn.execute(
+                """
+                SELECT file_path, SUM(access_count) as total_accesses
+                FROM blueprint_cache
+                WHERE expires_at > ? AND access_count >= ?
+                GROUP BY file_path
+                ORDER BY total_accesses DESC
+                LIMIT ?
+                """,
+                (time.time(), min_access_count, limit)
+            )
+
+            return [(row[0], row[1]) for row in cursor.fetchall()]
+
+        except Exception as e:
+            logger.warning(f"Error getting hot files: {e}")
+            return []
 
     @staticmethod
     def _generate_cache_key(file_path: str, mtime: float, flags: Dict[str, Any]) -> str:

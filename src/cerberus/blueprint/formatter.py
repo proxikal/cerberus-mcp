@@ -78,6 +78,18 @@ class BlueprintFormatter:
                 "generated_at": blueprint.generated_at
             }
 
+        # Phase 13.5: Include hydrated files
+        if blueprint.hydrated_files:
+            result["hydrated_dependencies"] = [
+                {
+                    "file": hf.file_path,
+                    "reference_count": hf.reference_count,
+                    "total_symbols": hf.blueprint.total_symbols,
+                    "symbols": [BlueprintFormatter._node_to_dict(node) for node in hf.blueprint.nodes]
+                }
+                for hf in blueprint.hydrated_files
+            ]
+
         return result
 
     @staticmethod
@@ -110,7 +122,8 @@ class BlueprintFormatter:
                 {
                     "target": dep.target,
                     "confidence": dep.confidence,
-                    "resolution_method": dep.resolution_method
+                    "resolution_method": dep.resolution_method,
+                    "dependency_type": dep.dependency_type  # Phase 13.5
                 }
                 for dep in overlay.dependencies
             ]

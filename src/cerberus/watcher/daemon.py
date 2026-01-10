@@ -83,6 +83,7 @@ def start_watcher_daemon(
     project_path: Path,
     index_path: Path,
     background: bool = True,
+    auto_blueprint: bool = False,
 ) -> int:
     """
     Start the watcher daemon process.
@@ -91,6 +92,7 @@ def start_watcher_daemon(
         project_path: Path to project to watch
         index_path: Path to index file to update
         background: Run as background daemon (default: True)
+        auto_blueprint: Enable background blueprint regeneration (Phase 13.5)
 
     Returns:
         PID of started daemon
@@ -121,6 +123,10 @@ def start_watcher_daemon(
         "--index", str(index_path),
         "--pid-file", str(pid_file),
     ]
+
+    # Phase 13.5: Add auto-blueprint flag if enabled
+    if auto_blueprint:
+        cmd.append("--auto-blueprint")
 
     if background:
         # Start as background daemon

@@ -22,6 +22,7 @@ def start_watcher(
     project_path: Path,
     index_path: Path,
     force: bool = False,
+    auto_blueprint: bool = False,
 ) -> int:
     """
     Start the background watcher daemon for a project.
@@ -30,6 +31,7 @@ def start_watcher(
         project_path: Path to project to watch
         index_path: Path to index file to keep updated
         force: Restart even if already running
+        auto_blueprint: Enable background blueprint regeneration (Phase 13.5)
 
     Returns:
         PID of watcher daemon
@@ -51,9 +53,17 @@ def start_watcher(
             logger.info("Force flag set, stopping existing watcher")
             stop_watcher(project_path)
 
-    # Start new watcher
-    pid = start_watcher_daemon(project_path, index_path, background=True)
-    logger.info(f"Watcher started for {project_path} (PID: {pid})")
+    # Start new watcher with auto_blueprint flag
+    pid = start_watcher_daemon(
+        project_path,
+        index_path,
+        background=True,
+        auto_blueprint=auto_blueprint
+    )
+    logger.info(
+        f"Watcher started for {project_path} (PID: {pid}, "
+        f"auto_blueprint={auto_blueprint})"
+    )
     return pid
 
 

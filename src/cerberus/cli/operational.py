@@ -261,6 +261,11 @@ def watcher_cmd(
         "--blueprints",
         help="Show blueprint cache metrics (for 'health' action)."
     ),
+    auto_blueprint: bool = typer.Option(
+        False,
+        "--auto-blueprint",
+        help="Enable background blueprint regeneration (Phase 13.5, for 'start' action)."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
 ):
     """
@@ -289,7 +294,7 @@ def watcher_cmd(
 
     try:
         if action == "start":
-            pid = start_watcher(project_path, index_path, force=force)
+            pid = start_watcher(project_path, index_path, force=force, auto_blueprint=auto_blueprint)
 
             if json_output:
                 typer.echo(json.dumps({"status": "started", "pid": pid}))
@@ -333,7 +338,7 @@ def watcher_cmd(
         elif action == "restart":
             console.print("[cyan]Restarting watcher...[/cyan]")
             stop_watcher(project_path)
-            pid = start_watcher(project_path, index_path, force=True)
+            pid = start_watcher(project_path, index_path, force=True, auto_blueprint=auto_blueprint)
 
             if json_output:
                 typer.echo(json.dumps({"status": "restarted", "pid": pid}))

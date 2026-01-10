@@ -18,6 +18,7 @@ from .schemas import (
     BlueprintRequest,
     SymbolOverlay,
     TreeRenderOptions,
+    HydratedFile,
 )
 from .cache_manager import BlueprintCache
 from .dependency_overlay import DependencyOverlay
@@ -30,6 +31,8 @@ from .formatter import BlueprintFormatter
 from .diff_analyzer import DiffAnalyzer
 from .aggregator import BlueprintAggregator, AggregatedBlueprint
 from .cycle_detector import CycleDetector
+# Phase 13.5 analyzers
+from .hydration_analyzer import HydrationAnalyzer
 
 
 class BlueprintGenerator:
@@ -46,7 +49,8 @@ class BlueprintGenerator:
         self.conn = conn
         self.repo_path = repo_path or Path.cwd()
         self.cache = BlueprintCache(conn)
-        self.dep_overlay = DependencyOverlay(conn)
+        # Phase 13.5: Pass repo_path for dependency classification
+        self.dep_overlay = DependencyOverlay(conn, project_root=self.repo_path)
         self.complexity_analyzer = ComplexityAnalyzer()
         # Phase 13.2 analyzers
         self.churn_analyzer = ChurnAnalyzer()
@@ -55,6 +59,8 @@ class BlueprintGenerator:
         self.diff_analyzer = DiffAnalyzer(conn, self.repo_path)
         self.aggregator = BlueprintAggregator(conn)
         self.cycle_detector = CycleDetector(conn)
+        # Phase 13.5 analyzers
+        self.hydration_analyzer = HydrationAnalyzer(conn, self.repo_path)
 
     def generate(self, request: BlueprintRequest) -> Union[Blueprint, AggregatedBlueprint]:
         """
@@ -85,6 +91,7 @@ class BlueprintGenerator:
             "stability": request.show_stability,
             "cycles": request.show_cycles,
             "diff": request.diff_ref is not None,
+            "hydrate": request.show_hydrate,
         }
 
         # Try cache first (skip cache for diff mode as it's dynamic)
@@ -101,6 +108,11 @@ class BlueprintGenerator:
         # Phase 13.3: Apply diff annotations if diff mode enabled
         if request.diff_ref:
             self._annotate_diff(blueprint, request.diff_ref)
+
+        # Phase 13.5: Apply auto-hydration if requested
+        if request.show_hydrate and request.show_deps:
+            # Hydration requires dependencies to be calculated
+            self._apply_hydration(blueprint, request)
 
         # Cache if enabled
         if request.use_cache and not request.fast_mode and not request.diff_ref:
@@ -509,6 +521,75 @@ class BlueprintGenerator:
 
         except Exception as e:
             logger.error(f"Error annotating diff: {e}")
+
+    def _apply_hydration(self, blueprint: Blueprint, request: BlueprintRequest) -> None:
+        """
+        Apply auto-hydration to blueprint (Phase 13.5).
+
+        Analyzes dependencies and automatically includes mini-blueprints
+        of heavily-referenced internal files.
+
+        Args:
+            blueprint: Main blueprint to hydrate
+            request: Blueprint request with options
+        """
+        try:
+            # Analyze which files should be hydrated
+            files_to_hydrate = self.hydration_analyzer.analyze_for_hydration(blueprint)
+
+            if not files_to_hydrate:
+                logger.debug("No files selected for auto-hydration")
+                return
+
+            logger.debug(f"Auto-hydrating {len(files_to_hydrate)} files: {files_to_hydrate}")
+
+            # Generate mini-blueprints for each hydrated file
+            # (structure only, no overlays except deps for consistency)
+            hydrated_files = []
+
+            for file_path in files_to_hydrate:
+                try:
+                    # Count actual references for this file
+                    ref_count = self.hydration_analyzer._count_file_references(blueprint).get(file_path, 0)
+
+                    # Create minimal blueprint request (structure only)
+                    hydrate_request = BlueprintRequest(
+                        file_path=file_path,
+                        show_deps=False,  # Don't recursively hydrate dependencies
+                        show_meta=False,
+                        show_churn=False,
+                        show_coverage=False,
+                        show_stability=False,
+                        show_cycles=False,
+                        show_hydrate=False,  # Prevent recursive hydration
+                        use_cache=True,      # Use cache if available
+                        fast_mode=True,      # Fast mode for hydrated files
+                        output_format=request.output_format
+                    )
+
+                    # Generate mini-blueprint
+                    mini_blueprint = self._generate_fresh(hydrate_request)
+
+                    # Create HydratedFile entry
+                    hydrated_file = HydratedFile(
+                        file_path=file_path,
+                        reference_count=ref_count,
+                        blueprint=mini_blueprint
+                    )
+
+                    hydrated_files.append(hydrated_file)
+                    logger.debug(f"Hydrated {file_path} ({ref_count} refs, {mini_blueprint.total_symbols} symbols)")
+
+                except Exception as e:
+                    logger.warning(f"Failed to hydrate {file_path}: {e}")
+                    continue
+
+            # Attach hydrated files to main blueprint
+            blueprint.hydrated_files = hydrated_files
+            logger.debug(f"Successfully hydrated {len(hydrated_files)} files")
+
+        except Exception as e:
+            logger.error(f"Error applying hydration: {e}")
 
     def format_output(
         self,
