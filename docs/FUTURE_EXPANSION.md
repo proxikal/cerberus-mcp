@@ -31,6 +31,28 @@
 - **Java/Go Support:** Class hierarchies, interface resolution, and package management integration.
 - **Generic Language Protocol:** A plugin system allowing community contributions for new languages.
 
+## 4. Documentation Symbiosis (Complete Dogfooding)
+*Deferred from Phase 14*
+
+**Mission:** Close the final dogfooding gap by treating documentation as structured data, not plain text.
+- **Documentation Indexing:** Extract markdown headers as "symbols", parse code blocks, track internal links as dependencies
+- **Section-Based Reading:** `cerberus docs read CERBERUS.md --section "ENFORCEMENT"` for semantic access (40-60% token savings vs line-based)
+- **Semantic Search:** `cerberus docs search "batch-edit"` across all documentation
+- **Table of Contents:** `cerberus docs toc` for hierarchical header navigation
+- **Cross-Reference Tracking:** Link resolution and dependency graphs between documentation files
+
+**Rationale for Deferral:**
+- Current `Read` tool exception for `.md` files works adequately
+- Higher ROI features (Style Guard, Context Anchors, Predictive Editing) provide immediate agent productivity gains
+- Documentation parsing complexity (markdown flavors, edge cases) requires significant maintenance
+- Can revisit with intelligence layer (staleness detection, code-doc bidirectional linking) for greater value
+
+**Implementation Notes (When Resumed):**
+- Keep scope minimal: section extraction + semantic search only
+- Skip advanced features: format conversion, linting, blueprint visualization
+- Use CommonMark spec exclusively to avoid markdown flavor complexity
+- Store doc symbols in separate database table to avoid code index pollution
+
 ---
 
 ## 🔗 Connection to Mission

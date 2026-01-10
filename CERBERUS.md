@@ -1,4 +1,4 @@
-# CERBERUS v0.13.0 - AI Agent Operating System
+# CERBERUS v0.14.0 - AI Agent Operating System
 # Protocol: UACP/1.2 | Fidelity: 100% | Mode: Machine-First (JSON) | Arch: AST/SQLite
 
 ## ⚡ CORE MANDATES [REQUIRED]
@@ -57,7 +57,7 @@ PRINCIPLES:
 You are NOT a human with access to Cerberus.
 You ARE an AI agent whose ONLY interface to code is Cerberus commands.
 
-**SELF-AUDIT (Every 10 Actions):**
+**SELF-AUDIT (Every Other Action):**
 Ask yourself:
 - "Have I used `Read` directly on code files?" → VIOLATION
 - "Have I used `grep`/`Glob` for code search?" → VIOLATION
@@ -249,6 +249,15 @@ P13 [PREDICTIVE]:
   - External Dependency Marking: Internal/external/stdlib classification. ✅ (Phase 13.5)
   - Width Management: Smart truncation for terminal display. ✅ (Phase 13.5)
   - Background Regeneration: Auto-rebuild hot blueprints. ✅ (Phase 13.5)
+P14 [PRODUCTIVITY]:
+  - Style Guard: Explicit style fixing (whitespace, imports, quotes). ✅ (Phase 14.1)
+  - Symbol Guard Integration: HIGH RISK file protection. ✅ (Phase 14.1)
+  - Mutation Pipeline Integration: Auto-detect issues after edits. ✅ (Phase 14.1)
+  - Context Anchors: GPS + deps + risk + temporal + safety metadata. ✅ (Phase 14.2)
+  - Hallucination Detection: Wrong-file validation for mutations. ✅ (Phase 14.2)
+  - Compact Mode: <5% token overhead for anchor metadata. ✅ (Phase 14.2)
+  - Predictive Editing: Deterministic relationship discovery + basic logging. ✅ (Phase 14.3)
+  - Prediction Accuracy Tracking: Correlate suggestions with agent actions. 🔜 (Phase 14.4)
 
 ## 🛠 COMMAND QUICKREF
 # 1. ORIENT (Map - Use This First)
@@ -300,6 +309,21 @@ cerberus mutations delete file.py --symbol bar --force   # Override Symbol Guard
 # UNDO (Safety Net):
 cerberus mutations undo                    # Revert last batch
 
+# 4. QUALITY (Style Guard - Phase 14.1, Predictive Editing - Phase 14.3)
+# Style Guard:
+cerberus quality style-check src/main.py              # Preview style issues
+cerberus quality style-check src/ --recursive         # Check directory
+cerberus quality style-fix src/main.py                # Apply fixes
+cerberus quality style-fix src/main.py --preview      # Preview fixes without applying
+cerberus quality style-fix src/core.py --force        # Override Symbol Guard for HIGH RISK
+cerberus quality style-fix src/ --verify "pytest"     # Fix + verify tests pass
+
+# Predictive Editing:
+cerberus quality related-changes validate_ops         # Show predicted related changes
+cerberus quality related-changes batch_edit --file src/mutations.py  # With explicit file
+cerberus quality related-changes AuthConfig --verbose # Detailed reasoning
+cerberus quality related-changes process_request --json  # Machine-readable output
+
 ## 🧠 SYMBOLIC INTELLIGENCE
 
 ### Output Quality Standards (Parsability Requirement)
@@ -316,8 +340,9 @@ cerberus mutations undo                    # Revert last batch
 - **Confidence Scores:** All dependencies show provenance (✓1.0 = certain, ✓0.6 = verify). ✅
 - **Stability Scoring:** Composite risk metrics (🟢 Safe, 🟡 Medium, 🔴 High Risk). ✅ (Phase 13.2)
 - **Symbol Guard:** Blocks HIGH RISK mutations, warns on MEDIUM risk, allows SAFE (use --force to override). ✅ (Phase 13.2)
-- **Style Guard:** Simple lint errors (whitespace/imports) are auto-fixed. Don't waste turns fixing them. 🔜
-- **Context Anchors:** Coming soon to ground large-context models. 🔜
+- **Style Guard:** Explicit style fixing (whitespace/imports/quotes). Use `quality style-check` to preview, `quality style-fix` to apply. ✅ (Phase 14.1)
+- **Context Anchors:** GPS + deps + risk + temporal + safety metadata in all outputs. ✅ (Phase 14.2)
+- **Predictive Editing:** Proactive suggestions for related changes based on deterministic AST relationships. Use `quality related-changes <symbol>` to explore. ✅ (Phase 14.3)
 
 ## 🎯 QUALITY ASSURANCE [STANDARDS]
 
@@ -369,6 +394,11 @@ If parsability < 98%:
 - `CERBERUS_MACHINE_MODE=1`: Force JSON output (Default).
 - `CERBERUS_SILENT_METRICS=1`: Hide `[Meta]` token stats.
 - `CERBERUS_HUMAN_MODE=1`: Opt-in to rich text/tables (Not for Agents).
+- `CERBERUS_ANCHORS=json|compact|text|off`: Context anchor mode (Default: json). Phase 14.2.
+  - `json`: Full JSON anchor metadata (default)
+  - `compact`: Compact JSON (<5% overhead)
+  - `text`: Human-readable box format
+  - `off`: Disable anchors
 ## 📊 TOKEN SAVINGS TRACKING
 
 Every Cerberus command automatically tracks token savings vs. reading full files.
