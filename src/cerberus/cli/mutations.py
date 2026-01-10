@@ -119,6 +119,19 @@ def edit_cmd(
         # Machine mode: pure JSON with predictions
         output_data = result.model_dump()
 
+        # Phase 14.4: Record action for accuracy tracking
+        if result.success:
+            try:
+                ledger = DiffLedger()
+                ledger.record_action(
+                    action_type="edit",
+                    target_symbol=symbol,
+                    target_file=str(file),
+                    command=f"cerberus mutations edit {file} --symbol {symbol}"
+                )
+            except Exception as e:
+                logger.debug(f"Action tracking failed: {e}")
+
         # Phase 14.3: Add predictions if enabled
         if not no_predict and result.success:
             try:
@@ -135,7 +148,8 @@ def edit_cmd(
 
                 # Log predictions to ledger (Phase 14.3 basic logging)
                 if predictions:
-                    ledger = DiffLedger()
+                    if 'ledger' not in locals():
+                        ledger = DiffLedger()
                     prediction_dicts = [
                         {"symbol": p.symbol, "confidence_score": p.confidence_score}
                         for p in predictions
@@ -149,6 +163,18 @@ def edit_cmd(
     else:
         # Human mode: rich output
         if result.success:
+            # Phase 14.4: Record action for accuracy tracking
+            try:
+                ledger = DiffLedger()
+                ledger.record_action(
+                    action_type="edit",
+                    target_symbol=symbol,
+                    target_file=str(file),
+                    command=f"cerberus mutations edit {file} --symbol {symbol}"
+                )
+            except Exception as e:
+                logger.debug(f"Action tracking failed: {e}")
+
             # Phase 12.5: Context Anchoring (GPS)
             anchor_header = ContextAnchor.format_mutation_header(
                 operation="edit",
