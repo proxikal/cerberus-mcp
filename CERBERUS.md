@@ -1,166 +1,62 @@
-# CERBERUS v0.10.0 - AI Agent Context
-# Protocol: UACP/1.0 | Tokens: ~900 | Compression: 99.8% | Fidelity: 100%
-# Compatible: Claude✓ Gemini✓ Codex✓ | Verified: 2026-01-09
-# Truth: THIS_FILE | Verify: cerberus verify-context
+# CERBERUS v0.13.0 - AI Agent Operating System
+# Protocol: UACP/1.2 | Fidelity: 100% | Mode: Machine-First (JSON) | Arch: AST/SQLite
 
-## CORE [ALWAYS_LOAD]
-id=cerberus mission=AST→symbol→context type=deterministic_engine firmness=REQUIRED
-status=P1-10:✅ P7-mono:⏸️ tests=176/191(0❌) prod=READY
-principle=code_over_prompts forbidden=[LLM_analysis,time_est,feature_creep,proactive_docs,emojis,bypass_facade]
+## ⚡ CORE MANDATES [REQUIRED]
+MISSION: 100% Signal / 0% Noise. Deterministic AST > LLM Guesswork.
+PRINCIPLES:
+  1. Code > Prompts: Use `get-symbol` (AST), never `read_file` (Text).
+  2. Verified Transactions: writes MUST use `--verify` to prevent regression.
+  3. Strict Resolution: No auto-correct on mutations. Ambiguity = Error.
+  4. Symbiosis: Use `blueprint` (Map) before `read` (Flashlight).
 
-## IDENTITY
-Cerberus: deterministic context layer for AI agents. 
-Core: AST parsing → symbolic intelligence → compressed context.
-NOT: LLM-based analysis, prompt engineering, RAG chunking.
+## 🚫 FORBIDDEN [STRICT]
+- `cat/read_file` on full files (>50 lines). USE: `blueprint` or `read --lines`.
+- `grep`. USE: `cerberus search` (Semantic/Hybrid).
+- `ls -R`. USE: `cerberus tree`.
+- Speculative/Unverified Edits. USE: `batch-edit --verify`.
+- Deleting referenced symbols WITHOUT checking deps. (Symbol Guard: 🔜).
 
-Principles:
-  code>prompts: tree-sitter AST | SQLite | FAISS → ∅LLM
-  self_similar: ∀pkg∃{facade.py,config.py,__init__.py} ∧ ¬internal_cross_import
-  aegis: {log:struct, exc:custom, trace:@, diag:doctor}
-  dogfood: cerberus.index(cerberus)==REQUIRED
+## 🗺 PHASE STATUS [CAPABILITIES]
+P1-11 [CORE]: Indexing (SQLite/FAISS), Retrieval (Hybrid), Editing (AST). ✅
+P12 [HARMONY]: 
+  - Batch: Atomic multi-file edits (`batch-edit`). ✅
+  - Verify: Auto-revert on test failure (`--verify`). ✅
+  - Strict: Optimistic Locking + No Fuzzy Writes. ✅
+P12.5 [SAFETY/INTEL]:
+  - Undo: Persistent Rollback (`cerberus undo`). ✅
+  - JIT: Output footers guide next steps ("Whisper Protocol"). ✅
+  - Guard: Blocks deleting referenced symbols. 🔜
+  - Smart Merge: Auto-resolves non-overlapping AST conflicts. 🔜
+  - Anchors: Standardized headers `[File: X] [Symbol: Y]` ("GPS"). 🔜
+P13 [PREDICTIVE]:
+  - Blueprint: Visual ASCII Trees + Dependency Overlay + Churn. 🔜
 
-Forbidden:
-  LLM_code_analysis → use tree-sitter AST (deterministic)
-  time_estimates → say WHAT not WHEN
-  feature_creep → IF !context_mgmt THEN reject+explain
-  proactive_docs → explicit_user_request REQUIRED
-  cross_imports → only via __init__.py exports (¬bypass_facade)
-  emojis → forbidden unless user explicitly requests
-  unsolicited_files → edit existing before creating new
-  standard_tools_when_indexed → PAUSE+propose cerberus enhancement OR explain gap to user
+## 🛠 COMMAND QUICKREF
+# 1. ORIENT (Map)
+cerberus blueprint src/main.py --visual    # Architecture Map (Phase 13)
+cerberus tree --depth 2                    # File Hierarchy
 
-## RULES [DECISION_MATRIX]
-@mission_drift:
-  IF: violates_mandates OR !serves_context_management
-  DO: [STOP, explain_violation, propose_alternative, BE_FIRM]
-  MSG: "Conflicts with core mission. Violation: [cite]. Alternative: [propose]."
+# 2. READ (Flashlight)
+cerberus retrieval get-symbol AuthConfig   # Get Code + Docstring
+cerberus retrieval search "login error"    # Semantic Search
+cerberus symbolic deps AuthConfig          # Who does this call?
+cerberus symbolic references AuthConfig    # Who calls this?
 
-@new_package:
-  REQUIRE: [facade.py, config.py, __init__.py]
-  TEST: can_cerberus_index_itself()
-  PATTERN: self_similarity_mandate
+# 3. WRITE (Scalpel)
+# ATOMIC BATCH (Preferred):
+cerberus mutations batch-edit ops.json --verify "pytest tests/" --preview
+# JSON Format: [{"op": "edit", "file": "...", "symbol": "...", "code": "..."}]
 
-@documentation:
-  IF: proactive
-  REJECT: "explicit user request required"
+# UNDO (Safety Net):
+cerberus mutations undo                    # Revert last batch
 
-@commit:
-  WHEN: user_explicitly_requests
-  STYLE: conventional_commits + "Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+## 🧠 SYMBOLIC INTELLIGENCE
+- **JIT Guidance:** Follow the `[Tip]` footer in commands for correct syntax. ✅
+- **Diff Feedback:** All edits return Unified Diffs. Review them before confirming. ✅
+- **Style Guard:** Simple lint errors (whitespace/imports) are auto-fixed. Don't waste turns fixing them. 🔜
+- **Context Anchors:** Coming soon to ground large-context models. 🔜
 
-@architecture:
-  IF: violates_self_similarity OR violates_aegis
-  DO: [STOP, cite_mandate, propose_compliant_alternative]
-
-@surgical_edits:
-  CONTEXT: Interface requires 'Read' before 'Write/Update'.
-  RULE: Never use `read_file` for the entire file.
-  DO: Use `cerberus get-symbol` OR `cerberus read --lines` to satisfy the tool's read-requirement.
-  GOAL: Minimal tokens to satisfy safety check.
-
-@parsimony:
-  CONTEXT: Write/Edit operations
-  RULE: solution_complexity <= problem_complexity
-  FORBIDDEN: [over_engineering, speculative_features, rewriting_unchanged_logic]
-  MANDATE: "Atomic edits only. Do not rewrite full files if search/replace works."
-  GOAL: Minimal token diff.
-
-## STATUS
-version: 0.10.0 | phases: P1-10(complete) P7-mono(deferred)
-tests: 176/191 passing | 15 skipped | 0 failing | compliance: 100%
-Performance:
-  memory: 0.22MB keyword | 227x under P7 target | lazy: 400MB semantic
-  tokens: 99.7%↓ (150K→500) | smart_ctx: 87%↓
-  capacity: 10K+ files | 68K symbols validated
-  daemon: 7.2ms avg query | <50ms target ✓ | zero cold start
-Phase 8 (Context Amplification):
-  blueprint: index-backed whole-file AST (faster than disk)
-  timeline: git-aware symbol change tracking
-  auto-hydrate: automatic type dependency injection
-  trace-path: execution flow mapping (BFS pathfinding)
-Phase 9 (Active Cortex - COMPLETE ✓):
-  9.1-9.4: Daemon server + JSON-RPC 2.0 protocol ✓
-  9.5: Thin client routing (7ms avg, 227x faster) ✓
-  9.6: Filesystem watcher (auto-index updates) ✓
-  9.7: Session management (automatic cleanup) ✓
-  9.8: Three-tier memory (hot/warm/cold) ✓
-Phase 10 (Deterministic Interface - COMPLETE ✓):
-  10.1: Machine-First Protocol (machine mode is DEFAULT, --human to opt-in) ✓
-  10.2: Configurable token ledger (--show-turn-savings, --silent-metrics) ✓
-  10.3: MachineAwareConsole (strips rich markup/emojis) ✓
-  10.4: Structured failure (JSON errors + actionable fixes) ✓
-  10.5: Schema contract (introspect command interfaces) ✓
-  10.6: Batch protocol (in-process parallel execution) ✓
-
-## ARCH
-pipeline: scan→parse→index→retrieve→resolve→synthesize
-packages: [scanner,parser,index,retrieval,incremental,watcher,synthesis,storage,resolution,semantic,summarization]
-pattern: ∀pkg∃{facade.py,config.py} | export_via=__init__.py | ¬cross_import
-Storage: primary: SQLite+ACID | vector: FAISS(optional) | arch: streaming_const_mem
-
-## WORKFLOW [AI_AGENT_PATTERNS]
-1. understand: search/inspect/deps [DO NOT read full files manually]
-2. plan: approach_fit(self_similar, aegis)
-3. implement: facade_pattern + tests
-4. test: PYTHONPATH=src python3 -m pytest tests/ -v
-5. verify: cerberus verify-context
-6. commit: ONLY if requested
-
-## COMMANDS [39 total]
-Core: hello, version, doctor, scan, index, update, watcher
-Utils: stats, bench, generate-tools, summarize, verify-context, generate-context, schema, batch
-Retrieval: get-symbol (--auto-hydrate), search, skeleton-file, skeletonize, blueprint, get-context
-Symbolic: deps, calls, references, resolution-stats, inherit-tree, descendants, overrides, call-graph, smart-context, trace-path
-Dogfood: read, inspect, tree, ls, grep, timeline
-
-## EXPLORATION [PROTOCOL]
-- `cerberus` is in PATH - call it directly (NOT `PYTHONPATH=src python3 -m cerberus.main`)
-- Index Cerberus itself before exploration: `cerberus index .`
-- **Machine mode is DEFAULT:** Pure data output, no rich formatting. Use `--human` for pretty tables.
-- **MANDATORY:** Use Cerberus commands for ALL exploration:
-  - Pattern search: `cerberus dogfood grep "pattern" [path] -l` (files) or `-C 3` (context)
-  - Read files: `cerberus dogfood read <file> [--lines 1-100]`
-  - Find symbols: `cerberus retrieval get-symbol <name> [--file path]`
-  - Search code: `cerberus retrieval search "query" [--mode keyword]`
-  - Dependencies: `cerberus symbolic deps <symbol>`
-  - Blueprint: `cerberus retrieval blueprint <file>` (Phase 8)
-  - Timeline: `cerberus dogfood timeline --commits N` (Phase 8)
-- **IF standard tool needed (Grep/Read/Glob):**
-  1. PAUSE execution
-  2. Explain to user: "Need to use [tool] because Cerberus lacks [feature]"
-  3. Propose: "Should I implement `cerberus [new-cmd]` first? Or proceed with workaround?"
-  4. Wait for user decision before continuing
-- **IF cerberus command fails:**
-  1. Check syntax: `cerberus <cmd> --help`
-  2. Retry with correct syntax
-  3. If still fails, explain error and ask user for guidance
-- CHALLENGE user if requested changes drift from deterministic mission.
-
-## QUICKREF
-# Setup
-cerberus index .                            # Index current directory
-PYTHONPATH=src python3 -m pytest tests/ -v # Run tests (needs PYTHONPATH)
-cerberus utils verify-context               # Verify CERBERUS.md
-
-# Exploration (100% Dogfooding - cerberus is in PATH)
-cerberus dogfood grep "def.*parse" src/ -l              # Find files with pattern
-cerberus dogfood grep "import.*embeddings" . -C 2       # Pattern with context
-cerberus dogfood read src/cerberus/main.py --lines 1-100  # Read file range
-cerberus retrieval get-symbol SQLiteIndexStore          # Get symbol definition
-cerberus retrieval search "fts5 implementation"         # Search code
-cerberus symbolic deps hybrid_search                    # Symbol dependencies
-cerberus symbolic smart-context <symbol>                # Full context assembly
-
-# Phase 8 Features
-cerberus retrieval blueprint src/cerberus/main.py       # Whole-file AST (index-backed)
-cerberus dogfood timeline --commits 3                   # Changed symbols (last 3 commits)
-cerberus retrieval get-symbol User --auto-hydrate       # Auto-fetch referenced types
-cerberus symbolic trace-path api_endpoint db_save       # Execution flow mapping
-
-# Phase 10 Features (Agent Symbiosis - Machine-First)
-cerberus retrieval get-symbol Foo --json               # Default: machine mode (pure data)
-cerberus --human retrieval get-symbol Foo              # Opt-in to human mode (rich tables)
-cerberus --silent-metrics utils stats                  # Suppress all metrics
-cerberus utils schema --list                           # List all command schemas
-cerberus utils schema get-symbol                       # Get command interface schema
-cerberus utils batch --file requests.json              # Atomic batch execution (parallel)
+## ⚙️ CONFIGURATION
+- `CERBERUS_MACHINE_MODE=1`: Force JSON output (Default).
+- `CERBERUS_SILENT_METRICS=1`: Hide `[Meta]` token stats.
+- `CERBERUS_HUMAN_MODE=1`: Opt-in to rich text/tables (Not for Agents).

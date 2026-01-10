@@ -24,7 +24,7 @@ def parse_typescript_file(file_path: Path, content: str) -> List[CodeSymbol]:
                 CodeSymbol(
                     name=symbol_name,
                     type=symbol_type,
-                    file_path=str(file_path),
+                    file_path=str(file_path.resolve()),
                     start_line=line_number,
                     end_line=line_number,
                 )

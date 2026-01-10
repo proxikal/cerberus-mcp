@@ -291,3 +291,89 @@ class SymbolReference(BaseModel):
     target_type: Optional[str] = None  # Class/type name
     confidence: float = 1.0  # Resolution confidence (0.0-1.0)
     resolution_method: Optional[str] = None  # How it was resolved: "import_trace", "type_annotation", "inference"
+
+
+# Phase 11: Symbolic Editing (Mutation) Schemas
+
+class SymbolLocation(BaseModel):
+    """
+    Precise AST-based symbol location with byte ranges.
+    Phase 11: Enable surgical edits by symbol name.
+    """
+    file_path: str
+    symbol_name: str
+    symbol_type: str  # "function", "class", "method", etc.
+    start_byte: int  # Exact byte offset where symbol starts
+    end_byte: int  # Exact byte offset where symbol ends
+    start_line: int  # Line number (1-indexed)
+    end_line: int  # Line number (1-indexed)
+    indentation_level: int  # Number of indentation units
+    language: str  # "python", "javascript", "typescript"
+    parent_class: Optional[str] = None  # For methods, the containing class
+
+
+class MutationResult(BaseModel):
+    """
+    Result of a mutation operation (edit/insert/delete).
+    Phase 11: Track write efficiency and validation status.
+    Phase 12: Add diff output for agent feedback.
+    """
+    success: bool
+    operation: Literal["edit", "insert", "delete"]
+    file_path: str
+    symbol_name: str
+    lines_changed: int  # Number of lines modified
+    lines_total: int  # Total lines in file
+    write_efficiency: float  # lines_changed / lines_total
+    tokens_saved: int  # Estimated tokens saved vs full rewrite
+    validation_passed: bool  # Did syntax/semantic validation pass
+    errors: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    backup_path: Optional[str] = None  # Path to backup file if created
+    diff: Optional[str] = None  # Phase 12: Unified diff output
+
+
+class DiffMetric(BaseModel):
+    """
+    Write efficiency tracking metric for mutation operations.
+    Phase 11: Measure token savings and edit precision.
+    """
+    timestamp: float
+    operation: str  # "edit", "insert", "delete"
+    file_path: str
+    lines_changed: int
+    lines_total: int
+    write_efficiency: float  # lines_changed / lines_total
+    tokens_saved: int  # vs full file rewrite
+
+
+# Phase 12: Batch Editing Schemas
+class EditOperation(BaseModel):
+    """
+    A single edit operation in a batch.
+    Phase 12: Atomic multi-edit transactions.
+    """
+    operation: Literal["edit", "insert", "delete"]
+    file_path: str
+    symbol_name: str
+    new_code: Optional[str] = None  # Required for edit/insert
+    symbol_type: Optional[str] = None
+    parent_class: Optional[str] = None
+    parent_symbol: Optional[str] = None  # For insert operations
+    after_symbol: Optional[str] = None  # For insert operations
+    before_symbol: Optional[str] = None  # For insert operations
+    auto_format: bool = True
+    auto_imports: bool = True
+
+
+class BatchEditResult(BaseModel):
+    """
+    Result of a batch edit operation.
+    Phase 12: Atomic transaction results with rollback capability.
+    """
+    success: bool
+    operations_completed: int
+    operations_total: int
+    results: List[MutationResult]
+    errors: List[str] = Field(default_factory=list)
+    rolled_back: bool = False  # True if transaction was rolled back

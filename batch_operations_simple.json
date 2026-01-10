@@ -1,0 +1,15 @@
+[
+  {
+    "operation": "edit",
+    "file_path": "/Users/proxikal/Desktop/Dev/Cerberus/test_batch_example.py",
+    "symbol_name": "example_function",
+    "new_code": "def example_function():\n    \"\"\"Updated by Phase 12 batch-edit.\"\"\"\n    return 100",
+    "symbol_type": "function"
+  },
+  {
+    "operation": "delete",
+    "file_path": "/Users/proxikal/Desktop/Dev/Cerberus/test_batch_example.py",
+    "symbol_name": "old_function",
+    "symbol_type": "function"
+  }
+]

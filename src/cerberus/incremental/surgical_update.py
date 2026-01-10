@@ -311,6 +311,8 @@ def _parse_single_file(file_path: str, project_path: Path) -> List[CodeSymbol]:
     """
     Parse a single file and extract symbols (Phase 4 helper).
 
+    Optimized: Parses only the target file instead of scanning entire parent directory.
+
     Args:
         file_path: Relative file path
         project_path: Project root path
@@ -318,34 +320,23 @@ def _parse_single_file(file_path: str, project_path: Path) -> List[CodeSymbol]:
     Returns:
         List of extracted symbols
     """
+    from ..parser import parse_file
+
     abs_path = project_path / file_path
     if not abs_path.exists():
         logger.warning(f"File {abs_path} does not exist")
         return []
 
     try:
-        scan_result = scan(
-            directory=abs_path.parent,
-            respect_gitignore=False,
-            extensions=None,
-            previous_index=None,
-            incremental=False,
-            max_bytes=None,
-        )
-
-        # Filter to only this file
-        abs_path_str = str(abs_path.resolve())
-        file_symbols = [
-            s for s in scan_result.symbols
-            if Path(s.file_path).resolve() == Path(abs_path_str)
-        ]
+        # Parse just this file directly (avoid scanning parent directory)
+        symbols = parse_file(str(abs_path))
 
         # Normalize file paths to relative (for SQLite consistency)
-        for symbol in file_symbols:
+        for symbol in symbols:
             symbol.file_path = file_path
 
-        logger.debug(f"Extracted {len(file_symbols)} symbols from {file_path}")
-        return file_symbols
+        logger.debug(f"Extracted {len(symbols)} symbols from {file_path}")
+        return symbols
 
     except Exception as e:
         logger.error(f"Failed to parse {abs_path}: {e}")

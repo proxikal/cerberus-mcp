@@ -115,18 +115,19 @@ def scan_files_streaming(
 
             # Create FileObject
             last_modified = file_path.stat().st_mtime
+            resolved_path = str(file_path.resolve())
             file_obj = FileObject(
-                path=str(relative_path),
-                abs_path=str(file_path.resolve()),
+                path=resolved_path,  # Use absolute resolved path (needed for mutation operations)
+                abs_path=resolved_path,
                 size=file_size,
                 last_modified=last_modified,
             )
 
             # Check if file changed (for incremental)
             if incremental and previous_files:
-                prev_mtime = previous_files.get(str(relative_path))
+                prev_mtime = previous_files.get(resolved_path)
                 if prev_mtime and abs(prev_mtime - last_modified) < 0.01:
-                    logger.debug(f"Skipping unchanged file: '{relative_path}'")
+                    logger.debug(f"Skipping unchanged file: '{resolved_path}'")
                     continue
 
             # Parse file
@@ -140,9 +141,9 @@ def scan_files_streaming(
                     # Not a code file or no symbols found - skip
                     continue
 
-                # Normalize file paths to relative
+                # Normalize file paths to absolute resolved (needed for mutation operations)
                 for symbol in symbols:
-                    symbol.file_path = str(relative_path)
+                    symbol.file_path = str(file_path.resolve())
 
                 # Extract additional info (all take file_path and content)
                 imports = extract_imports(file_path, content)
@@ -151,17 +152,17 @@ def scan_files_streaming(
                 import_links = extract_import_links(file_path, content)
                 method_calls = extract_method_calls(file_path, content)  # Phase 5.1
 
-                # Normalize file paths in related data
+                # Normalize file paths in related data to absolute resolved
                 for imp in imports:
-                    imp.file_path = str(relative_path)
+                    imp.file_path = resolved_path
                 for call in calls:
-                    call.caller_file = str(relative_path)
+                    call.caller_file = resolved_path
                 for ti in type_infos:
-                    ti.file_path = str(relative_path)
+                    ti.file_path = resolved_path
                 for link in import_links:
-                    link.importer_file = str(relative_path)
+                    link.importer_file = resolved_path
                 for mc in method_calls:  # Phase 5.1
-                    mc.caller_file = str(relative_path)
+                    mc.caller_file = resolved_path
 
                 # Yield result immediately (no accumulation!)
                 yield FileResult(

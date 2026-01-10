@@ -180,7 +180,7 @@ cerberus/resolution/
 
 ---
 
-### Phase 11: The Surgical Writer (Symbolic Editing) 🔜 PLANNED
+### Phase 11: The Surgical Writer (Symbolic Editing) ✅ COMPLETE
 *   **Safe Code Modification:** Edit by Concept, not Line Number.
     *   **Symbolic Edit:** `cerberus edit --symbol` (Replace function/class).
     *   **Safety Pillars:** Auto-Indentation, Import Guardian, Syntax Verification.
@@ -190,28 +190,32 @@ cerberus/resolution/
 
 ---
 
-### Phase 12: Visual Intelligence (Optional/Future)
-*   **Web UI:** Lightweight local dashboard for visual exploration
-    *   Interactive call graph visualization
-    *   Inheritance hierarchy tree view
-    *   Search interface with highlighting
-*   **VS Code Extension:** Native IDE integration
-*   **Export Formats:** SVG/PNG call graphs, Mermaid diagrams
+### Phase 12: The Harmonized Writer (Agent Symbiosis) 🔜 PLANNED
+*   **Perfect Harmony:** Optimizing UX for Agents.
+    *   **Batch Protocol:** Atomic multi-file edits with Sequential Re-parsing.
+    *   **Verified Transactions:** `--verify` flag that auto-reverts on test failure.
+    *   **Diff Feedback:** Return unified diffs for all mutations.
+    *   **Strict Resolution:** No auto-correct on writes; suggestions only.
+
+**Goal:** Make Cerberus the *undisputed* choice for code modification. See [PHASE12_SPEC.md](./PHASE12_SPEC.md).
 
 ---
 
-### Phase 13: Enhanced Security & Compliance
-*   **Security Scanning:** Automated PII and secret detection within the indexing pipeline
-*   **Compliance Reporting:** Generate security audit reports
-*   **Safe Context Assembly:** Automatic redaction of sensitive data from AI context
+### Phase 13: The Predictive Blueprint (Architectural Intelligence) 🔜 PLANNED
+*   **Visual Intelligence:** ASCII Tree Maps for instant understanding.
+*   **Deep Insight:** Dependency overlays (outgoing calls) and Complexity metrics.
+*   **Churn Awareness:** Git integration to highlight "Hot" symbols.
+*   **Auto-Hydration:** Smartly include minified context of dependencies.
+
+**Goal:** Zero-token logic inspection. See [PHASE13_SPEC.md](./PHASE13_SPEC.md).
 
 ---
 
-### Phase 14: Multi-Language Expansion
-*   **Full TypeScript Support:** Complete skeletonization and advanced parsing
-*   **Rust Support:** Full parsing, type inference, trait resolution
-*   **Java Support:** Class hierarchies, interface resolution
-*   **Generic Language Protocol:** Plugin system for adding new languages
+## Future Expansion (Post-Core)
+*   **Status:** Long-Term. See [FUTURE_EXPANSION.md](./FUTURE_EXPANSION.md).
+*   **Visual Intelligence:** Web UI, VS Code Extension.
+*   **Security & Compliance:** PII/Secret detection.
+*   **Multi-Language:** Parity for Rust, Java, Go.
 
 ---
 

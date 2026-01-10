@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Dict, Any
 from cerberus.index import find_symbol, compute_stats, ScanResult
 from cerberus.retrieval import hybrid_search
+from cerberus.storage.sqlite_store import SQLiteIndexStore
+from cerberus.mutation import MutationFacade
 
 
 def handle_get_symbol(args: dict, scan_result: ScanResult, index_path: Path) -> dict:
@@ -136,6 +138,77 @@ def handle_references(args: dict, scan_result: ScanResult, index_path: Path) -> 
     }
 
 
+def handle_edit(args: dict, scan_result: ScanResult, index_path: Path) -> dict:
+    """Handle edit command - Phase 11 symbolic editing."""
+    file_path = args.get("file")
+    symbol = args.get("symbol")
+    code = args.get("code")
+
+    if not file_path:
+        return {"error": "Missing required argument: file"}
+    if not symbol:
+        return {"error": "Missing required argument: symbol"}
+    if not code:
+        return {"error": "Missing required argument: code"}
+
+    try:
+        # Load store
+        store = SQLiteIndexStore(str(index_path))
+
+        # Create facade
+        facade = MutationFacade(store)
+
+        # Perform edit
+        result = facade.edit_symbol(
+            file_path=file_path,
+            symbol_name=symbol,
+            new_code=code,
+            symbol_type=args.get("type"),
+            parent_class=args.get("parent"),
+            dry_run=args.get("dry_run", False),
+            auto_format=not args.get("no_format", False),
+            auto_imports=not args.get("no_imports", False)
+        )
+
+        return result.model_dump()
+
+    except Exception as e:
+        return {"error": f"Edit failed: {e}"}
+
+
+def handle_delete(args: dict, scan_result: ScanResult, index_path: Path) -> dict:
+    """Handle delete command - Phase 11 symbolic deletion."""
+    file_path = args.get("file")
+    symbol = args.get("symbol")
+
+    if not file_path:
+        return {"error": "Missing required argument: file"}
+    if not symbol:
+        return {"error": "Missing required argument: symbol"}
+
+    try:
+        # Load store
+        store = SQLiteIndexStore(str(index_path))
+
+        # Create facade
+        facade = MutationFacade(store)
+
+        # Perform delete
+        result = facade.delete_symbol(
+            file_path=file_path,
+            symbol_name=symbol,
+            symbol_type=args.get("type"),
+            parent_class=args.get("parent"),
+            dry_run=args.get("dry_run", False),
+            keep_decorators=args.get("keep_decorators", False)
+        )
+
+        return result.model_dump()
+
+    except Exception as e:
+        return {"error": f"Delete failed: {e}"}
+
+
 # Command handler registry
 BATCH_HANDLERS: Dict[str, Any] = {
     "get-symbol": handle_get_symbol,
@@ -144,4 +217,6 @@ BATCH_HANDLERS: Dict[str, Any] = {
     "deps": handle_deps,
     "calls": handle_calls,
     "references": handle_references,
+    "edit": handle_edit,  # Phase 11
+    "delete": handle_delete,  # Phase 11
 }
