@@ -73,7 +73,7 @@ def process(data: List[str]) -> Dict[str, int]:
     assert any(t.name == "service" and t.inferred_type == "AuthService" for t in types)
 
     print("✅ PASSED\n")
-    return types
+
 
 
 def test_typescript_type_extraction():

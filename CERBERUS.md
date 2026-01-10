@@ -16,6 +16,41 @@ PRINCIPLES:
 - Speculative/Unverified Edits. USE: `batch-edit --verify`.
 - Deleting referenced symbols WITHOUT checking deps. (Symbol Guard: 🔜).
 
+## 🔄 DAEMON MANAGEMENT [REQUIRED]
+**AT SESSION START - CHECK FIRST:**
+1. Status: `cerberus watcher status` - Returns PID if running.
+2. Start ONLY if stopped: `cerberus watcher start`
+3. NEVER start multiple watchers → Performance catastrophe (logs, CPU).
+
+**HEALTH MONITORING (Required During Session):**
+Check health BEFORE: batch operations, index updates, every 10 commands.
+```bash
+cerberus watcher health --json
+# Returns: {"status": "healthy|warning|critical", "log_size_mb": 2.5, "cpu_percent": 15}
+```
+
+**Thresholds (Auto-Stop if Critical):**
+- Log > 50MB = CRITICAL (rotation failure) → Watcher auto-stops
+- CPU > 80% = CRITICAL (runaway process) → Watcher auto-stops
+- Log > 20MB or CPU > 50% = WARNING (monitor closely)
+
+**If Watcher Auto-Stopped:**
+```
+⚠️ WATCHER STOPPED: [reason]
+
+Options:
+1. Clean logs and restart: cerberus clean --preserve-index && cerberus watcher start
+2. Investigate logs: cerberus watcher logs
+3. Continue without watcher
+```
+
+**Commands:**
+cerberus watcher status    # Check daemon state
+cerberus watcher start     # Start if not running
+cerberus watcher stop      # Stop daemon
+cerberus watcher health    # Check health (log size, CPU)
+cerberus watcher logs      # View daemon logs
+
 ## 🗺 PHASE STATUS [CAPABILITIES]
 P1-11 [CORE]: Indexing (SQLite/FAISS), Retrieval (Hybrid), Editing (AST). ✅
 P12 [HARMONY]: 

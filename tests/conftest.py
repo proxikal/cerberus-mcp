@@ -4,8 +4,7 @@ from cerberus.logging_config import setup_logging
 @pytest.fixture(autouse=True)
 def setup_test_logging():
     """
-    Forces the logger to DEBUG level for all tests.
+    Phase 10: Machine mode by default - suppress console logs for clean test output.
     """
-    # Re-run setup, but force the level. 
-    # This is a simple way to do it for our project.
-    setup_logging(level="DEBUG")
+    # Machine mode: suppress console logging, only write to file
+    setup_logging(level="DEBUG", suppress_console=True)

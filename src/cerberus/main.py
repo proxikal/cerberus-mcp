@@ -398,7 +398,7 @@ def update(
 def watcher_cmd(
     action: str = typer.Argument(
         ...,
-        help="Action: start, stop, status, restart, logs"
+        help="Action: start, stop, status, restart, logs, health"
     ),
     project_path: Optional[Path] = typer.Option(
         None,
@@ -437,6 +437,7 @@ def watcher_cmd(
       status  - Show watcher status
       restart - Restart the watcher daemon
       logs    - View watcher logs
+      health  - Check watcher health (log size, CPU usage)
     """
     from cerberus.watcher import start_watcher, stop_watcher, watcher_status
     from cerberus.watcher.config import get_log_file_path
@@ -527,9 +528,122 @@ def watcher_cmd(
                 result = subprocess.run(["tail", "-n", "50", str(log_file)], capture_output=True, text=True)
                 console.print(result.stdout)
 
+        elif action == "health":
+            import psutil
+            from cerberus.watcher import is_watcher_running, stop_watcher
+            from cerberus.watcher.daemon import get_watcher_pid
+
+            # Check if watcher is running
+            if not is_watcher_running(project_path):
+                if json_output:
+                    typer.echo(json.dumps({"status": "stopped", "message": "Watcher is not running"}))
+                else:
+                    console.print("[yellow]Watcher is not running[/yellow]")
+                return
+
+            # Get watcher PID
+            pid = get_watcher_pid(project_path)
+
+            # Check log file size
+            log_file = get_log_file_path(project_path)
+            log_size_bytes = 0
+            log_size_mb = 0.0
+            if log_file.exists():
+                log_size_bytes = log_file.stat().st_size
+                log_size_mb = log_size_bytes / (1024 * 1024)
+
+            # Check CPU usage
+            cpu_percent = 0.0
+            memory_mb = 0.0
+            try:
+                process = psutil.Process(pid)
+                cpu_percent = process.cpu_percent(interval=0.5)
+                memory_mb = process.memory_info().rss / (1024 * 1024)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                if json_output:
+                    typer.echo(json.dumps({"status": "error", "message": "Could not access watcher process"}))
+                else:
+                    console.print("[red]Error: Could not access watcher process[/red]")
+                raise typer.Exit(code=1)
+
+            # Determine health status
+            issues = []
+            is_critical = False
+
+            # Check log file size (> 50MB is critical)
+            if log_size_mb > 50:
+                issues.append(f"Log file exceeded 50MB ({log_size_mb:.1f} MB) - rotation failure")
+                is_critical = True
+            elif log_size_mb > 20:
+                issues.append(f"Log file large ({log_size_mb:.1f} MB) - rotation may be struggling")
+
+            # Check CPU usage (> 80% is critical)
+            if cpu_percent > 80:
+                issues.append(f"CPU usage excessive ({cpu_percent:.1f}%)")
+                is_critical = True
+            elif cpu_percent > 50:
+                issues.append(f"CPU usage elevated ({cpu_percent:.1f}%)")
+
+            # Determine overall status
+            if is_critical:
+                status = "critical"
+            elif issues:
+                status = "warning"
+            else:
+                status = "healthy"
+
+            # Build response
+            health_data = {
+                "status": status,
+                "pid": pid,
+                "log_size_mb": round(log_size_mb, 2),
+                "cpu_percent": round(cpu_percent, 1),
+                "memory_mb": round(memory_mb, 1),
+                "issues": issues,
+            }
+
+            # If critical, stop the watcher
+            if is_critical:
+                console.print(f"[bold red]⚠️  CRITICAL: Watcher health check failed![/bold red]")
+                for issue in issues:
+                    console.print(f"[red]  • {issue}[/red]")
+                console.print(f"\n[yellow]Stopping watcher (PID: {pid})...[/yellow]")
+
+                stop_watcher(project_path)
+                health_data["action_taken"] = "stopped"
+
+                if json_output:
+                    typer.echo(json.dumps(health_data, indent=2))
+                else:
+                    console.print(f"\n[bold yellow]⚠️  WATCHER STOPPED: {issues[0]}[/bold yellow]\n")
+                    console.print("[cyan]Options:[/cyan]")
+                    console.print("  1. Clean logs and restart: [bold]cerberus clean --preserve-index && cerberus watcher start[/bold]")
+                    console.print("  2. Investigate logs: [bold]cerberus watcher logs[/bold]")
+                    console.print("  3. Continue without watcher")
+                    console.print("\n[dim]What would you like to do?[/dim]")
+
+                raise typer.Exit(code=1)
+
+            # Output results
+            if json_output:
+                typer.echo(json.dumps(health_data, indent=2))
+            else:
+                if status == "healthy":
+                    console.print(f"[green]✓ Watcher is healthy[/green]")
+                elif status == "warning":
+                    console.print(f"[yellow]⚠ Watcher has warnings:[/yellow]")
+                    for issue in issues:
+                        console.print(f"[yellow]  • {issue}[/yellow]")
+
+                console.print(f"\n[cyan]Metrics:[/cyan]")
+                console.print(f"  PID: {pid}")
+                console.print(f"  Log size: {log_size_mb:.1f} MB")
+                console.print(f"  CPU usage: {cpu_percent:.1f}%")
+                console.print(f"  Memory: {memory_mb:.1f} MB")
+
         else:
             console.print(f"[red]Unknown action: {action}[/red]")
-            console.print("Valid actions: start, stop, status, restart, logs")
+            console.print("Valid actions: start, stop, status, restart, logs, health")
             raise typer.Exit(code=1)
 
     except Exception as e:
@@ -569,6 +683,208 @@ def session(
         console.print(f"[red]Unknown action: {action}[/red]")
         console.print("Valid actions: summary, clear")
         raise typer.Exit(code=1)
+
+
+@app.command("clean")
+def clean_cmd(
+    project_path: Optional[Path] = typer.Option(
+        None,
+        "--project",
+        "-p",
+        help="Path to project (default: current directory).",
+    ),
+    preserve_index: bool = typer.Option(
+        False,
+        "--preserve-index",
+        help="Keep the main index file (cerberus.db)."
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show what would be deleted without actually deleting."
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Skip confirmation prompt."
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
+):
+    """
+    Clean Cerberus cache, logs, and database files.
+
+    This command removes:
+      - .cerberus/ directory (logs, backups, watcher data)
+      - cerberus.db (main index database)
+      - .cerberus_ledger.db (ledger database)
+      - Temporary watcher files (PID files, sockets)
+
+    Use --preserve-index to keep cerberus.db.
+    Use --dry-run to see what would be deleted.
+    """
+    import shutil
+    from cerberus.watcher import stop_watcher, is_watcher_running
+    from cerberus.watcher.config import get_pid_file_path, get_socket_file_path
+
+    if project_path is None:
+        project_path = Path.cwd()
+
+    # Files and directories to clean
+    items_to_clean = []
+
+    # .cerberus directory (logs, backups, etc.)
+    cerberus_dir = project_path / ".cerberus"
+    if cerberus_dir.exists():
+        size = sum(f.stat().st_size for f in cerberus_dir.rglob('*') if f.is_file())
+        items_to_clean.append({
+            "path": cerberus_dir,
+            "type": "directory",
+            "size": size,
+            "description": "Cache directory (logs, backups, watcher data)"
+        })
+
+    # Main index database
+    if not preserve_index:
+        index_db = project_path / "cerberus.db"
+        if index_db.exists():
+            items_to_clean.append({
+                "path": index_db,
+                "type": "file",
+                "size": index_db.stat().st_size,
+                "description": "Main index database"
+            })
+
+    # Ledger database
+    ledger_db = project_path / ".cerberus_ledger.db"
+    if ledger_db.exists():
+        items_to_clean.append({
+            "path": ledger_db,
+            "type": "file",
+            "size": ledger_db.stat().st_size,
+            "description": "Ledger database"
+        })
+
+    # Watcher PID and socket files
+    pid_file = get_pid_file_path(project_path)
+    if pid_file.exists():
+        items_to_clean.append({
+            "path": pid_file,
+            "type": "file",
+            "size": pid_file.stat().st_size,
+            "description": "Watcher PID file"
+        })
+
+    socket_file = get_socket_file_path(project_path)
+    if socket_file.exists():
+        items_to_clean.append({
+            "path": socket_file,
+            "type": "file",
+            "size": 0,
+            "description": "Watcher socket file"
+        })
+
+    if not items_to_clean:
+        if json_output:
+            typer.echo(json.dumps({"status": "nothing_to_clean", "items": []}))
+        else:
+            console.print("[green]Nothing to clean - no Cerberus files found.[/green]")
+        return
+
+    # Calculate total size
+    total_size = sum(item["size"] for item in items_to_clean)
+
+    # Format size for display
+    def format_size(size_bytes):
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        else:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+    # Dry run mode
+    if dry_run:
+        if json_output:
+            output = {
+                "status": "dry_run",
+                "items": [
+                    {
+                        "path": str(item["path"]),
+                        "type": item["type"],
+                        "size_bytes": item["size"],
+                        "size_formatted": format_size(item["size"]),
+                        "description": item["description"]
+                    }
+                    for item in items_to_clean
+                ],
+                "total_size_bytes": total_size,
+                "total_size_formatted": format_size(total_size)
+            }
+            typer.echo(json.dumps(output, indent=2))
+        else:
+            console.print("[bold yellow]DRY RUN - No files will be deleted[/bold yellow]\n")
+            console.print(f"[cyan]Items to clean:[/cyan]")
+            for item in items_to_clean:
+                size_str = format_size(item["size"])
+                console.print(f"  • {item['path']} ({size_str}) - {item['description']}")
+            console.print(f"\n[bold]Total size: {format_size(total_size)}[/bold]")
+        return
+
+    # Show what will be deleted
+    if not json_output:
+        console.print(f"[bold yellow]⚠️  WARNING: This will delete the following:[/bold yellow]\n")
+        for item in items_to_clean:
+            size_str = format_size(item["size"])
+            console.print(f"  • {item['path']} ({size_str}) - {item['description']}")
+        console.print(f"\n[bold]Total size: {format_size(total_size)}[/bold]\n")
+
+    # Stop watcher if running
+    if is_watcher_running(project_path):
+        console.print("[yellow]Stopping watcher daemon...[/yellow]")
+        stop_watcher(project_path)
+
+    # Confirm deletion
+    if not force and not json_output:
+        confirm = typer.confirm("Are you sure you want to delete these files?")
+        if not confirm:
+            console.print("[yellow]Cancelled.[/yellow]")
+            raise typer.Exit(code=0)
+
+    # Perform deletion
+    deleted_items = []
+    failed_items = []
+
+    for item in items_to_clean:
+        try:
+            if item["type"] == "directory":
+                shutil.rmtree(item["path"])
+            else:
+                item["path"].unlink()
+            deleted_items.append(str(item["path"]))
+            if not json_output:
+                console.print(f"[green]✓ Deleted: {item['path']}[/green]")
+        except Exception as e:
+            failed_items.append({"path": str(item["path"]), "error": str(e)})
+            if not json_output:
+                console.print(f"[red]✗ Failed to delete {item['path']}: {e}[/red]")
+
+    # Output results
+    if json_output:
+        output = {
+            "status": "completed",
+            "deleted_items": deleted_items,
+            "failed_items": failed_items,
+            "total_size_freed_bytes": total_size,
+            "total_size_freed_formatted": format_size(total_size)
+        }
+        typer.echo(json.dumps(output, indent=2))
+    else:
+        if deleted_items:
+            console.print(f"\n[bold green]✓ Cleaned {len(deleted_items)} items ({format_size(total_size)} freed)[/bold green]")
+        if failed_items:
+            console.print(f"[bold red]✗ Failed to delete {len(failed_items)} items[/bold red]")
+            raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ from .ledger import DiffLedger
 from .guard import SymbolGuard
 from .undo import UndoStack
 from .style_guard import StyleGuard
+from .smart_merge import SmartMerge
 from .config import (
     MUTATION_CONFIG,
     FORMATTERS,
@@ -36,6 +37,7 @@ __all__ = [
     "SymbolGuard",
     "UndoStack",
     "StyleGuard",
+    "SmartMerge",
 
     # Configuration
     "MUTATION_CONFIG",

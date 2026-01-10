@@ -212,6 +212,28 @@ class MutationFacade:
                 location.language
             )
 
+        # Phase 12.5: Apply Style Guard auto-fixes
+        if not dry_run:
+            # Calculate changed line numbers
+            changed_lines = set(range(location.start_line - 1, location.end_line))
+
+            # Apply style fixes
+            fixed_content, fixes_applied = self.style_guard.auto_fix(
+                modified_content,
+                file_path,
+                changed_lines
+            )
+
+            # Write fixed content back if changes were made
+            if fixes_applied:
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(fixed_content)
+                    modified_content = fixed_content
+                    logger.info(f"StyleGuard applied {len(fixes_applied)} fixes")
+                except Exception as e:
+                    logger.warning(f"Failed to apply style fixes: {e}")
+
         # 7. Format file (optional)
         if auto_format and not dry_run:
             self.formatter.format_file(file_path, location.language)

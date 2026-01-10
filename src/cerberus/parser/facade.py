@@ -2,7 +2,6 @@ from typing import List
 from pathlib import Path
 
 from cerberus.logging_config import logger
-from cerberus.tracing import trace
 from cerberus.schemas import CodeSymbol
 from .config import SUPPORTED_LANGUAGES
 from .python_parser import parse_python_file
@@ -11,7 +10,6 @@ from .typescript_parser import parse_typescript_file
 from .go_parser import parse_go_file
 # Import other specialist parsers here as they are created
 
-@trace
 def parse_file(file_path: Path) -> List[CodeSymbol]:
     """
     Parses a single file to extract symbols (functions, classes, etc.).
@@ -24,8 +22,8 @@ def parse_file(file_path: Path) -> List[CodeSymbol]:
     if not language:
         logger.debug(f"Unsupported file type: {file_path.suffix}. Skipping.")
         return []
-        
-    logger.info(f"Parsing file: {file_path} with language {language}")
+
+    logger.debug(f"Parsing file: {file_path} with language {language}")
     
     try:
         content = file_path.read_text(encoding="utf-8")

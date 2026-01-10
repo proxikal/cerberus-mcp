@@ -14,6 +14,7 @@ from rich.table import Table
 from rich.markup import escape
 
 from cerberus.logging_config import logger
+from cerberus.cli.config import CLIConfig
 from cerberus.agent_session import record_operation
 from cerberus.index import (
     load_index,
@@ -60,7 +61,7 @@ def deps(
 
             graph_result = build_recursive_call_graph(symbol, scan_result, max_depth=depth)
 
-            if json_output:
+            if CLIConfig.is_machine_mode() or json_output:
                 response["symbol"] = symbol
                 response["recursive"] = True
                 response["graph"] = graph_result.model_dump()
@@ -110,7 +111,7 @@ def deps(
         response["imports"] = file_imports
         response["show_resolution"] = show_resolution
 
-    if json_output:
+    if CLIConfig.is_machine_mode() or json_output:
         typer.echo(json.dumps(response, indent=2))
         return
 
@@ -203,7 +204,7 @@ def calls_cmd(
         # Limit results
         results = results[:limit]
 
-        if json_output:
+        if CLIConfig.is_machine_mode() or json_output:
             output = {
                 "total": len(results),
                 "calls": [
@@ -307,7 +308,7 @@ def references_cmd(
         # Limit results
         results = results[:limit]
 
-        if json_output:
+        if CLIConfig.is_machine_mode() or json_output:
             output = {
                 "total": len(results),
                 "references": [
@@ -394,7 +395,7 @@ def resolution_stats_cmd(
         store = open_index(str(index_path))
         stats = get_resolution_stats(store)
 
-        if json_output:
+        if CLIConfig.is_machine_mode() or json_output:
             typer.echo(json.dumps(stats, indent=2))
         else:
             from rich.panel import Panel
@@ -482,7 +483,7 @@ def inherit_tree_cmd(
             console.print(f"[red]No inheritance found for class '{class_name}'[/red]")
             raise typer.Exit(code=1)
 
-        if json_output:
+        if CLIConfig.is_machine_mode() or json_output:
             mro_data = [
                 {
                     "class_name": node.class_name,
@@ -565,7 +566,7 @@ def descendants_cmd(
 
         descendants = get_class_descendants(store, class_name, str(file_path) if file_path else None)
 
-        if json_output:
+        if CLIConfig.is_machine_mode() or json_output:
             typer.echo(json.dumps({"base_class": class_name, "descendants": descendants}, indent=2))
             return
 
@@ -630,7 +631,7 @@ def overrides_cmd(
 
         overrides = get_overridden_methods(store, class_name, str(file_path) if file_path else None)
 
-        if json_output:
+        if CLIConfig.is_machine_mode() or json_output:
             typer.echo(json.dumps({"class": class_name, "overrides": overrides}, indent=2))
             return
 
@@ -718,7 +719,7 @@ def call_graph_cmd(
             max_depth
         )
 
-        if json_output:
+        if CLIConfig.is_machine_mode() or json_output:
             import json as json_lib
             graph_data = {
                 "root_symbol": graph.root_symbol,
@@ -943,7 +944,7 @@ def trace_path_cmd(
             return
 
         # Format output
-        if json_output:
+        if CLIConfig.is_machine_mode() or json_output:
             output = {
                 'source': source,
                 'target': target,

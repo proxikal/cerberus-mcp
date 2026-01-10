@@ -260,13 +260,16 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Configure logging to file
+    # Configure logging to file with rotation
     log_file = get_log_file_path(args.project)
     logger.remove()  # Remove default handler
     logger.add(
         log_file,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}",
         level="INFO",
+        rotation=WATCHER_CONFIG["log_rotation_max_bytes"],  # Rotate when file reaches max size
+        retention=WATCHER_CONFIG["log_rotation_backup_count"],  # Keep N backup files
+        compression="gz",  # Compress rotated logs to save space
     )
 
     # Run daemon

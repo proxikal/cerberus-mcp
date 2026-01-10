@@ -27,6 +27,10 @@ from .retrieval_routing import get_symbol_with_routing
 from .output import print_error, structured_error, get_console
 from .config import CLIConfig
 from .suggestions import symbol_suggestions
+# Phase 12.5: JIT Guidance
+from .guidance import GuidanceProvider
+# Phase 12.5: Context Anchoring
+from .anchoring import ContextAnchor
 
 app = typer.Typer()
 console = get_console()
@@ -229,10 +233,13 @@ def get_symbol(
 
             item["hydrated_types"] = hydrated
 
-    if json_output:
-        typer.echo(json.dumps(enriched, indent=2))
+    # Phase 10: Machine mode is DEFAULT - JSON output for AI agents
+    if CLIConfig.is_machine_mode() or json_output:
+        # Compact JSON for agents (no pretty printing)
+        typer.echo(json.dumps(enriched, separators=(',', ':')))
         return
 
+    # Human mode: Rich tables and formatted output
     table = Table(title=f"Matches for '{name}'")
     table.add_column("Name", style="cyan", no_wrap=True)
     table.add_column("Type", style="green")
@@ -252,7 +259,17 @@ def get_symbol(
 
     for item in enriched:
         snippet = item["snippet"]
-        console.print(f"[bold]Context ({snippet['start_line']}-{snippet['end_line']})[/bold]:\n{snippet['content']}")
+        symbol = item["symbol"]
+
+        # Phase 12.5: Context Anchoring
+        header = ContextAnchor.format_header(
+            file_path=symbol["file_path"],
+            symbol=symbol["name"],
+            lines=f"{snippet['start_line']}-{snippet['end_line']}",
+            status="Read-Only"
+        )
+        console.print(f"\n{header}")
+        console.print(snippet['content'])
 
         if item.get("callers"):
             caller_table = Table(title="Callers")
@@ -277,6 +294,12 @@ def get_symbol(
             for hydrated in item["hydrated_types"]:
                 console.print(f"\n[bold cyan]{hydrated['type_name']}[/bold cyan] [dim]({hydrated['file']}:{hydrated['line']})[/dim]")
                 console.print(f"[dim]{hydrated['skeleton']}[/dim]")
+
+    # Phase 12.5: JIT Guidance
+    if not json_output and not CLIConfig.is_machine_mode():
+        tip = GuidanceProvider.get_tip("get-symbol")
+        if tip:
+            console.print(GuidanceProvider.format_tip(tip, style="footer"))
 
 
 
@@ -460,11 +483,13 @@ def search(
 
             response.append(result_dict)
 
-        if json_output:
-            typer.echo(json.dumps(response, indent=2))
+        # Phase 10: Machine mode is DEFAULT - JSON output for AI agents
+        if CLIConfig.is_machine_mode() or json_output:
+            # Compact JSON for agents (no pretty printing)
+            typer.echo(json.dumps(response, separators=(',', ':')))
             return
 
-        # Display results
+        # Human mode: Rich tables and formatted output
         table = Table(title=f"Hybrid Search: '{query}' (mode: {mode})")
         table.add_column("Rank", justify="right", style="white")
         table.add_column("Score", justify="right", style="yellow")
@@ -503,6 +528,12 @@ def search(
             console.print(f"  Vector (semantic): {top['vector_score']:.3f}")
             console.print(f"  Hybrid (fused): {top['hybrid_score']:.3f}")
             console.print(f"  Match type: {top['match_type']}")
+
+        # Phase 12.5: JIT Guidance
+        if not json_output:
+            tip = GuidanceProvider.get_tip("search")
+            if tip:
+                console.print(GuidanceProvider.format_tip(tip, style="footer"))
 
     except Exception as e:
         logger.error(f"Search failed: {e}")

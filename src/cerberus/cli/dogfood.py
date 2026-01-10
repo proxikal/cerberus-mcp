@@ -24,6 +24,10 @@ from cerberus.index import (
     semantic_search,
 )
 from .output import get_console
+# Phase 12.5: JIT Guidance
+from .guidance import GuidanceProvider
+# Phase 12.5: Context Anchoring
+from .anchoring import ContextAnchor
 
 app = typer.Typer()
 console = get_console()
@@ -148,8 +152,8 @@ def read(
 
     record_operation("read", tokens_read=tokens_read, tokens_saved=tokens_saved, file_path=str(file_path))
 
-    # JSON output
-    if json_output:
+    # Phase 10: Machine mode is DEFAULT - JSON output for AI agents
+    if CLIConfig.is_machine_mode() or json_output:
         output = {
             "file_path": str(file_path),
             "mode": "blueprint",
@@ -160,17 +164,29 @@ def read(
             "total_lines": total_lines,
             "content": "\n".join(selected_lines),
         }
-        typer.echo(json.dumps(output, indent=2))
+        # Compact JSON for agents (no pretty printing)
+        typer.echo(json.dumps(output, separators=(',', ':')))
         return
 
-    # Human-readable output
-    console.print(f"\n[bold]File:[/bold] {file_path} [cyan]Blueprint (Phase 8)[/cyan]")
-    console.print(f"[bold]Lines:[/bold] {start_line}-{end_idx} of {total_lines} ({100 * (end_idx - start_line + 1) / total_lines:.1f}%)")
+    # Human mode: Rich formatted output with Phase 12.5 Context Anchoring
+    header = ContextAnchor.format_header(
+        file_path=str(file_path),
+        lines=f"{start_line}-{end_idx}",
+        status="Blueprint",
+        extra={"Total": f"{total_lines} lines", "Mode": "Phase 8"}
+    )
+    console.print(f"\n{header}")
     console.print()
 
     # Display content with line numbers
     for i, line in enumerate(selected_lines, start=start_line):
         console.print(f"[dim]{i:5}[/dim] | {escape(line)}")
+
+    # Phase 12.5: JIT Guidance
+    if not json_output:
+        tip = GuidanceProvider.get_tip("read")
+        if tip:
+            console.print(GuidanceProvider.format_tip(tip, style="footer"))
 
 
 @app.command()

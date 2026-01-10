@@ -42,8 +42,6 @@ def test_basic_scan():
     assert len(scan_result.symbols) > 0, "Should extract symbols"
     print("\n✅ Basic scan test PASSED\n")
 
-    return scan_result
-
 
 def test_type_extraction():
     """Test type resolution (Phase 1.2)."""

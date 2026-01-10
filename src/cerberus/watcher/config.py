@@ -6,12 +6,14 @@ import tempfile
 from pathlib import Path
 
 WATCHER_CONFIG = {
-    "auto_start": True,  # Auto-start watcher on CLI commands
+    "auto_start": False,  # Auto-start watcher on CLI commands (DISABLED to prevent performance issues)
     "debounce_delay": 2.0,  # Seconds to wait after last change before updating
     "event_batch_size": 10,  # Process events in batches
     "max_events_per_update": 100,  # Limit events per update cycle
     "shutdown_idle_timeout": 0,  # Shutdown after N seconds of inactivity (0 = never)
     "log_to_file": True,  # Log daemon output to file
+    "log_rotation_max_bytes": 10 * 1024 * 1024,  # Max log file size: 10MB
+    "log_rotation_backup_count": 3,  # Keep 3 backup log files
 }
 
 MONITORING_CONFIG = {
@@ -26,6 +28,10 @@ MONITORING_CONFIG = {
         "**/dist/**",
         "**/.git/**",
         "**/.cerberus/**",
+        "**/.cerberus_backups/**",
+        "**/.idea/**",
+        "**/.vscode/**",
+        "**/site-packages/**",
     ],
     "recursive": True,
 }
