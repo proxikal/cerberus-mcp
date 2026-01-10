@@ -239,7 +239,10 @@ P13 [PREDICTIVE]:
   - Caching: Mtime-based with TTL + cache invalidation. ✅ (Phase 13.1)
   - JSON Export: Machine-readable blueprint format. ✅ (Phase 13.1)
   - Stability: Git Churn + Test Coverage + Composite Risk Scoring. ✅ (Phase 13.2)
-  - Analysis: Structural Diffs + Cycle Detection + Auto-Hydration. 🔜 (Phase 13.3+)
+  - Structural Diffs: Compare code structure across git revisions. ✅ (Phase 13.3)
+  - Package Aggregation: Multi-file architectural views. ✅ (Phase 13.3)
+  - Cycle Detection: Circular dependency analysis. ✅ (Phase 13.3)
+  - Auto-Hydration: Smart dependency inclusion. 🔜 (Phase 13.4+)
 
 ## 🛠 COMMAND QUICKREF
 # 1. ORIENT (Map - Use This First)
@@ -257,9 +260,13 @@ cerberus retrieval blueprint src/main.py --churn            # + Git churn (edits
 cerberus retrieval blueprint src/main.py --coverage         # + Test coverage (percent, test files) ✅
 cerberus retrieval blueprint src/main.py --stability        # + Risk score (🟢 SAFE/🟡 MEDIUM/🔴 HIGH RISK) ✅
 
-# Phase 13.3+ - Future:
-cerberus retrieval blueprint src/main.py --diff HEAD~5      # Structural changes 🔜
-cerberus retrieval blueprint src/ --aggregate               # Package-level view 🔜
+# Phase 13.3 - Implemented:
+cerberus retrieval blueprint src/main.py --diff HEAD~1      # Structural changes (added/removed/modified) ✅
+cerberus retrieval blueprint src/main.py --cycles           # Circular dependency detection ✅
+cerberus retrieval blueprint src/ --aggregate               # Package-level aggregated view ✅
+cerberus retrieval blueprint src/ --aggregate --aggregate-depth 2  # Limited depth aggregation ✅
+
+# Phase 13.4+ - Future:
 
 # Other orientation commands:
 cerberus dogfood tree --depth 2                             # File Hierarchy

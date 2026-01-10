@@ -604,7 +604,7 @@ def skeletonize_cmd(
 
 @app.command("blueprint")
 def blueprint_cmd(
-    file: Path = typer.Argument(..., help="File to generate blueprint for."),
+    file: Path = typer.Argument(..., help="File or directory to generate blueprint for."),
     # Overlay flags (Phase 13.1)
     deps: bool = typer.Option(False, "--deps", help="Show dependencies with confidence scores"),
     meta: bool = typer.Option(False, "--meta", help="Show complexity metrics"),
@@ -612,6 +612,11 @@ def blueprint_cmd(
     churn: bool = typer.Option(False, "--churn", help="Show git churn analysis (edits, authors, recency)"),
     coverage: bool = typer.Option(False, "--coverage", help="Show test coverage metrics"),
     stability: bool = typer.Option(False, "--stability", help="Show composite stability score (risk assessment)"),
+    # Phase 13.3 flags:
+    diff_ref: Optional[str] = typer.Option(None, "--diff", help="Compare structure against git ref (e.g., 'HEAD~1', 'main')"),
+    cycles: bool = typer.Option(False, "--cycles", help="Detect circular dependencies"),
+    aggregate: bool = typer.Option(False, "--aggregate", help="Aggregate package-level view (directory input)"),
+    aggregate_depth: Optional[int] = typer.Option(None, "--aggregate-depth", help="Max directory depth for aggregation"),
     # Output flags
     format_type: str = typer.Option(None, "--format", help="Output format: tree or json (default: json in machine mode, tree in human mode)"),
     # Performance flags
@@ -628,7 +633,7 @@ def blueprint_cmd(
     ),
 ):
     """
-    [PHASE 13.1/13.2] Architectural blueprint with dependencies, complexity, churn, coverage, and stability.
+    [PHASE 13.1/13.2/13.3] Architectural blueprint with dependencies, complexity, churn, coverage, stability, diffs, and cycles.
 
     Generates token-efficient visual hierarchy with optional overlays:
 
@@ -643,6 +648,12 @@ def blueprint_cmd(
     - --churn: Show git churn (edits/week, authors, last modified)
     - --coverage: Show test coverage (percent, test files, assertions)
     - --stability: Show composite stability score (🟢 SAFE / 🟡 MEDIUM / 🔴 HIGH RISK)
+
+    Phase 13.3:
+    - --diff: Compare structure against git ref (e.g., HEAD~1, main) to see what changed
+    - --cycles: Detect circular dependencies (import cycles, call cycles, inheritance cycles)
+    - --aggregate: Generate package-level aggregated view (requires directory input)
+    - --aggregate-depth: Limit directory depth for aggregation
     """
     from cerberus.index import load_index
     from cerberus.blueprint import BlueprintGenerator, BlueprintRequest, TreeRenderOptions
@@ -683,13 +694,18 @@ def blueprint_cmd(
             show_churn=churn,
             show_coverage=coverage,
             show_stability=stability,
+            diff_ref=diff_ref,
+            show_cycles=cycles,
+            aggregate=aggregate,
+            aggregate_max_depth=aggregate_depth,
             use_cache=cached,
             fast_mode=fast,
             output_format=format_type
         )
 
-        # Generate blueprint
-        generator = BlueprintGenerator(conn)
+        # Generate blueprint (with repo path for diff support)
+        repo_path = Path.cwd()  # Assume current directory is in git repo
+        generator = BlueprintGenerator(conn, repo_path=repo_path)
         blueprint = generator.generate(request)
 
         # Format and output

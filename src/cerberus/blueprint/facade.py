@@ -2,11 +2,12 @@
 
 Phase 13.1: High-level API for generating enriched blueprints with caching.
 Phase 13.2: Intelligence layer with churn, coverage, and stability.
+Phase 13.3: Structural diffs, aggregation, and cycle detection.
 """
 
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 import sqlite3
 
 from cerberus.logging_config import logger
@@ -25,36 +26,52 @@ from .churn_analyzer import ChurnAnalyzer
 from .coverage_analyzer import CoverageAnalyzer
 from .stability_scorer import StabilityScorer
 from .formatter import BlueprintFormatter
+# Phase 13.3 analyzers
+from .diff_analyzer import DiffAnalyzer
+from .aggregator import BlueprintAggregator, AggregatedBlueprint
+from .cycle_detector import CycleDetector
 
 
 class BlueprintGenerator:
     """Orchestrates blueprint generation with overlays and caching."""
 
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, repo_path: Optional[Path] = None):
         """
         Initialize blueprint generator.
 
         Args:
             conn: SQLite connection to database
+            repo_path: Optional path to git repository root (for diff analysis)
         """
         self.conn = conn
+        self.repo_path = repo_path or Path.cwd()
         self.cache = BlueprintCache(conn)
         self.dep_overlay = DependencyOverlay(conn)
         self.complexity_analyzer = ComplexityAnalyzer()
         # Phase 13.2 analyzers
         self.churn_analyzer = ChurnAnalyzer()
         self.coverage_analyzer = CoverageAnalyzer()
+        # Phase 13.3 analyzers
+        self.diff_analyzer = DiffAnalyzer(conn, self.repo_path)
+        self.aggregator = BlueprintAggregator(conn)
+        self.cycle_detector = CycleDetector(conn)
 
-    def generate(self, request: BlueprintRequest) -> Blueprint:
+    def generate(self, request: BlueprintRequest) -> Union[Blueprint, AggregatedBlueprint]:
         """
         Generate blueprint for a file with requested overlays.
+
+        Phase 13.3: Supports aggregation mode and structural diffs.
 
         Args:
             request: BlueprintRequest with file path and options
 
         Returns:
-            Blueprint object with requested overlays applied
+            Blueprint or AggregatedBlueprint object with requested overlays applied
         """
+        # Phase 13.3: Handle aggregation mode
+        if request.aggregate:
+            return self._generate_aggregated(request)
+
         # Normalize file path
         file_path = str(Path(request.file_path).resolve())
 
@@ -66,10 +83,12 @@ class BlueprintGenerator:
             "churn": request.show_churn,
             "coverage": request.show_coverage,
             "stability": request.show_stability,
+            "cycles": request.show_cycles,
+            "diff": request.diff_ref is not None,
         }
 
-        # Try cache first
-        if request.use_cache and not request.fast_mode:
+        # Try cache first (skip cache for diff mode as it's dynamic)
+        if request.use_cache and not request.fast_mode and not request.diff_ref:
             cached = self.cache.get(file_path, flags)
             if cached:
                 logger.debug(f"Returning cached blueprint for {file_path}")
@@ -79,8 +98,12 @@ class BlueprintGenerator:
         logger.debug(f"Generating fresh blueprint for {file_path}")
         blueprint = self._generate_fresh(request)
 
+        # Phase 13.3: Apply diff annotations if diff mode enabled
+        if request.diff_ref:
+            self._annotate_diff(blueprint, request.diff_ref)
+
         # Cache if enabled
-        if request.use_cache and not request.fast_mode:
+        if request.use_cache and not request.fast_mode and not request.diff_ref:
             self.cache.set(file_path, flags, blueprint)
 
         return blueprint
@@ -114,15 +137,17 @@ class BlueprintGenerator:
         nodes = self._build_hierarchy(symbols)
 
         # Apply overlays
-        if request.show_deps or request.show_meta or request.show_churn or request.show_coverage or request.show_stability:
+        if request.show_deps or request.show_meta or request.show_churn or request.show_coverage or request.show_stability or request.show_cycles:
             self._apply_overlays(
                 nodes,
                 symbols,
+                file_path=file_path,
                 show_deps=request.show_deps,
                 show_meta=request.show_meta,
                 show_churn=request.show_churn,
                 show_coverage=request.show_coverage,
                 show_stability=request.show_stability,
+                show_cycles=request.show_cycles,
                 fast_mode=request.fast_mode
             )
 
@@ -264,41 +289,54 @@ class BlueprintGenerator:
         self,
         nodes: List[BlueprintNode],
         symbols: List[CodeSymbol],
+        file_path: str,
         show_deps: bool,
         show_meta: bool,
         show_churn: bool,
         show_coverage: bool,
         show_stability: bool,
+        show_cycles: bool,
         fast_mode: bool
     ) -> None:
         """
-        Apply overlays (dependencies, complexity, churn, coverage, stability) to nodes.
+        Apply overlays (dependencies, complexity, churn, coverage, stability, cycles) to nodes.
 
         Modifies nodes in place.
 
         Args:
             nodes: List of BlueprintNode objects
             symbols: Original CodeSymbol list (for queries)
+            file_path: File path for cycle detection
             show_deps: Whether to add dependency overlay
             show_meta: Whether to add complexity overlay
             show_churn: Whether to add git churn overlay
             show_coverage: Whether to add test coverage overlay
             show_stability: Whether to add stability score overlay
+            show_cycles: Whether to add cycle detection overlay
             fast_mode: Skip expensive analysis
         """
         # Build symbol lookup
         symbol_map = {sym.name: sym for sym in symbols}
+
+        # Phase 13.3: Detect cycles if requested
+        symbols_in_cycles = set()
+        if show_cycles:
+            cycles = self.cycle_detector.detect_cycles(file_path=file_path)
+            symbols_in_cycles = self.cycle_detector.get_symbols_in_cycles(file_path, cycles)
+            logger.debug(f"Detected {len(cycles)} cycles involving {len(symbols_in_cycles)} symbols")
 
         # Process each node recursively
         for node in nodes:
             self._apply_overlay_to_node(
                 node,
                 symbol_map,
+                symbols_in_cycles=symbols_in_cycles,
                 show_deps=show_deps,
                 show_meta=show_meta,
                 show_churn=show_churn,
                 show_coverage=show_coverage,
                 show_stability=show_stability,
+                show_cycles=show_cycles,
                 fast_mode=fast_mode
             )
 
@@ -306,11 +344,13 @@ class BlueprintGenerator:
         self,
         node: BlueprintNode,
         symbol_map: dict,
+        symbols_in_cycles: set,
         show_deps: bool,
         show_meta: bool,
         show_churn: bool,
         show_coverage: bool,
         show_stability: bool,
+        show_cycles: bool,
         fast_mode: bool
     ) -> None:
         """
@@ -319,11 +359,13 @@ class BlueprintGenerator:
         Args:
             node: BlueprintNode to enrich
             symbol_map: Map of symbol names to CodeSymbol objects
+            symbols_in_cycles: Set of symbol names involved in cycles
             show_deps: Add dependencies
             show_meta: Add complexity
             show_churn: Add git churn
             show_coverage: Add test coverage
             show_stability: Add stability score
+            show_cycles: Add cycle detection
             fast_mode: Skip expensive operations
         """
         # Get original symbol
@@ -354,6 +396,12 @@ class BlueprintGenerator:
             if coverage:
                 node.overlay.coverage = coverage
 
+        # Cycle detection overlay (Phase 13.3)
+        if show_cycles:
+            if node.name in symbols_in_cycles:
+                node.overlay.in_cycle = True
+                node.overlay.cycle_info = "⚠️ Part of circular dependency"
+
         # Stability score overlay (Phase 13.2)
         # Note: Stability requires complexity, churn, and coverage
         if show_stability and not fast_mode:
@@ -380,31 +428,118 @@ class BlueprintGenerator:
             self._apply_overlay_to_node(
                 child,
                 symbol_map,
+                symbols_in_cycles=symbols_in_cycles,
                 show_deps=show_deps,
                 show_meta=show_meta,
                 show_churn=show_churn,
                 show_coverage=show_coverage,
                 show_stability=show_stability,
+                show_cycles=show_cycles,
                 fast_mode=fast_mode
             )
 
+    def _generate_aggregated(self, request: BlueprintRequest) -> AggregatedBlueprint:
+        """
+        Generate aggregated blueprint for a package (Phase 13.3).
+
+        Args:
+            request: BlueprintRequest with package path and options
+
+        Returns:
+            AggregatedBlueprint object
+        """
+        package_path = Path(request.file_path).resolve()
+
+        if not package_path.is_dir():
+            logger.warning(f"{package_path} is not a directory, treating as single file")
+            # Fall back to single file blueprint
+            request.aggregate = False
+            return self.generate(request)
+
+        return self.aggregator.aggregate_package(
+            package_path=package_path,
+            max_depth=request.aggregate_max_depth,
+            include_deps=request.show_deps
+        )
+
+    def _annotate_diff(self, blueprint: Blueprint, git_ref: str) -> None:
+        """
+        Annotate blueprint with structural diff information (Phase 13.3).
+
+        Modifies blueprint nodes in place to mark added/removed/modified symbols.
+
+        Args:
+            blueprint: Blueprint to annotate
+            git_ref: Git reference to compare against
+        """
+        try:
+            # Get structural changes
+            changes = self.diff_analyzer.analyze_diff(
+                file_path=blueprint.file_path,
+                git_ref=git_ref
+            )
+
+            # Build change map
+            change_map = {
+                (change.symbol_name, change.symbol_type): change
+                for change in changes
+            }
+
+            # Annotate nodes
+            def annotate_node(node: BlueprintNode):
+                key = (node.name, node.type)
+                if key in change_map:
+                    change = change_map[key]
+                    # Add diff annotation to cycle_info field (reuse since rarely both used)
+                    if change.change_type.value == "added":
+                        node.overlay.cycle_info = f"+ NEW (added in {git_ref}..HEAD)"
+                    elif change.change_type.value == "removed":
+                        node.overlay.cycle_info = f"- REMOVED (deleted in {git_ref}..HEAD)"
+                    elif change.change_type.value == "modified":
+                        node.overlay.cycle_info = f"~ MODIFIED (signature changed)"
+
+                # Recurse
+                for child in node.children:
+                    annotate_node(child)
+
+            for node in blueprint.nodes:
+                annotate_node(node)
+
+            logger.debug(f"Annotated blueprint with {len(changes)} structural changes")
+
+        except Exception as e:
+            logger.error(f"Error annotating diff: {e}")
+
     def format_output(
         self,
-        blueprint: Blueprint,
+        blueprint: Union[Blueprint, AggregatedBlueprint],
         output_format: str,
         tree_options: Optional[TreeRenderOptions] = None
     ) -> str:
         """
         Format blueprint for output.
 
+        Phase 13.3: Supports both Blueprint and AggregatedBlueprint.
+
         Args:
-            blueprint: Blueprint to format
+            blueprint: Blueprint or AggregatedBlueprint to format
             output_format: "tree" or "json"
             tree_options: Options for tree rendering
 
         Returns:
             Formatted output string
         """
+        # Phase 13.3: Handle aggregated blueprints
+        if isinstance(blueprint, AggregatedBlueprint):
+            if output_format == "json":
+                import json
+                return json.dumps(blueprint.to_dict(), indent=None)
+            else:
+                # For tree format, convert to simple string representation
+                # TODO: Implement proper tree formatting for aggregated blueprints
+                return f"[Package: {blueprint.package_path}] ({blueprint.total_files} files, {blueprint.total_symbols} symbols)"
+
+        # Regular blueprint formatting
         if output_format == "tree":
             return BlueprintFormatter.format_as_tree(blueprint, tree_options)
         elif output_format == "json":

@@ -115,15 +115,19 @@ class SymbolOverlay(BaseModel):
     churn: Optional[ChurnMetrics] = Field(None, description="Git churn analysis")
     coverage: Optional[CoverageMetrics] = Field(None, description="Test coverage metrics")
     stability: Optional[StabilityScore] = Field(None, description="Composite stability score")
+    # Phase 13.3 fields:
+    in_cycle: Optional[bool] = Field(None, description="Whether symbol is part of a circular dependency")
+    cycle_info: Optional[str] = Field(None, description="Description of cycle (if in_cycle is True)")
 
 
 class BlueprintNode(BaseModel):
     """A node in the blueprint tree (represents a symbol)."""
 
     name: str = Field(description="Symbol name")
-    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct"] = Field(
+    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct", "file"] = Field(
         description="Symbol type"
     )
+    file_path: Optional[str] = Field(None, description="File path (for file nodes in aggregation)")
     signature: Optional[str] = Field(None, description="Full signature")
     start_line: int = Field(description="Starting line number")
     end_line: int = Field(description="Ending line number")
@@ -185,6 +189,7 @@ class TreeRenderOptions(BaseModel):
     show_line_numbers: bool = Field(True, description="Show line ranges")
     show_signatures: bool = Field(True, description="Show function signatures")
     indent_size: int = Field(4, description="Spaces per indentation level")
+    collapse_private: bool = Field(False, description="Collapse private symbols (Phase 13.3)")
 
 
 class BlueprintRequest(BaseModel):
@@ -204,6 +209,11 @@ class BlueprintRequest(BaseModel):
 
     # Phase 13.2 diff mode:
     diff_ref: Optional[str] = Field(None, description="Git ref to compare against (e.g., 'HEAD~1', 'main')")
+
+    # Phase 13.3 flags:
+    show_cycles: bool = Field(False, description="Include cycle detection (circular dependencies)")
+    aggregate: bool = Field(False, description="Aggregate multiple files (package-level view)")
+    aggregate_max_depth: Optional[int] = Field(None, description="Max directory depth for aggregation")
 
 
 # Enable forward references for recursive models
