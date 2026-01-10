@@ -27,6 +27,9 @@ class BlueprintCache:
             conn: SQLite connection to database with blueprint_cache table
         """
         self.conn = conn
+        # Phase 13.4: Track cache hit rate
+        self._cache_hits = 0
+        self._cache_misses = 0
 
     def get(self, file_path: str, flags: Dict[str, Any]) -> Optional[Blueprint]:
         """
@@ -43,6 +46,7 @@ class BlueprintCache:
             # Get file mtime
             path = Path(file_path)
             if not path.exists():
+                self._cache_misses += 1
                 return None
 
             mtime = path.stat().st_mtime
@@ -63,6 +67,7 @@ class BlueprintCache:
 
             if not row:
                 logger.debug(f"Blueprint cache miss: {file_path}")
+                self._cache_misses += 1
                 return None
 
             blueprint_json, expires_at = row
@@ -77,6 +82,7 @@ class BlueprintCache:
                     (cache_key,)
                 )
                 self.conn.commit()
+                self._cache_misses += 1
                 return None
 
             # Deserialize and return
@@ -84,10 +90,12 @@ class BlueprintCache:
             blueprint = Blueprint(**data)
             blueprint.cached = True
             logger.debug(f"Blueprint cache hit: {file_path}")
+            self._cache_hits += 1
             return blueprint
 
         except Exception as e:
             logger.warning(f"Error reading blueprint cache: {e}")
+            self._cache_misses += 1
             return None
 
     def set(
@@ -211,10 +219,17 @@ class BlueprintCache:
             row = cursor.fetchone()
             total, valid, expired = row
 
+            # Phase 13.4: Calculate cache hit rate
+            total_requests = self._cache_hits + self._cache_misses
+            hit_rate = (self._cache_hits / total_requests * 100) if total_requests > 0 else 0.0
+
             return {
                 "total_entries": total or 0,
                 "valid_entries": valid or 0,
-                "expired_entries": expired or 0
+                "expired_entries": expired or 0,
+                "cache_hits": self._cache_hits,
+                "cache_misses": self._cache_misses,
+                "hit_rate_percent": round(hit_rate, 1)
             }
 
         except Exception as e:

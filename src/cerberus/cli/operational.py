@@ -256,6 +256,11 @@ def watcher_cmd(
         "--follow",
         help="Follow logs in real-time (for 'logs' action)."
     ),
+    blueprints: bool = typer.Option(
+        False,
+        "--blueprints",
+        help="Show blueprint cache metrics (for 'health' action)."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
 ):
     """
@@ -419,6 +424,21 @@ def watcher_cmd(
             else:
                 status = "healthy"
 
+            # Phase 13.4: Get blueprint cache stats if requested
+            blueprint_stats = None
+            if blueprints:
+                try:
+                    import sqlite3
+                    from cerberus.blueprint.cache_manager import BlueprintCache
+
+                    conn = sqlite3.connect(str(index_path))
+                    cache = BlueprintCache(conn)
+                    blueprint_stats = cache.get_stats()
+                    conn.close()
+                except Exception as e:
+                    logger.warning(f"Error getting blueprint cache stats: {e}")
+                    blueprint_stats = {"error": str(e)}
+
             # Build response
             health_data = {
                 "status": status,
@@ -428,6 +448,9 @@ def watcher_cmd(
                 "memory_mb": round(memory_mb, 1),
                 "issues": issues,
             }
+
+            if blueprint_stats:
+                health_data["blueprint_cache"] = blueprint_stats
 
             # If critical, stop the watcher
             if is_critical:
@@ -467,6 +490,18 @@ def watcher_cmd(
                 console.print(f"  Log size: {log_size_mb:.1f} MB")
                 console.print(f"  CPU usage: {cpu_percent:.1f}%")
                 console.print(f"  Memory: {memory_mb:.1f} MB")
+
+                # Phase 13.4: Display blueprint cache stats if available
+                if blueprint_stats and "error" not in blueprint_stats:
+                    console.print(f"\n[cyan]Blueprint Cache:[/cyan]")
+                    console.print(f"  Total entries: {blueprint_stats.get('total_entries', 0)}")
+                    console.print(f"  Valid entries: {blueprint_stats.get('valid_entries', 0)}")
+                    console.print(f"  Expired entries: {blueprint_stats.get('expired_entries', 0)}")
+                    console.print(f"  Cache hits: {blueprint_stats.get('cache_hits', 0)}")
+                    console.print(f"  Cache misses: {blueprint_stats.get('cache_misses', 0)}")
+                    console.print(f"  Hit rate: {blueprint_stats.get('hit_rate_percent', 0.0)}%")
+                elif blueprint_stats and "error" in blueprint_stats:
+                    console.print(f"\n[yellow]Blueprint Cache: Error - {blueprint_stats['error']}[/yellow]")
 
         else:
             console.print(f"[red]Unknown action: {action}[/red]")

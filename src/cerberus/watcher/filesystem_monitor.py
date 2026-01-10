@@ -146,6 +146,34 @@ class CerberusEventHandler(FileSystemEventHandler):
                     f"{len(changes.modified)} modified, {len(changes.deleted)} deleted"
                 )
 
+                # Phase 13.4: Invalidate blueprint cache for changed files
+                try:
+                    import sqlite3
+                    from ..blueprint.cache_manager import BlueprintCache
+
+                    # Open connection to index database
+                    conn = sqlite3.connect(str(self.index_path))
+                    cache = BlueprintCache(conn)
+
+                    # Invalidate cache for all changed files
+                    all_changed_files = set()
+                    all_changed_files.update(changes.added)
+                    all_changed_files.update(changes.modified)
+                    all_changed_files.update(changes.deleted)
+
+                    for file_path in all_changed_files:
+                        # Convert to absolute path
+                        abs_path = str((self.project_path / file_path).resolve())
+                        cache.invalidate(abs_path)
+                        logger.debug(f"Invalidated blueprint cache for: {abs_path}")
+
+                    conn.close()
+                    logger.info(f"Invalidated blueprint cache for {len(all_changed_files)} files")
+
+                except Exception as e:
+                    # Don't fail the index update if cache invalidation fails
+                    logger.warning(f"Error invalidating blueprint cache: {e}")
+
                 result = update_index_incrementally(
                     index_path=self.index_path,
                     project_path=self.project_path,

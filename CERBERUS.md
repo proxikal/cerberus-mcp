@@ -215,11 +215,12 @@ Options:
 ```
 
 **Commands:**
-cerberus watcher status    # Check daemon state
-cerberus watcher start     # Start if not running
-cerberus watcher stop      # Stop daemon
-cerberus watcher health    # Check health (log size, CPU)
-cerberus watcher logs      # View daemon logs
+cerberus watcher status              # Check daemon state
+cerberus watcher start               # Start if not running
+cerberus watcher stop                # Stop daemon
+cerberus watcher health              # Check health (log size, CPU)
+cerberus watcher health --blueprints # Check health + blueprint cache metrics (Phase 13.4)
+cerberus watcher logs                # View daemon logs
 
 ## 🗺 PHASE STATUS [CAPABILITIES]
 P1-11 [CORE]: Indexing (SQLite/FAISS), Retrieval (Hybrid), Editing (AST). ✅
@@ -242,7 +243,10 @@ P13 [PREDICTIVE]:
   - Structural Diffs: Compare code structure across git revisions. ✅ (Phase 13.3)
   - Package Aggregation: Multi-file architectural views. ✅ (Phase 13.3)
   - Cycle Detection: Circular dependency analysis. ✅ (Phase 13.3)
+  - Watcher Integration: Auto cache invalidation on file changes. ✅ (Phase 13.4)
+  - Cache Metrics: Hit rate tracking + `watcher health --blueprints`. ✅ (Phase 13.4)
   - Auto-Hydration: Smart dependency inclusion. 🔜 (Phase 13.4+)
+  - Background Regeneration: Auto-rebuild hot blueprints. 🔜 (Phase 13.4+)
 
 ## 🛠 COMMAND QUICKREF
 # 1. ORIENT (Map - Use This First)
