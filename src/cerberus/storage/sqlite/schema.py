@@ -200,6 +200,20 @@ CREATE TABLE IF NOT EXISTS metadata (
     updated_at REAL DEFAULT (julianday('now'))
 );
 
+-- Phase 13.1: Blueprint cache table
+CREATE TABLE IF NOT EXISTS blueprint_cache (
+    cache_key TEXT PRIMARY KEY,  -- Format: file_path:mtime:flags_hash
+    blueprint_json TEXT NOT NULL,  -- Serialized Blueprint object
+    created_at REAL DEFAULT (julianday('now')),
+    expires_at REAL NOT NULL,  -- TTL expiration timestamp
+    file_path TEXT NOT NULL,  -- For easier invalidation
+
+    FOREIGN KEY (file_path) REFERENCES files(path) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_blueprint_cache_file ON blueprint_cache(file_path);
+CREATE INDEX IF NOT EXISTS idx_blueprint_cache_expires ON blueprint_cache(expires_at);
+
 -- Initialize schema version
 INSERT OR IGNORE INTO metadata (key, value) VALUES ('schema_version', '1.0.0');
 INSERT OR IGNORE INTO metadata (key, value) VALUES ('created_at', strftime('%s', 'now'));
