@@ -14,6 +14,7 @@ from rich.table import Table
 from cerberus.logging_config import logger
 from cerberus.mutation import MutationFacade, DiffLedger
 from cerberus.storage.sqlite_store import SQLiteIndexStore
+from cerberus.quality import StyleDetector
 from .output import get_console, structured_error
 from .common import load_index_or_exit, get_default_index
 from .config import CLIConfig
@@ -44,9 +45,12 @@ def edit_cmd(
         readable=True,
     ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    no_predict: bool = typer.Option(False, "--no-predict", help="Disable predictive suggestions (Phase 14.3)"),
 ):
     """
     Edit a code symbol by name using surgical AST-based replacement.
+
+    Phase 14.3: Includes predictive editing suggestions for related changes.
 
     Phase 11: The Surgical Writer - replaces symbols without full-file rewrites.
     """
@@ -112,8 +116,36 @@ def edit_cmd(
 
     # Output result
     if CLIConfig.is_machine_mode() or json_output:
-        # Machine mode: pure JSON
-        print(json.dumps(result.model_dump(), separators=(',', ':')))
+        # Machine mode: pure JSON with predictions
+        output_data = result.model_dump()
+
+        # Phase 14.3: Add predictions if enabled
+        if not no_predict and result.success:
+            try:
+                from cerberus.quality.predictor import PredictionEngine
+                engine = PredictionEngine(str(index_path))
+                predictions, stats = engine.predict_related_changes(
+                    edited_symbol=symbol,
+                    file_path=str(file),
+                    symbol_type=symbol_type or "function"
+                )
+                prediction_output = engine.to_json(predictions, stats)
+                output_data["predictions"] = prediction_output["predictions"]
+                output_data["prediction_stats"] = prediction_output["prediction_stats"]
+
+                # Log predictions to ledger (Phase 14.3 basic logging)
+                if predictions:
+                    ledger = DiffLedger()
+                    prediction_dicts = [
+                        {"symbol": p.symbol, "confidence_score": p.confidence_score}
+                        for p in predictions
+                    ]
+                    ledger.record_predictions(symbol, str(file), prediction_dicts)
+            except Exception as e:
+                logger.debug(f"Prediction engine failed: {e}")
+                output_data["predictions"] = []
+
+        print(json.dumps(output_data, separators=(',', ':')))
     else:
         # Human mode: rich output
         if result.success:
@@ -136,6 +168,49 @@ def edit_cmd(
                 console.print("[yellow]Warnings:[/yellow]")
                 for warning in result.warnings:
                     console.print(f"  - {warning}")
+
+            # Phase 14.1: Style detection (suggest fixes if issues found)
+            try:
+                detector = StyleDetector()
+                issues = detector.check_file(str(file))
+                if issues:
+                    issue_types = list(set(issue.issue_type.value.replace('_', ' ') for issue in issues))
+                    console.print(f"\n[yellow]⚠️  Style Issues Detected: {len(issues)} ({', '.join(issue_types[:3])})[/yellow]")
+                    console.print(f"[dim]💡 Fix with: cerberus quality style-fix {file}[/dim]")
+            except Exception as e:
+                logger.debug(f"Style detection failed: {e}")
+
+            # Phase 14.3: Predictive editing (suggest related changes)
+            if not no_predict:
+                try:
+                    from cerberus.quality.predictor import PredictionEngine
+                    engine = PredictionEngine(str(index_path))
+                    predictions, stats = engine.predict_related_changes(
+                        edited_symbol=symbol,
+                        file_path=str(file),
+                        symbol_type=symbol_type or "function"
+                    )
+
+                    # Log predictions to ledger (Phase 14.3 basic logging)
+                    if predictions:
+                        ledger = DiffLedger()
+                        prediction_dicts = [
+                            {"symbol": p.symbol, "confidence_score": p.confidence_score}
+                            for p in predictions
+                        ]
+                        ledger.record_predictions(symbol, str(file), prediction_dicts)
+
+                        console.print(f"\n[cyan]🔮 [Predictive] Related changes suggested ({len(predictions)} HIGH confidence):[/cyan]")
+                        for i, pred in enumerate(predictions[:3], 1):  # Show top 3
+                            console.print(f"  {i}. {pred.symbol} ({Path(pred.file).name}:{pred.line})")
+                            console.print(f"     [dim]{pred.relationship}[/dim]")
+
+                        if len(predictions) > 3:
+                            console.print(f"  [dim]... and {len(predictions) - 3} more[/dim]")
+
+                        console.print(f"[dim]💡 Review with: cerberus quality related-changes {symbol}[/dim]")
+                except Exception as e:
+                    logger.debug(f"Prediction engine failed: {e}")
 
             # Phase 12.5: JIT Guidance
             if GuidanceProvider.should_show_guidance(CLIConfig.is_machine_mode()):

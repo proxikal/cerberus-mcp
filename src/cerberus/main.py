@@ -20,7 +20,7 @@ from cerberus.index import (
     read_range,
     semantic_search,
 )
-from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations
+from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality
 from cerberus.cli.config import CLIConfig
 from cerberus.cli.output import get_console
 
@@ -89,6 +89,7 @@ app.add_typer(retrieval.app, name="retrieval", help="Search and retrieval comman
 app.add_typer(symbolic.app, name="symbolic", help="Symbolic intelligence commands")
 app.add_typer(dogfood.app, name="dogfood", help="Dogfooding commands (read, inspect, tree, ls, grep)")
 app.add_typer(mutations.app, name="mutations", help="Code mutation commands (edit, delete, insert, batch-edit)")
+app.add_typer(quality.app, name="quality", help="Quality commands (style-check, style-fix) - Phase 14.1")
 
 @app.command()
 def hello():

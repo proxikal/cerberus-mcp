@@ -31,6 +31,8 @@ from .suggestions import symbol_suggestions
 from .guidance import GuidanceProvider
 # Phase 12.5: Context Anchoring
 from .anchoring import ContextAnchor
+# Phase 14.2: Context Anchors V2
+from cerberus.anchoring import ContextAnchorV2, AnchorConfig
 
 app = typer.Typer()
 console = get_console()

@@ -7,7 +7,7 @@ Phase 11: Prove value of surgical edits with data.
 import sqlite3
 import time
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 from cerberus.logging_config import logger
 from cerberus.schemas import DiffMetric
@@ -58,6 +58,25 @@ class DiffLedger:
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_timestamp
                 ON diff_metrics(timestamp)
+            """)
+
+            # Create prediction_log table (Phase 14.3)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS prediction_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp REAL NOT NULL,
+                    edited_symbol TEXT NOT NULL,
+                    edited_file TEXT NOT NULL,
+                    predictions_count INTEGER NOT NULL,
+                    predicted_symbols TEXT NOT NULL,
+                    confidence_scores TEXT NOT NULL
+                )
+            """)
+
+            # Create index on timestamp for predictions
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_prediction_timestamp
+                ON prediction_log(timestamp)
             """)
 
             conn.commit()
@@ -226,3 +245,118 @@ class DiffLedger:
         except Exception as e:
             logger.error(f"Failed to get recent metrics: {e}")
             return []
+
+    def record_predictions(
+        self,
+        edited_symbol: str,
+        edited_file: str,
+        predictions: List[Dict[str, Any]]
+    ) -> bool:
+        """
+        Record predictions made by the prediction engine (Phase 14.3).
+
+        Args:
+            edited_symbol: Name of the symbol that was edited
+            edited_file: File path of the edited symbol
+            predictions: List of prediction dictionaries
+
+        Returns:
+            True if recorded successfully, False otherwise
+        """
+        try:
+            import json
+            import time
+
+            conn = sqlite3.connect(self.ledger_path)
+            cursor = conn.cursor()
+
+            # Extract symbols and scores
+            predicted_symbols = [p.get("symbol", "") for p in predictions]
+            confidence_scores = [p.get("confidence_score", 0.0) for p in predictions]
+
+            cursor.execute("""
+                INSERT INTO prediction_log (
+                    timestamp, edited_symbol, edited_file,
+                    predictions_count, predicted_symbols, confidence_scores
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                time.time(),
+                edited_symbol,
+                edited_file,
+                len(predictions),
+                json.dumps(predicted_symbols),
+                json.dumps(confidence_scores)
+            ))
+
+            conn.commit()
+            conn.close()
+
+            logger.debug(f"Recorded {len(predictions)} predictions for {edited_symbol}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to record predictions: {e}")
+            return False
+
+    def get_prediction_stats(self, limit: int = 100) -> Dict[str, Any]:
+        """
+        Get statistics about predictions (Phase 14.3 basic logging).
+
+        Args:
+            limit: Number of recent predictions to analyze
+
+        Returns:
+            Dictionary with prediction statistics
+        """
+        try:
+            import json
+
+            conn = sqlite3.connect(self.ledger_path)
+            cursor = conn.cursor()
+
+            # Total predictions made
+            cursor.execute("""
+                SELECT COUNT(*) FROM prediction_log
+            """)
+            total_logs = cursor.fetchone()[0]
+
+            # Average predictions per symbol edit
+            cursor.execute("""
+                SELECT AVG(predictions_count) FROM prediction_log
+                LIMIT ?
+            """, (limit,))
+            avg_predictions = cursor.fetchone()[0] or 0.0
+
+            # Most frequently predicted symbols
+            cursor.execute("""
+                SELECT predicted_symbols FROM prediction_log
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """, (limit,))
+            rows = cursor.fetchall()
+
+            all_predicted = []
+            for row in rows:
+                symbols = json.loads(row[0])
+                all_predicted.extend(symbols)
+
+            # Count frequency
+            from collections import Counter
+            symbol_counts = Counter(all_predicted)
+            top_predicted = dict(symbol_counts.most_common(5))
+
+            conn.close()
+
+            return {
+                "total_prediction_logs": total_logs,
+                "average_predictions_per_edit": round(avg_predictions, 2),
+                "top_predicted_symbols": top_predicted
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get prediction stats: {e}")
+            return {
+                "total_prediction_logs": 0,
+                "average_predictions_per_edit": 0.0,
+                "top_predicted_symbols": {}
+            }
