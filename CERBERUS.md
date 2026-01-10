@@ -15,7 +15,7 @@ PRINCIPLES:
 - `grep`. USE: `cerberus search` (Semantic/Hybrid).
 - `ls -R`. USE: `cerberus tree`.
 - Speculative/Unverified Edits. USE: `batch-edit --verify`.
-- Deleting referenced symbols WITHOUT checking deps. (Symbol Guard: 🔜).
+- Deleting/editing referenced symbols WITHOUT checking deps. (Symbol Guard: ✅ Phase 13.2).
 
 ## 🔒 ENFORCEMENT PROTOCOL [ZERO TOLERANCE]
 
@@ -230,7 +230,7 @@ P12 [HARMONY]:
 P12.5 [SAFETY/INTEL]:
   - Undo: Persistent Rollback (`cerberus undo`). ✅
   - JIT: Output footers guide next steps ("Whisper Protocol"). ✅
-  - Guard: Blocks deleting referenced symbols. 🔜
+  - Guard: Risk-aware mutation protection with Phase 13.2 stability integration. ✅
   - Smart Merge: Auto-resolves non-overlapping AST conflicts. 🔜
   - Anchors: Standardized headers `[File: X] [Symbol: Y]` ("GPS"). 🔜
 P13 [PREDICTIVE]:
@@ -275,6 +275,11 @@ cerberus symbolic references AuthConfig    # Who calls this?
 cerberus mutations batch-edit ops.json --verify "pytest tests/" --preview
 # JSON Format: [{"op": "edit", "file": "...", "symbol": "...", "code": "..."}]
 
+# SINGLE MUTATIONS (Symbol Guard protected - Phase 13.2):
+cerberus mutations edit file.py --symbol foo --code "def foo(): pass"
+cerberus mutations delete file.py --symbol bar           # Blocked if HIGH RISK
+cerberus mutations delete file.py --symbol bar --force   # Override Symbol Guard (use carefully)
+
 # UNDO (Safety Net):
 cerberus mutations undo                    # Revert last batch
 
@@ -292,7 +297,8 @@ cerberus mutations undo                    # Revert last batch
 - **JIT Guidance:** Follow the `[Tip]` footer in commands for correct syntax. ✅
 - **Diff Feedback:** All edits return Unified Diffs. Review them before confirming. ✅
 - **Confidence Scores:** All dependencies show provenance (✓1.0 = certain, ✓0.6 = verify). ✅
-- **Stability Scoring:** Composite risk metrics (🟢 Safe, 🟡 Medium, 🔴 High Risk). 🔜
+- **Stability Scoring:** Composite risk metrics (🟢 Safe, 🟡 Medium, 🔴 High Risk). ✅ (Phase 13.2)
+- **Symbol Guard:** Blocks HIGH RISK mutations, warns on MEDIUM risk, allows SAFE (use --force to override). ✅ (Phase 13.2)
 - **Style Guard:** Simple lint errors (whitespace/imports) are auto-fixed. Don't waste turns fixing them. 🔜
 - **Context Anchors:** Coming soon to ground large-context models. 🔜
 

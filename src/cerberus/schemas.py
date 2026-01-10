@@ -352,6 +352,7 @@ class EditOperation(BaseModel):
     """
     A single edit operation in a batch.
     Phase 12: Atomic multi-edit transactions.
+    Phase 13.2: Symbol Guard integration with force override.
     """
     operation: Literal["edit", "insert", "delete"]
     file_path: str
@@ -364,6 +365,7 @@ class EditOperation(BaseModel):
     before_symbol: Optional[str] = None  # For insert operations
     auto_format: bool = True
     auto_imports: bool = True
+    force: bool = False  # Phase 13.2: Bypass Symbol Guard protection
 
 
 class BatchEditResult(BaseModel):

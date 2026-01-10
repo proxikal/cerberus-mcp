@@ -77,7 +77,8 @@ class MutationFacade:
         parent_class: Optional[str] = None,
         dry_run: bool = False,
         auto_format: bool = True,
-        auto_imports: bool = True
+        auto_imports: bool = True,
+        force: bool = False
     ) -> MutationResult:
         """
         Edit a symbol by name.
@@ -91,6 +92,7 @@ class MutationFacade:
             dry_run: If True, validate but don't write
             auto_format: If True, auto-format after edit
             auto_imports: If True, auto-inject missing imports
+            force: If True, bypass reference protection (Phase 13.2)
 
         Returns:
             MutationResult with status and metrics
@@ -126,6 +128,35 @@ class MutationFacade:
                 validation_passed=False,
                 errors=[f"Symbol '{symbol_name}' not found in {file_path}"]
             )
+
+        # Phase 13.2: Symbol Guard - Check references and stability before edit
+        if not dry_run:
+            allowed, guard_message, references = self.guard.check_references(
+                symbol_name,
+                file_path,
+                force
+            )
+
+            # Collect warnings if MEDIUM risk
+            guard_warnings = []
+            if guard_message and "MEDIUM" in guard_message:
+                guard_warnings.append(guard_message)
+
+            # Block if HIGH RISK without --force
+            if not allowed:
+                return MutationResult(
+                    success=False,
+                    operation="edit",
+                    file_path=file_path,
+                    symbol_name=symbol_name,
+                    lines_changed=0,
+                    lines_total=0,
+                    write_efficiency=0.0,
+                    tokens_saved=0,
+                    validation_passed=False,
+                    errors=[guard_message or "Operation blocked by Symbol Guard"],
+                    warnings=[f"Found {len(references)} reference(s) to this symbol"] if references else []
+                )
 
         # 2. Format new code to match indentation
         if auto_format:
@@ -686,7 +717,8 @@ class MutationFacade:
                             parent_class=op.parent_class,
                             dry_run=preview,
                             auto_format=op.auto_format,
-                            auto_imports=op.auto_imports
+                            auto_imports=op.auto_imports,
+                            force=op.force
                         )
                     elif op.operation == "insert":
                         result = self.insert_symbol(
@@ -703,7 +735,8 @@ class MutationFacade:
                             symbol_name=op.symbol_name,
                             symbol_type=op.symbol_type,
                             parent_class=op.parent_class,
-                            dry_run=preview
+                            dry_run=preview,
+                            force=op.force
                         )
                     else:
                         result = MutationResult(

@@ -35,6 +35,7 @@ def edit_cmd(
     dry_run: bool = typer.Option(False, "--dry-run", help="Validate but don't write"),
     no_format: bool = typer.Option(False, "--no-format", help="Skip auto-formatting"),
     no_imports: bool = typer.Option(False, "--no-imports", help="Skip import injection"),
+    force: bool = typer.Option(False, "--force", help="Bypass Symbol Guard protection (Phase 13.2)"),
     index_path: Optional[Path] = typer.Option(
         None,
         "--index",
@@ -49,6 +50,7 @@ def edit_cmd(
     Edit a code symbol by name using surgical AST-based replacement.
 
     Phase 11: The Surgical Writer - replaces symbols without full-file rewrites.
+    Phase 13.2: Symbol Guard protection with --force override.
     """
     # Validate input
     if not code and not code_file:
@@ -107,7 +109,8 @@ def edit_cmd(
         parent_class=parent_class,
         dry_run=dry_run,
         auto_format=not no_format,
-        auto_imports=not no_imports
+        auto_imports=not no_imports,
+        force=force
     )
 
     # Output result
@@ -160,7 +163,7 @@ def delete_cmd(
     parent_class: Optional[str] = typer.Option(None, "--parent", "-p", help="Parent class for methods"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Validate but don't write"),
     keep_decorators: bool = typer.Option(False, "--keep-decorators", help="Keep decorators when deleting"),
-    force: bool = typer.Option(False, "--force", help="Bypass reference protection (Phase 12.5)"),
+    force: bool = typer.Option(False, "--force", help="Bypass Symbol Guard protection (Phase 13.2)"),
     index_path: Optional[Path] = typer.Option(
         None,
         "--index",
@@ -175,7 +178,7 @@ def delete_cmd(
     Delete a code symbol by name.
 
     Phase 11: Safely remove symbols with backup and validation.
-    Phase 12.5: Protected by Symbol Guard - blocks deletion if referenced.
+    Phase 13.2: Protected by Symbol Guard with stability-aware risk assessment.
     """
     # Load index
     index_path = get_default_index(index_path)
