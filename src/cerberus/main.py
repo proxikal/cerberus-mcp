@@ -28,7 +28,9 @@ app = typer.Typer()
 console = get_console()
 
 # Register session summary display at exit (for agent dogfooding metrics)
-atexit.register(display_session_summary)
+# Note: Use show_task_summary=False to prevent display after every command
+# Task summaries are only shown via explicit display_task_completion() calls
+atexit.register(lambda: display_session_summary(show_task_summary=False))
 
 # Global CLI callback for flags that apply to all commands
 @app.callback()

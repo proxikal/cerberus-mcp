@@ -255,24 +255,39 @@ class SessionTracker:
 
         # Machine mode: compact default output
         if CLIConfig.is_machine_mode():
+            # Only display when showing task summary (at task completion)
+            # This prevents session summary from appearing after every single command
+            if not show_task_summary:
+                return
+
+            # Skip if no task data to show
+            if task_total == 0:
+                return
+
             print()  # Newline for readability
 
-            # Show task summary if requested and there's task data
-            if show_task_summary and task_total > 0:
-                print(f"[Task] Saved: {self.metrics.task_tokens_saved:,} tokens (~${task_dollars:.4f}) | Efficiency: {task_efficiency:.1f}%")
+            # Show task summary
+            print(f"[Task] Saved: {self.metrics.task_tokens_saved:,} tokens (~${task_dollars:.4f}) | Efficiency: {task_efficiency:.1f}%")
 
-            # Always show session summary
+            # Show session summary (only at task completion)
             print(f"[Session] Saved: {self.metrics.tokens_saved:,} tokens (~${session_dollars:.2f}) | Efficiency: {session_efficiency:.1f}%")
             print()  # Newline for readability
 
             # Reset task metrics after displaying
-            if show_task_summary:
-                self.metrics.reset_task_metrics()
-                self._save_session()
+            self.metrics.reset_task_metrics()
+            self._save_session()
 
             return
 
-        # Human mode: rich output (unchanged for now)
+        # Human mode: rich output
+        # Only display when showing task summary (at task completion)
+        if not show_task_summary:
+            return
+
+        # Skip if no task data to show
+        if task_total == 0:
+            return
+
         from rich.console import Console
         from rich.panel import Panel
         from rich.table import Table
@@ -285,8 +300,8 @@ class SessionTracker:
         stats_table.add_column(style="cyan", justify="right")
         stats_table.add_column(style="bold white")
 
-        # Task metrics (if requested and available)
-        if show_task_summary and task_total > 0:
+        # Task metrics
+        if task_total > 0:
             stats_table.add_row("[bold]This Task:", "")
             stats_table.add_row("  Tokens Saved:", f"[green]{self.metrics.task_tokens_saved:,}[/green]")
             stats_table.add_row("  Cost Savings:", f"[green]${task_dollars:.4f}[/green]")
@@ -316,9 +331,8 @@ class SessionTracker:
         console.print()
 
         # Reset task metrics after displaying
-        if show_task_summary:
-            self.metrics.reset_task_metrics()
-            self._save_session()
+        self.metrics.reset_task_metrics()
+        self._save_session()
 
 
 # Global session tracker instance
