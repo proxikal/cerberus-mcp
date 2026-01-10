@@ -185,12 +185,12 @@ def calls_cmd(
       cerberus calls --type Adam --method step --json
       cerberus calls --file src/train.py --json
     """
-    from cerberus.storage import open_index
+    from cerberus.storage.sqlite_store import SQLiteIndexStore
 
     index_path = get_default_index(index_path)
 
     try:
-        store = open_index(str(index_path))
+        store = SQLiteIndexStore(str(index_path))
 
         # Query with filters
         file_path_str = str(file.absolute()) if file else None
@@ -285,12 +285,12 @@ def references_cmd(
       cerberus references --min-confidence 0.8 --json
       cerberus references --source-file src/train.py --json
     """
-    from cerberus.storage import open_index
+    from cerberus.storage.sqlite_store import SQLiteIndexStore
 
     index_path = get_default_index(index_path)
 
     try:
-        store = open_index(str(index_path))
+        store = SQLiteIndexStore(str(index_path))
 
         # Query with filters
         source_file_str = str(source_file.absolute()) if source_file else None

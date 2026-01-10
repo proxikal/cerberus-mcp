@@ -1,0 +1,23 @@
+"""Test file for Symbol Guard demonstration."""
+
+
+def important_function():
+    """A function that will be referenced elsewhere."""
+    return "important"
+
+
+def caller_1():
+    """References important_function."""
+    result = important_function()
+    return f"caller_1: {result}"
+
+
+def caller_2():
+    """Also references important_function."""
+    result = important_function()
+    return f"caller_2: {result}"
+
+
+if __name__ == "__main__":
+    print(caller_1())
+    print(caller_2())
