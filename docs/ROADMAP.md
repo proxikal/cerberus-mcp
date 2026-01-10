@@ -211,6 +211,17 @@ cerberus/resolution/
 
 ---
 
+### Phase 14: Documentation Symbiosis (Complete Dogfooding) 🔜 PLANNED
+*   **Documentation Indexing:** Treat `.md`, `.txt`, `.rst` files as structured data with headers as symbols.
+*   **`cerberus docs` Suite:** Dedicated commands for documentation (read, search, toc, blueprint).
+*   **Section-Based Reading:** Read documentation by semantic sections, not arbitrary line ranges.
+*   **Cross-Document Intelligence:** Understand documentation as an interconnected knowledge graph.
+*   **Validation & Linting:** Detect broken links, orphaned code blocks, outdated references.
+
+**Goal:** Eliminate the documentation exception clause, achieving 100% Cerberus-exclusive workflows. See [PHASE14_SPEC.md](./PHASE14_SPEC.md).
+
+---
+
 ## Future Expansion (Post-Core)
 *   **Status:** Long-Term. See [FUTURE_EXPANSION.md](./FUTURE_EXPANSION.md).
 *   **Visual Intelligence:** Web UI, VS Code Extension.
