@@ -135,7 +135,7 @@ class BlueprintGenerator:
             file_path: Absolute file path
 
         Returns:
-            List of CodeSymbol objects
+            List of CodeSymbol objects (deduplicated)
         """
         try:
             cursor = self.conn.execute(
@@ -171,7 +171,17 @@ class BlueprintGenerator:
                     )
                 )
 
-            return symbols
+            # Deduplicate symbols (SQLite may have duplicates from indexing)
+            seen = set()
+            unique_symbols = []
+            for sym in symbols:
+                key = (sym.name, sym.type, sym.start_line, sym.parent_class or '')
+                if key not in seen:
+                    seen.add(key)
+                    unique_symbols.append(sym)
+
+            logger.debug(f"Queried {len(symbols)} symbols, {len(unique_symbols)} unique for {file_path}")
+            return unique_symbols
 
         except Exception as e:
             logger.error(f"Error querying symbols for {file_path}: {e}")
