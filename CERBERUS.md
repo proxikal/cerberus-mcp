@@ -346,3 +346,35 @@ If parsability < 98%:
 - `CERBERUS_MACHINE_MODE=1`: Force JSON output (Default).
 - `CERBERUS_SILENT_METRICS=1`: Hide `[Meta]` token stats.
 - `CERBERUS_HUMAN_MODE=1`: Opt-in to rich text/tables (Not for Agents).
+## 📊 TOKEN SAVINGS TRACKING
+
+Every Cerberus command automatically tracks token savings vs. reading full files.
+
+**Features:**
+- **Per-Task Tracking**: Shows tokens saved for each individual task (resets after display)
+- **Session Accumulation**: Tracks cumulative savings across the entire session
+- **Dollar Conversion**: Displays cost savings in USD (Claude Sonnet 4.5 pricing)
+- **Auto-Reset**: Session resets after 1 hour of inactivity (configurable)
+
+**Output Format (Machine Mode - Default):**
+```
+[Task] Saved: 1,500 tokens (~$0.0045) | Efficiency: 83.3%
+[Session] Saved: 8,043,223 tokens (~$24.13) | Efficiency: 92.1%
+```
+
+**Configuration:**
+- `CERBERUS_NO_TRACK=true` - Disable tracking entirely
+- `CERBERUS_SESSION_TIMEOUT=3600` - Session timeout in seconds (default: 1 hour)
+- `CERBERUS_SILENT_METRICS=1` - Hide token savings output
+
+**Pricing (as of Jan 2026):**
+- Input tokens: $3.00 per 1M tokens
+- Output tokens: $15.00 per 1M tokens
+- Savings calculated using input token pricing (conservative estimate)
+
+**How It Works:**
+1. Each Cerberus command records tokens that would have been used with `Read` tool
+2. Per-task metrics accumulate during operations and display after each task
+3. Session metrics accumulate continuously and persist to `.cerberus_session.json`
+4. After 1 hour of inactivity, session automatically resets
+5. Task metrics reset after each display, session metrics continue accumulating

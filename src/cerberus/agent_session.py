@@ -3,10 +3,18 @@ Agent session tracking for dogfooding metrics.
 
 Tracks token usage and savings when AI agents use Cerberus CLI to explore/maintain codebases.
 Shows beautiful summary of efficiency gains from using deterministic tools.
+
+Features:
+- Per-task token tracking (resets after each summary display)
+- Session-level cumulative tracking
+- Auto-reset after inactivity (1 hour by default)
+- Token-to-dollar cost savings conversion
+- Default display after task completion
 """
 
 import os
 import json
+import time
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -16,9 +24,13 @@ from datetime import datetime
 class SessionMetrics:
     """Metrics for a Cerberus CLI session."""
 
-    # Token tracking
-    tokens_read: int = 0  # Total tokens read via Cerberus
-    tokens_saved: int = 0  # Tokens saved via skeleton/range limits
+    # Session-level token tracking (cumulative)
+    tokens_read: int = 0  # Total tokens read via Cerberus (session)
+    tokens_saved: int = 0  # Tokens saved via skeleton/range limits (session)
+
+    # Per-task token tracking (resets after display)
+    task_tokens_read: int = 0  # Tokens read in current task
+    task_tokens_saved: int = 0  # Tokens saved in current task
 
     # Operation counts
     commands_used: Dict[str, int] = field(default_factory=dict)
@@ -27,26 +39,52 @@ class SessionMetrics:
     # Session info
     session_start: Optional[float] = None
     session_end: Optional[float] = None
+    last_operation_time: Optional[float] = None  # For inactivity detection
 
     def record_command(self, command: str, tokens_read: int = 0, tokens_saved: int = 0, file_path: Optional[str] = None):
         """Record a command execution."""
         self.commands_used[command] = self.commands_used.get(command, 0) + 1
+
+        # Update session-level counters
         self.tokens_read += tokens_read
         self.tokens_saved += tokens_saved
+
+        # Update per-task counters
+        self.task_tokens_read += tokens_read
+        self.task_tokens_saved += tokens_saved
+
+        # Update last operation timestamp
+        self.last_operation_time = time.time()
 
         if file_path and file_path not in self.files_accessed:
             self.files_accessed.append(file_path)
 
+    def reset_task_metrics(self):
+        """Reset per-task metrics after displaying summary."""
+        self.task_tokens_read = 0
+        self.task_tokens_saved = 0
+
     def get_total_tokens(self) -> int:
-        """Get total tokens that would have been used without Cerberus."""
+        """Get total tokens that would have been used without Cerberus (session)."""
         return self.tokens_read + self.tokens_saved
 
+    def get_task_total_tokens(self) -> int:
+        """Get total tokens for current task."""
+        return self.task_tokens_read + self.task_tokens_saved
+
     def get_efficiency_percent(self) -> float:
-        """Calculate efficiency percentage."""
+        """Calculate efficiency percentage (session)."""
         total = self.get_total_tokens()
         if total == 0:
             return 0.0
         return (self.tokens_saved / total) * 100
+
+    def get_task_efficiency_percent(self) -> float:
+        """Calculate efficiency percentage (current task)."""
+        total = self.get_task_total_tokens()
+        if total == 0:
+            return 0.0
+        return (self.task_tokens_saved / total) * 100
 
     def get_duration_seconds(self) -> float:
         """Get session duration in seconds."""
@@ -54,20 +92,54 @@ class SessionMetrics:
             return self.session_end - self.session_start
         return 0.0
 
+    @staticmethod
+    def tokens_to_dollars(tokens: int, is_output: bool = False) -> float:
+        """
+        Convert tokens to dollar cost savings.
+
+        Uses Claude Sonnet 4.5 pricing (as of Jan 2026):
+        - Input: $3.00 per 1M tokens
+        - Output: $15.00 per 1M tokens
+
+        Args:
+            tokens: Number of tokens
+            is_output: Whether these are output tokens (more expensive)
+
+        Returns:
+            Dollar amount
+        """
+        if tokens == 0:
+            return 0.0
+
+        # Claude Sonnet 4.5 pricing
+        price_per_million = 15.0 if is_output else 3.0
+
+        return (tokens / 1_000_000) * price_per_million
+
 
 class SessionTracker:
     """Global session tracker for agent usage."""
 
+    # Session timeout: reset after 1 hour of inactivity (configurable via env)
+    DEFAULT_SESSION_TIMEOUT = 3600  # 1 hour in seconds
+
     def __init__(self):
         self.metrics = SessionMetrics()
-        
+
+        # Get session timeout from environment or use default
+        timeout_str = os.environ.get("CERBERUS_SESSION_TIMEOUT", str(self.DEFAULT_SESSION_TIMEOUT))
+        try:
+            self.session_timeout = int(timeout_str)
+        except ValueError:
+            self.session_timeout = self.DEFAULT_SESSION_TIMEOUT
+
         # Enable tracking by default unless CERBERUS_NO_TRACK is set
         no_track = os.environ.get("CERBERUS_NO_TRACK", "false").lower() == "true"
         # Legacy support: also check CERBERUS_TRACK_SESSION
         track_session = os.environ.get("CERBERUS_TRACK_SESSION", "true").lower() == "true"
-        
+
         self.enabled = not no_track and track_session
-        
+
         # Dogfooding safeguard: if we are in the Cerberus repo itself, use a separate session file
         # to avoid polluting user sessions.
         is_dev = os.path.exists(os.path.join(os.getcwd(), ".git")) and "Cerberus" in os.getcwd()
@@ -80,9 +152,28 @@ class SessionTracker:
             # Load existing session or create new one
             if os.path.exists(self.session_file):
                 self._load_session()
+                # Check if session has timed out due to inactivity
+                if self._is_session_expired():
+                    self._reset_session()
             else:
-                self.metrics.session_start = datetime.now().timestamp()
+                self.metrics.session_start = time.time()
+                self.metrics.last_operation_time = time.time()
                 self._save_session()
+
+    def _is_session_expired(self) -> bool:
+        """Check if session has expired due to inactivity."""
+        if not self.metrics.last_operation_time:
+            return False
+
+        elapsed = time.time() - self.metrics.last_operation_time
+        return elapsed > self.session_timeout
+
+    def _reset_session(self):
+        """Reset session metrics (called after timeout)."""
+        self.metrics = SessionMetrics()
+        self.metrics.session_start = time.time()
+        self.metrics.last_operation_time = time.time()
+        self._save_session()
 
     def _load_session(self):
         """Load session from file."""
@@ -91,12 +182,16 @@ class SessionTracker:
                 data = json.load(f)
                 self.metrics.tokens_read = data.get("tokens_read", 0)
                 self.metrics.tokens_saved = data.get("tokens_saved", 0)
+                self.metrics.task_tokens_read = data.get("task_tokens_read", 0)
+                self.metrics.task_tokens_saved = data.get("task_tokens_saved", 0)
                 self.metrics.commands_used = data.get("commands_used", {})
                 self.metrics.files_accessed = data.get("files_accessed", [])
                 self.metrics.session_start = data.get("session_start")
+                self.metrics.last_operation_time = data.get("last_operation_time")
         except Exception:
             # If load fails, start fresh
-            self.metrics.session_start = datetime.now().timestamp()
+            self.metrics.session_start = time.time()
+            self.metrics.last_operation_time = time.time()
 
     def _save_session(self):
         """Save session to file."""
@@ -104,9 +199,12 @@ class SessionTracker:
             data = {
                 "tokens_read": self.metrics.tokens_read,
                 "tokens_saved": self.metrics.tokens_saved,
+                "task_tokens_read": self.metrics.task_tokens_read,
+                "task_tokens_saved": self.metrics.task_tokens_saved,
                 "commands_used": self.metrics.commands_used,
                 "files_accessed": self.metrics.files_accessed,
                 "session_start": self.metrics.session_start,
+                "last_operation_time": self.metrics.last_operation_time,
             }
             with open(self.session_file, 'w') as f:
                 json.dump(data, f)
@@ -124,42 +222,57 @@ class SessionTracker:
         if self.enabled and self.metrics.session_start:
             self.metrics.session_end = datetime.now().timestamp()
 
-    def display_summary(self):
-        """Display session summary respecting machine mode and metric configuration."""
+    def display_summary(self, show_task_summary: bool = True):
+        """
+        Display task and session summary with token savings and cost calculations.
+
+        Args:
+            show_task_summary: If True, show per-task metrics. If False, only show session.
+        """
         if not self.enabled:
             return
 
-        # Skip if no commands were used
-        if not self.metrics.commands_used:
+        # Skip if no operations recorded
+        if self.metrics.tokens_read == 0 and self.metrics.tokens_saved == 0:
             return
 
         # Import config to check machine mode and metric settings
         from cerberus.cli.config import CLIConfig
 
-        # Protocol Enforcement (Phase 10 - Symbiosis Check)
-        # Warn if human mode is being used during an agent session
-        if not CLIConfig.is_machine_mode():
-            print("\n[PROTOCOL] Warning: Human mode active. This burns tokens.")
-            print("[PROTOCOL] Machine mode is default. Remove --human flag or set CERBERUS_HUMAN_MODE=0\n")
-
         # Check if metrics should be suppressed
         if CLIConfig.is_silent_metrics():
             return
 
-        total_tokens = self.metrics.get_total_tokens()
-        efficiency = self.metrics.get_efficiency_percent()
+        # Calculate task metrics
+        task_total = self.metrics.get_task_total_tokens()
+        task_efficiency = self.metrics.get_task_efficiency_percent()
+        task_dollars = SessionMetrics.tokens_to_dollars(self.metrics.task_tokens_saved, is_output=False)
 
-        # Machine mode: minimal text output
+        # Calculate session metrics
+        session_total = self.metrics.get_total_tokens()
+        session_efficiency = self.metrics.get_efficiency_percent()
+        session_dollars = SessionMetrics.tokens_to_dollars(self.metrics.tokens_saved, is_output=False)
+
+        # Machine mode: compact default output
         if CLIConfig.is_machine_mode():
-            # Only show what's requested
-            if CLIConfig.show_session_savings():
-                print(f"[Meta] Session Saved: {self.metrics.tokens_saved:,} tokens")
-            if CLIConfig.show_turn_savings():
-                # Show turn-level savings if requested
-                pass  # Turn-level tracking would require per-command tracking
+            print()  # Newline for readability
+
+            # Show task summary if requested and there's task data
+            if show_task_summary and task_total > 0:
+                print(f"[Task] Saved: {self.metrics.task_tokens_saved:,} tokens (~${task_dollars:.4f}) | Efficiency: {task_efficiency:.1f}%")
+
+            # Always show session summary
+            print(f"[Session] Saved: {self.metrics.tokens_saved:,} tokens (~${session_dollars:.2f}) | Efficiency: {session_efficiency:.1f}%")
+            print()  # Newline for readability
+
+            # Reset task metrics after displaying
+            if show_task_summary:
+                self.metrics.reset_task_metrics()
+                self._save_session()
+
             return
 
-        # Human mode: rich output
+        # Human mode: rich output (unchanged for now)
         from rich.console import Console
         from rich.panel import Panel
         from rich.table import Table
@@ -172,46 +285,40 @@ class SessionTracker:
         stats_table.add_column(style="cyan", justify="right")
         stats_table.add_column(style="bold white")
 
-        # Tokens
-        stats_table.add_row("Tokens Read:", f"{self.metrics.tokens_read:,}")
-        stats_table.add_row("Tokens Saved:", f"[green]{self.metrics.tokens_saved:,}[/green]")
-        stats_table.add_row("Total Tokens (without Cerberus):", f"[dim]{total_tokens:,}[/dim]")
-        stats_table.add_row("Efficiency:", f"[bold green]{efficiency:.1f}%[/bold green]" if efficiency > 0 else "0%")
+        # Task metrics (if requested and available)
+        if show_task_summary and task_total > 0:
+            stats_table.add_row("[bold]This Task:", "")
+            stats_table.add_row("  Tokens Saved:", f"[green]{self.metrics.task_tokens_saved:,}[/green]")
+            stats_table.add_row("  Cost Savings:", f"[green]${task_dollars:.4f}[/green]")
+            stats_table.add_row("  Efficiency:", f"[bold green]{task_efficiency:.1f}%[/bold green]")
+            stats_table.add_row("", "")
 
-        # Commands
-        commands_str = ", ".join(f"{cmd}({count})" for cmd, count in sorted(self.metrics.commands_used.items()))
-        stats_table.add_row("", "")
-        stats_table.add_row("Commands Used:", f"[yellow]{commands_str}[/yellow]")
-        stats_table.add_row("Files Accessed:", f"{len(self.metrics.files_accessed)}")
-
-        # Duration
-        duration = self.metrics.get_duration_seconds()
-        if duration > 0:
-            stats_table.add_row("Session Duration:", f"{duration:.1f}s")
+        # Session metrics
+        stats_table.add_row("[bold]This Session:", "")
+        stats_table.add_row("  Tokens Saved:", f"[green]{self.metrics.tokens_saved:,}[/green]")
+        stats_table.add_row("  Cost Savings:", f"[green]${session_dollars:.2f}[/green]")
+        stats_table.add_row("  Efficiency:", f"[bold green]{session_efficiency:.1f}%[/bold green]")
+        stats_table.add_row("  Operations:", f"{sum(self.metrics.commands_used.values())}")
 
         # Create the panel
         title = Text()
-        title.append("🤖 Agent Session Summary ", style="bold magenta")
-        title.append("• Cerberus Dogfooding Metrics", style="dim")
+        title.append("💰 Token Savings Report", style="bold green")
 
         panel = Panel(
             stats_table,
             title=title,
-            border_style="magenta",
+            border_style="green",
             padding=(1, 2),
         )
 
         console.print()
         console.print(panel)
+        console.print()
 
-        # Show savings message if significant
-        if self.metrics.tokens_saved > 1000:
-            savings_msg = Text()
-            savings_msg.append("💰 ", style="yellow")
-            savings_msg.append(f"Saved {self.metrics.tokens_saved:,} tokens ", style="bold green")
-            savings_msg.append("using deterministic context management!", style="dim")
-            console.print(savings_msg, justify="center")
-            console.print()
+        # Reset task metrics after displaying
+        if show_task_summary:
+            self.metrics.reset_task_metrics()
+            self._save_session()
 
 
 # Global session tracker instance
@@ -232,18 +339,38 @@ def record_operation(command: str, tokens_read: int = 0, tokens_saved: int = 0, 
     tracker.record(command, tokens_read, tokens_saved, file_path)
 
 
-def display_session_summary():
-    """Display the session summary if tracking is enabled."""
+def display_session_summary(show_task_summary: bool = True):
+    """
+    Display the session summary if tracking is enabled.
+
+    Args:
+        show_task_summary: If True, show per-task savings. If False, only session.
+    """
     tracker = get_session_tracker()
     tracker.finalize()
-    tracker.display_summary()
+    tracker.display_summary(show_task_summary=show_task_summary)
+
+
+def display_task_completion():
+    """
+    Display task completion summary (both task and session savings).
+
+    This is the default function to call after completing a task.
+    Shows token savings for this task + cumulative session savings.
+    """
+    tracker = get_session_tracker()
+    tracker.display_summary(show_task_summary=True)
 
 
 def clear_session():
-    """Clear the session file."""
+    """Clear the session file and reset all metrics."""
     tracker = get_session_tracker()
-    if tracker.enabled and os.path.exists(tracker.session_file):
-        try:
-            os.remove(tracker.session_file)
-        except Exception:
-            pass
+    if tracker.enabled:
+        # Reset metrics
+        tracker._reset_session()
+        # Delete file
+        if os.path.exists(tracker.session_file):
+            try:
+                os.remove(tracker.session_file)
+            except Exception:
+                pass
