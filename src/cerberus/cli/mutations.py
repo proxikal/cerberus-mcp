@@ -1,7 +1,7 @@
 """
 CLI Mutation Commands (Phase 11)
 
-edit, delete, stats
+edit, delete, insert, stats
 """
 
 import json
@@ -36,6 +36,7 @@ def edit_cmd(
     dry_run: bool = typer.Option(False, "--dry-run", help="Validate but don't write"),
     no_format: bool = typer.Option(False, "--no-format", help="Skip auto-formatting"),
     no_imports: bool = typer.Option(False, "--no-imports", help="Skip import injection"),
+    force: bool = typer.Option(False, "--force", help="Bypass Symbol Guard protection (Phase 13.2)"),
     index_path: Optional[Path] = typer.Option(
         None,
         "--index",
@@ -53,6 +54,7 @@ def edit_cmd(
     Phase 14.3: Includes predictive editing suggestions for related changes.
 
     Phase 11: The Surgical Writer - replaces symbols without full-file rewrites.
+    Phase 13.2: Symbol Guard protection with --force override.
     """
     # Validate input
     if not code and not code_file:
@@ -111,7 +113,8 @@ def edit_cmd(
         parent_class=parent_class,
         dry_run=dry_run,
         auto_format=not no_format,
-        auto_imports=not no_imports
+        auto_imports=not no_imports,
+        force=force
     )
 
     # Output result
@@ -261,7 +264,7 @@ def delete_cmd(
     parent_class: Optional[str] = typer.Option(None, "--parent", "-p", help="Parent class for methods"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Validate but don't write"),
     keep_decorators: bool = typer.Option(False, "--keep-decorators", help="Keep decorators when deleting"),
-    force: bool = typer.Option(False, "--force", help="Bypass reference protection (Phase 12.5)"),
+    force: bool = typer.Option(False, "--force", help="Bypass Symbol Guard protection (Phase 13.2)"),
     index_path: Optional[Path] = typer.Option(
         None,
         "--index",
@@ -276,7 +279,7 @@ def delete_cmd(
     Delete a code symbol by name.
 
     Phase 11: Safely remove symbols with backup and validation.
-    Phase 12.5: Protected by Symbol Guard - blocks deletion if referenced.
+    Phase 13.2: Protected by Symbol Guard with stability-aware risk assessment.
     """
     # Load index
     index_path = get_default_index(index_path)
@@ -336,6 +339,145 @@ def delete_cmd(
             for error in result.errors:
                 console.print(f"  [red]Error:[/red] {error}")
 
+    if not result.success:
+        raise typer.Exit(code=1)
+
+
+@app.command("insert")
+def insert_cmd(
+    file: Path = typer.Argument(..., help="Path to file", exists=True),
+    parent: str = typer.Option(..., "--parent", "-p", help="Parent symbol (class/module) to insert into"),
+    code: Optional[str] = typer.Option(None, "--code", "-c", help="New code inline"),
+    code_file: Optional[Path] = typer.Option(None, "--code-file", "-f", help="Path to file with new code"),
+    after: Optional[str] = typer.Option(None, "--after", "-a", help="Insert after this symbol"),
+    before: Optional[str] = typer.Option(None, "--before", "-b", help="Insert before this symbol"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate but don't write"),
+    no_format: bool = typer.Option(False, "--no-format", help="Skip auto-formatting"),
+    no_imports: bool = typer.Option(False, "--no-imports", help="Skip import injection"),
+    index_path: Optional[Path] = typer.Option(
+        None,
+        "--index",
+        "-i",
+        help="Path to index file. Defaults to 'cerberus.db' in CWD.",
+        dir_okay=False,
+        readable=True,
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """
+    Insert new code into a file at a specific location.
+
+    Phase 11: The Surgical Writer - insert new symbols without full-file rewrites.
+    """
+    # Validate input
+    if not code and not code_file:
+        error_msg = "Must provide either --code or --code-file"
+        if CLIConfig.is_machine_mode() or json_output:
+            error = structured_error(
+                code="MISSING_ARGUMENT",
+                message=error_msg,
+                suggestions=["--code 'def foo(): pass'", "--code-file new_impl.py"]
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print(f"[red]Error: {error_msg}[/red]")
+        raise typer.Exit(code=1)
+
+    # Validate position arguments
+    if after and before:
+        error_msg = "Cannot specify both --after and --before"
+        if CLIConfig.is_machine_mode() or json_output:
+            error = structured_error(
+                code="INVALID_ARGUMENT",
+                message=error_msg,
+                suggestions=["Use --after OR --before, not both"]
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print(f"[red]Error: {error_msg}[/red]")
+        raise typer.Exit(code=1)
+
+    # Read code from file if provided
+    if code_file:
+        try:
+            code = code_file.read_text(encoding='utf-8')
+        except Exception as e:
+            if CLIConfig.is_machine_mode() or json_output:
+                error = structured_error(
+                    code="FILE_READ_ERROR",
+                    message=f"Failed to read code file: {e}"
+                )
+                print(json.dumps(error, separators=(',', ':')))
+            else:
+                console.print(f"[red]Error: Failed to read {code_file}: {e}[/red]")
+            raise typer.Exit(code=1)
+
+    # Load index
+    index_path = get_default_index(index_path)
+    try:
+        store = SQLiteIndexStore(str(index_path))
+    except Exception as e:
+        if CLIConfig.is_machine_mode() or json_output:
+            error = structured_error(
+                code="INDEX_LOAD_ERROR",
+                message=f"Failed to load index: {e}",
+                actionable_fix="cerberus index ."
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print(f"[red]Error: Failed to load index: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    # Create facade
+    facade = MutationFacade(store)
+
+    # Perform insert
+    result = facade.insert_symbol(
+        file_path=str(file),
+        parent_symbol=parent,
+        new_code=code,
+        after_symbol=after,
+        before_symbol=before,
+        dry_run=dry_run
+    )
+
+    # Output result
+    if CLIConfig.is_machine_mode() or json_output:
+        # Machine mode: pure JSON
+        print(json.dumps(result.model_dump(), separators=(',', ':')))
+    else:
+        # Human mode: rich output
+        if result.success:
+            # Phase 12.5: Context Anchoring (GPS)
+            anchor_header = ContextAnchor.format_mutation_header(
+                operation="insert",
+                file_path=str(file),
+                symbol=parent,
+                status="Inserted"
+            )
+            console.print(f"[bold]{anchor_header}[/bold]\n")
+
+            console.print(f"[green]✓[/green] Successfully inserted code into '{parent}' in {file}")
+            console.print(f"  Lines added: {result.lines_changed}")
+            console.print(f"  Total lines: {result.lines_total}")
+            if result.backup_path:
+                console.print(f"  Backup: {result.backup_path}")
+            if result.warnings:
+                console.print("[yellow]Warnings:[/yellow]")
+                for warning in result.warnings:
+                    console.print(f"  - {warning}")
+
+            # Phase 12.5: JIT Guidance
+            if GuidanceProvider.should_show_guidance(CLIConfig.is_machine_mode()):
+                tip = GuidanceProvider.get_tip("insert")
+                if tip:
+                    console.print(f"[dim cyan]{GuidanceProvider.format_tip(tip)}[/dim cyan]")
+        else:
+            console.print(f"[red]✗[/red] Failed to insert code into '{parent}'")
+            for error in result.errors:
+                console.print(f"  [red]Error:[/red] {error}")
+
+    # Exit with appropriate code
     if not result.success:
         raise typer.Exit(code=1)
 

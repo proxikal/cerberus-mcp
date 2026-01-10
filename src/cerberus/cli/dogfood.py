@@ -24,6 +24,7 @@ from cerberus.index import (
     semantic_search,
 )
 from .output import get_console
+from .config import CLIConfig
 # Phase 12.5: JIT Guidance
 from .guidance import GuidanceProvider
 # Phase 12.5: Context Anchoring
@@ -85,7 +86,10 @@ def read(
     try:
         # Load index and use blueprint (Phase 8 dogfooding)
         scan_result = load_index(index_path)
-        file_str = str(file_path)
+
+        # BUG FIX #1: Convert to absolute path (database stores absolute paths)
+        file_absolute = file_path.resolve()
+        file_str = str(file_absolute)
 
         # Query symbols for this file
         symbols = list(scan_result._store.query_symbols(filter={'file_path': file_str}))
@@ -95,22 +99,32 @@ def read(
             console.print("[yellow]→ Run 'cerberus index .' to index this file.[/yellow]")
             raise typer.Exit(code=1)
 
-        # Build blueprint output (Phase 8 engine)
-        symbols.sort(key=lambda s: s.start_line)
+        # BUG FIX #2: If line range specified, read actual file content
+        # Blueprint mode is only for structure viewing (no line range)
+        use_blueprint = (start_line is None and end_line is None and lines is None)
 
-        blueprint_lines = [
-            f"# Blueprint: {file_path}",
-            f"# Symbols: {len(symbols)} | Mode: index-backed AST",
-            ""
-        ]
+        if use_blueprint:
+            # Build blueprint output (Phase 8 engine)
+            symbols.sort(key=lambda s: s.start_line)
 
-        for sym in symbols:
-            indent = "    " if sym.parent_class else ""
-            sig = sym.signature or f"{sym.type} {sym.name}"
-            blueprint_lines.append(f"{sym.start_line:5} | {indent}{sig}")
+            blueprint_lines = [
+                f"# Blueprint: {file_path}",
+                f"# Symbols: {len(symbols)} | Mode: index-backed AST",
+                ""
+            ]
 
-        content = "\n".join(blueprint_lines)
-        logger.info(f"Dogfooding: Used blueprint for {file_path} (Phase 8 engine)")
+            for sym in symbols:
+                indent = "    " if sym.parent_class else ""
+                sig = sym.signature or f"{sym.type} {sym.name}"
+                blueprint_lines.append(f"{sym.start_line:5} | {indent}{sig}")
+
+            content = "\n".join(blueprint_lines)
+            logger.info(f"Dogfooding: Used blueprint for {file_path} (Phase 8 engine)")
+        else:
+            # Read actual file content for line range queries
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            logger.info(f"Dogfooding: Read content for {file_path} (lines {start_line}-{end_line})")
 
     except Exception as e:
         logger.error(f"Blueprint failed: {e}")
@@ -156,7 +170,7 @@ def read(
     if CLIConfig.is_machine_mode() or json_output:
         output = {
             "file_path": str(file_path),
-            "mode": "blueprint",
+            "mode": "blueprint" if use_blueprint else "content",
             "lines_shown": {
                 "start": start_line,
                 "end": end_idx
@@ -169,11 +183,12 @@ def read(
         return
 
     # Human mode: Rich formatted output with Phase 12.5 Context Anchoring
+    mode_label = "Blueprint" if use_blueprint else "Content"
     header = ContextAnchor.format_header(
         file_path=str(file_path),
         lines=f"{start_line}-{end_idx}",
-        status="Blueprint",
-        extra={"Total": f"{total_lines} lines", "Mode": "Phase 8"}
+        status=mode_label,
+        extra={"Total": f"{total_lines} lines", "Mode": "Phase 8" if use_blueprint else "Direct Read"}
     )
     console.print(f"\n{header}")
     console.print()

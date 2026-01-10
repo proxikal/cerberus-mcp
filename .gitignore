@@ -19,6 +19,9 @@ ENV/
 *.swp
 *.swo
 
+# macOS
+.DS_Store
+
 # Build artifacts
 build/
 dist/
@@ -45,3 +48,9 @@ cerberus_agent.log
 .logs/
 .cerberus_session.json
 .cerberus_dev_session.json
+
+# Cerberus runtime files
+.cerberus/history/
+.cerberus_backups/
+*_ops.json
+PROJECT_PARITY.md

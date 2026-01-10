@@ -1,0 +1,12 @@
+"""Simple test file for blueprint."""
+
+class TestClass:
+    """A simple test class."""
+
+    def method_one(self, x):
+        """First method."""
+        return x + 1
+
+    def method_two(self, y):
+        """Second method."""
+        return y * 2

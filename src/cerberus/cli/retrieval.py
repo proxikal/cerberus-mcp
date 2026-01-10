@@ -622,7 +622,29 @@ def skeletonize_cmd(
 
 @app.command("blueprint")
 def blueprint_cmd(
-    file: Path = typer.Argument(..., help="File to generate blueprint for."),
+    file: Path = typer.Argument(..., help="File or directory to generate blueprint for."),
+    # Overlay flags (Phase 13.1)
+    deps: bool = typer.Option(False, "--deps", help="Show dependencies with confidence scores"),
+    meta: bool = typer.Option(False, "--meta", help="Show complexity metrics"),
+    # Overlay flags (Phase 13.2)
+    churn: bool = typer.Option(False, "--churn", help="Show git churn analysis (edits, authors, recency)"),
+    coverage: bool = typer.Option(False, "--coverage", help="Show test coverage metrics"),
+    stability: bool = typer.Option(False, "--stability", help="Show composite stability score (risk assessment)"),
+    # Phase 13.3 flags:
+    diff_ref: Optional[str] = typer.Option(None, "--diff", help="Compare structure against git ref (e.g., 'HEAD~1', 'main')"),
+    cycles: bool = typer.Option(False, "--cycles", help="Detect circular dependencies"),
+    aggregate: bool = typer.Option(False, "--aggregate", help="Aggregate package-level view (directory input)"),
+    aggregate_depth: Optional[int] = typer.Option(None, "--aggregate-depth", help="Max directory depth for aggregation"),
+    # Phase 13.5 flags:
+    hydrate: bool = typer.Option(False, "--hydrate", help="Auto-hydrate heavily-referenced internal dependencies"),
+    max_width: Optional[int] = typer.Option(None, "--max-width", help="Maximum line width before truncation (tree format only)"),
+    collapse_private: bool = typer.Option(False, "--collapse-private", help="Collapse private symbols (starting with _)"),
+    # Output flags
+    format_type: str = typer.Option(None, "--format", help="Output format: tree or json (default: json in machine mode, tree in human mode)"),
+    # Performance flags
+    cached: bool = typer.Option(True, "--cached/--no-cache", help="Use cache (default: enabled)"),
+    fast: bool = typer.Option(False, "--fast", help="Skip expensive analysis"),
+    # Common flags
     index_path: Optional[Path] = typer.Option(
         None,
         "--index",
@@ -631,14 +653,38 @@ def blueprint_cmd(
         dir_okay=False,
         readable=True,
     ),
-    json_output: bool = typer.Option(False, "--json", help="Output as JSON."),
 ):
     """
-    [PHASE 8] Whole-file AST blueprint from index (faster than disk read).
-    Shows complete file structure (classes, signatures, docstrings) without function bodies.
+    [PHASE 13.1/13.2/13.3/13.5] Architectural blueprint with dependencies, complexity, churn, coverage, stability, diffs, cycles, hydration, and width management.
+
+    Generates token-efficient visual hierarchy with optional overlays:
+
+    Phase 13.1:
+    - --deps: Show function/method dependencies with Phase 5 confidence scores
+    - --meta: Show complexity metrics (lines, cyclomatic complexity, nesting)
+    - --format: Output as ASCII tree or JSON
+    - --cached/--no-cache: Enable/disable caching (default: enabled)
+    - --fast: Skip expensive analysis for faster results
+
+    Phase 13.2:
+    - --churn: Show git churn (edits/week, authors, last modified)
+    - --coverage: Show test coverage (percent, test files, assertions)
+    - --stability: Show composite stability score (🟢 SAFE / 🟡 MEDIUM / 🔴 HIGH RISK)
+
+    Phase 13.3:
+    - --diff: Compare structure against git ref (e.g., HEAD~1, main) to see what changed
+    - --cycles: Detect circular dependencies (import cycles, call cycles, inheritance cycles)
+    - --aggregate: Generate package-level aggregated view (requires directory input)
+    - --aggregate-depth: Limit directory depth for aggregation
+
+    Phase 13.5:
+    - --hydrate: Auto-hydrate heavily-referenced internal dependencies (requires --deps)
+    - --max-width: Maximum line width before truncation (tree format only)
+    - --collapse-private: Collapse private symbols (starting with _) for cleaner output
     """
     from cerberus.index import load_index
-    from collections import defaultdict
+    from cerberus.blueprint import BlueprintGenerator, BlueprintRequest, TreeRenderOptions
+    from cerberus.cli.config import CLIConfig
 
     # Default to cerberus.db in CWD if not provided
     if index_path is None:
@@ -652,105 +698,63 @@ def blueprint_cmd(
         # Load index
         scan_result = load_index(index_path)
 
-        # Normalize file path
-        file_str = str(file)
-
-        # Query all symbols for the file from index
-        symbols = list(scan_result._store.query_symbols(filter={'file_path': file_str}))
-
-        if not symbols:
-            console.print(f"[red]No symbols found for file '{file}' in index.[/red]")
-            console.print(f"[dim]Make sure the file is indexed and the path matches.[/dim]")
+        # Get database connection
+        if hasattr(scan_result, '_store') and hasattr(scan_result._store, '_get_connection'):
+            conn = scan_result._store._get_connection()
+        else:
+            console.print(f"[red]Error: Blueprint requires SQLite index format.[/red]")
+            console.print(f"[dim]Rebuild index with 'cerberus index .'[/dim]")
             raise typer.Exit(code=1)
 
-        # Deduplicate symbols (SQLite may have duplicates)
-        seen = set()
-        unique_symbols = []
-        for sym in symbols:
-            key = (sym.name, sym.type, sym.start_line, sym.parent_class or '')
-            if key not in seen:
-                seen.add(key)
-                unique_symbols.append(sym)
-        symbols = unique_symbols
+        # Normalize file path (resolve to absolute)
+        file_path = Path(file).resolve()
 
-        # Sort symbols by line number
-        symbols.sort(key=lambda s: s.start_line)
+        # Determine output format (default to JSON in machine mode, tree in human mode)
+        if format_type is None:
+            format_type = "json" if CLIConfig.is_machine_mode() else "tree"
 
-        # Build blueprint structure
-        blueprint_data = {
-            'file': file_str,
-            'symbols': [],
-            'total_symbols': len(symbols),
-        }
+        # Create blueprint request
+        request = BlueprintRequest(
+            file_path=str(file_path),
+            show_deps=deps,
+            show_meta=meta,
+            show_churn=churn,
+            show_coverage=coverage,
+            show_stability=stability,
+            diff_ref=diff_ref,
+            show_cycles=cycles,
+            aggregate=aggregate,
+            aggregate_max_depth=aggregate_depth,
+            show_hydrate=hydrate,
+            use_cache=cached,
+            fast_mode=fast,
+            output_format=format_type
+        )
 
-        # Group methods by parent class
-        classes = defaultdict(list)
-        top_level = []
+        # Generate blueprint (with repo path for diff support)
+        repo_path = Path.cwd()  # Assume current directory is in git repo
+        generator = BlueprintGenerator(conn, repo_path=repo_path)
+        blueprint = generator.generate(request)
 
-        for sym in symbols:
-            sym_data = {
-                'name': sym.name,
-                'type': sym.type,
-                'line': sym.start_line,
-                'signature': sym.signature or '',
-            }
-
-            if sym.parent_class:
-                classes[sym.parent_class].append(sym_data)
-            else:
-                top_level.append(sym_data)
-
-        # Build structured output
-        for sym in top_level:
-            if sym['type'] == 'class':
-                # Add class with its methods
-                class_entry = {
-                    'name': sym['name'],
-                    'type': 'class',
-                    'line': sym['line'],
-                    'signature': sym['signature'],
-                    'methods': classes.get(sym['name'], [])
-                }
-                blueprint_data['symbols'].append(class_entry)
-            else:
-                # Top-level function/variable
-                blueprint_data['symbols'].append(sym)
-
-        if json_output:
-            typer.echo(json.dumps(blueprint_data, indent=2))
-            return
-
-        # Human-readable output
-        console.print(f"\n[bold cyan]Blueprint for {file}[/bold cyan]")
-        console.print(f"[dim]Total symbols: {len(symbols)} (index-backed, no disk read)[/dim]\n")
-
-        for sym in blueprint_data['symbols']:
-            if sym['type'] == 'class':
-                class_sig = sym.get('signature') or f"class {sym['name']}"
-                console.print(f"\n[bold yellow]{class_sig}[/bold yellow] [dim](line {sym['line']})[/dim]")
-
-                # Show methods
-                for method in sym.get('methods', []):
-                    method_sig = method.get('signature')
-                    if not method_sig:
-                        # Fallback: show as method name with parentheses
-                        method_sig = f"def {method['name']}(...)" if method['type'] == 'function' else method['name']
-                    console.print(f"    [green]{method_sig}[/green] [dim](line {method['line']})[/dim]")
-            else:
-                # Top-level function/variable
-                sig = sym.get('signature')
-                if not sig:
-                    # Fallback: show with def keyword for functions
-                    if sym['type'] == 'function':
-                        sig = f"def {sym['name']}(...)"
-                    else:
-                        sig = sym['name']
-                console.print(f"\n[bold green]{sig}[/bold green] [dim](line {sym['line']})[/dim]")
-
-        console.print()
+        # Format and output
+        if format_type == "json":
+            # Machine mode: minified JSON
+            output = generator.format_output(blueprint, "json")
+            typer.echo(output)
+        else:
+            # Tree format
+            tree_options = TreeRenderOptions(
+                show_line_numbers=True,
+                show_signatures=True,
+                collapse_private=collapse_private,
+                max_width=max_width
+            )
+            output = generator.format_output(blueprint, "tree", tree_options)
+            # Use typer.echo for plain text output
+            typer.echo(output)
 
         # Record operation for dogfooding metrics
-        record_operation('blueprint', tokens_read=0, tokens_saved=0, file_path=file_str)
+        record_operation('blueprint', tokens_read=0, tokens_saved=0, file_path=str(file_path))
 
     except Exception as e:
         logger.error(f"Failed to generate blueprint for {file}: {e}")
