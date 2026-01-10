@@ -235,6 +235,22 @@ def get_symbol(
 
             item["hydrated_types"] = hydrated
 
+    # Phase 14.4: Record action for accuracy tracking
+    if enriched:
+        try:
+            from cerberus.mutation.ledger import DiffLedger
+            ledger = DiffLedger()
+            # Log action for the first match (primary target)
+            first_symbol = enriched[0]["symbol"]
+            ledger.record_action(
+                action_type="get-symbol",
+                target_symbol=first_symbol["name"],
+                target_file=first_symbol["file_path"],
+                command=f"cerberus retrieval get-symbol {name or 'file query'}"
+            )
+        except Exception as e:
+            logger.debug(f"Action tracking failed: {e}")
+
     # Phase 10: Machine mode is DEFAULT - JSON output for AI agents
     if CLIConfig.is_machine_mode() or json_output:
         # Compact JSON for agents (no pretty printing)

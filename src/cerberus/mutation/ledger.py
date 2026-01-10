@@ -79,6 +79,30 @@ class DiffLedger:
                 ON prediction_log(timestamp)
             """)
 
+            # Create action_log table (Phase 14.4)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS action_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp REAL NOT NULL,
+                    action_type TEXT NOT NULL,
+                    target_symbol TEXT,
+                    target_file TEXT NOT NULL,
+                    command TEXT NOT NULL
+                )
+            """)
+
+            # Create index on timestamp for actions
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_action_timestamp
+                ON action_log(timestamp)
+            """)
+
+            # Create index on target_symbol for fast correlation
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_action_symbol
+                ON action_log(target_symbol)
+            """)
+
             conn.commit()
             conn.close()
 
@@ -359,4 +383,149 @@ class DiffLedger:
                 "total_prediction_logs": 0,
                 "average_predictions_per_edit": 0.0,
                 "top_predicted_symbols": {}
+            }
+
+    def record_action(
+        self,
+        action_type: str,
+        target_symbol: Optional[str],
+        target_file: str,
+        command: str
+    ) -> bool:
+        """
+        Record an agent action for correlation with predictions (Phase 14.4).
+
+        Args:
+            action_type: Type of action (edit, get-symbol, blueprint, etc.)
+            target_symbol: Symbol being accessed/modified (if applicable)
+            target_file: File path being accessed
+            command: Full cerberus command executed
+
+        Returns:
+            True if recorded successfully, False otherwise
+        """
+        try:
+            import time
+
+            conn = sqlite3.connect(self.ledger_path)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO action_log (
+                    timestamp, action_type, target_symbol, target_file, command
+                ) VALUES (?, ?, ?, ?, ?)
+            """, (
+                time.time(),
+                action_type,
+                target_symbol,
+                target_file,
+                command
+            ))
+
+            conn.commit()
+            conn.close()
+
+            logger.debug(f"Recorded action: {action_type} on {target_symbol or target_file}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to record action: {e}")
+            return False
+
+    def get_prediction_accuracy(
+        self,
+        time_window: float = 900.0,  # 15 minutes in seconds
+        limit: int = 100
+    ) -> Dict[str, Any]:
+        """
+        Calculate prediction accuracy by correlating predictions with actions (Phase 14.4).
+
+        Args:
+            time_window: Time window in seconds to consider actions as "following" predictions (default: 15 min)
+            limit: Number of recent predictions to analyze
+
+        Returns:
+            Dictionary with accuracy metrics
+        """
+        try:
+            import json
+
+            conn = sqlite3.connect(self.ledger_path)
+            cursor = conn.cursor()
+
+            # Get recent predictions
+            cursor.execute("""
+                SELECT id, timestamp, edited_symbol, edited_file,
+                       predicted_symbols, confidence_scores
+                FROM prediction_log
+                ORDER BY timestamp DESC
+                LIMIT ?
+            """, (limit,))
+            predictions = cursor.fetchall()
+
+            if not predictions:
+                conn.close()
+                return {
+                    "total_predictions": 0,
+                    "predictions_followed": 0,
+                    "accuracy_rate": 0.0,
+                    "avg_time_to_action": 0.0,
+                    "actions_per_prediction": 0.0
+                }
+
+            total_prediction_count = 0
+            followed_count = 0
+            time_deltas = []
+
+            for pred_row in predictions:
+                pred_id, pred_timestamp, edited_symbol, edited_file, predicted_symbols_json, confidence_scores_json = pred_row
+                predicted_symbols = json.loads(predicted_symbols_json)
+                total_prediction_count += len(predicted_symbols)
+
+                # For each predicted symbol, check if there was a follow-up action within time window
+                for predicted_symbol in predicted_symbols:
+                    cursor.execute("""
+                        SELECT timestamp, action_type
+                        FROM action_log
+                        WHERE target_symbol = ?
+                          AND timestamp > ?
+                          AND timestamp <= ?
+                        ORDER BY timestamp ASC
+                        LIMIT 1
+                    """, (
+                        predicted_symbol,
+                        pred_timestamp,
+                        pred_timestamp + time_window
+                    ))
+
+                    action_row = cursor.fetchone()
+                    if action_row:
+                        followed_count += 1
+                        action_timestamp = action_row[0]
+                        time_delta = action_timestamp - pred_timestamp
+                        time_deltas.append(time_delta)
+
+            conn.close()
+
+            # Calculate metrics
+            accuracy_rate = (followed_count / total_prediction_count) if total_prediction_count > 0 else 0.0
+            avg_time_to_action = (sum(time_deltas) / len(time_deltas)) if time_deltas else 0.0
+
+            return {
+                "total_predictions": total_prediction_count,
+                "predictions_followed": followed_count,
+                "predictions_ignored": total_prediction_count - followed_count,
+                "accuracy_rate": round(accuracy_rate, 3),
+                "avg_time_to_action_seconds": round(avg_time_to_action, 1),
+                "time_window_seconds": time_window,
+                "sample_size": len(predictions)
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get prediction accuracy: {e}")
+            return {
+                "total_predictions": 0,
+                "predictions_followed": 0,
+                "accuracy_rate": 0.0,
+                "error": str(e)
             }

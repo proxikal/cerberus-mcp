@@ -257,7 +257,7 @@ P14 [PRODUCTIVITY]:
   - Hallucination Detection: Wrong-file validation for mutations. ✅ (Phase 14.2)
   - Compact Mode: <5% token overhead for anchor metadata. ✅ (Phase 14.2)
   - Predictive Editing: Deterministic relationship discovery + basic logging. ✅ (Phase 14.3)
-  - Prediction Accuracy Tracking: Correlate suggestions with agent actions. 🔜 (Phase 14.4)
+  - Prediction Accuracy Tracking: Correlate suggestions with agent actions. ✅ (Phase 14.4)
 
 ## 🛠 COMMAND QUICKREF
 # 1. ORIENT (Map - Use This First)
@@ -309,7 +309,7 @@ cerberus mutations delete file.py --symbol bar --force   # Override Symbol Guard
 # UNDO (Safety Net):
 cerberus mutations undo                    # Revert last batch
 
-# 4. QUALITY (Style Guard - Phase 14.1, Predictive Editing - Phase 14.3)
+# 4. QUALITY (Style Guard - Phase 14.1, Predictive Editing - Phase 14.3, Accuracy Tracking - Phase 14.4)
 # Style Guard:
 cerberus quality style-check src/main.py              # Preview style issues
 cerberus quality style-check src/ --recursive         # Check directory
@@ -323,6 +323,11 @@ cerberus quality related-changes validate_ops         # Show predicted related c
 cerberus quality related-changes batch_edit --file src/mutations.py  # With explicit file
 cerberus quality related-changes AuthConfig --verbose # Detailed reasoning
 cerberus quality related-changes process_request --json  # Machine-readable output
+
+# Prediction Accuracy Tracking (Phase 14.4):
+cerberus quality prediction-stats                     # Show prediction accuracy metrics
+cerberus quality prediction-stats --window 600 --limit 50  # Custom time window and sample size
+cerberus quality prediction-stats --json              # Machine-readable output
 
 ## 🧠 SYMBOLIC INTELLIGENCE
 

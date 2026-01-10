@@ -11,8 +11,10 @@ from cerberus.anchoring.schema import (
     GPSLocation,
     DependencyInfo,
     RiskInfo,
+    RiskLevel,
     TemporalInfo,
     SafetyInfo,
+    GuardStatus,
 )
 
 __all__ = [
@@ -23,6 +25,8 @@ __all__ = [
     "GPSLocation",
     "DependencyInfo",
     "RiskInfo",
+    "RiskLevel",
     "TemporalInfo",
     "SafetyInfo",
+    "GuardStatus",
 ]

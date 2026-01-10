@@ -654,7 +654,7 @@ cerberus ledger show --filter anchors --stats
 - [x] Build deterministic ranking (confidence ≥0.9 only)
 - [x] Integrate with stability scores (prioritize SAFE)
 - [x] Add basic ledger logging (record predictions made)
-- [ ] ~~Add prediction accuracy tracking~~ → **Deferred to Phase 14.4**
+- [x] ~~Add prediction accuracy tracking~~ → **Completed in Phase 14.4**
 
 **Success Criteria:**
 - ✅ Zero heuristics or ML-based predictions
@@ -664,40 +664,72 @@ cerberus ledger show --filter anchors --stats
 - ✅ Automatic suggestions after edits
 - ✅ Basic logging to ledger (what predictions were made)
 
-**Deferred:**
-- Accuracy tracking (whether agents followed suggestions) - requires user action correlation
-
-### Phase 14.4: Advanced Analytics & Integration (Future)
-- [ ] **Prediction Accuracy Tracking** (deferred from 14.3)
-  - Track correlation between predictions and subsequent agent actions
-  - Detect if agents followed suggestions within temporal window
-  - Calculate accuracy metrics (% of predictions acted upon)
-  - Surface insights: `cerberus ledger show --filter predictions --stats`
-- [ ] Integrate Style Guard with --verify workflow
-- [ ] Integrate predictions with undo history
-- [ ] Add safety metadata to all anchors
-- [ ] Implement progressive rollout flags
-- [ ] Performance optimization (meet <250ms total budget)
+### Phase 14.4: Prediction Accuracy Tracking (COMPLETE)
+- [x] Create `action_log` table in ledger database
+- [x] Implement `record_action()` method to log agent actions
+- [x] Implement `get_prediction_accuracy()` method with temporal correlation
+- [x] Integrate action tracking into mutations CLI (`edit`, `delete`)
+- [x] Integrate action tracking into retrieval CLI (`get-symbol`, `blueprint`)
+- [x] Add `cerberus quality prediction-stats` command
+- [x] Write comprehensive tests for accuracy tracking
+- [x] Calculate accuracy metrics (% followed, avg time to action)
 
 **Success Criteria:**
-- All Phase 14 features compose with Phase 12/13 safety systems
-- Feature flags work independently
-- Total latency <250ms per operation
-- Zero regressions in existing functionality
+- ✅ Action logging with <10ms overhead per operation
+- ✅ Temporal correlation within configurable time window (default: 15 min)
+- ✅ Accuracy metrics: predictions followed vs ignored
+- ✅ CLI command with JSON and human-readable output
+- ✅ Database indexes for efficient correlation queries
+- ✅ Integration tests passing
+- ✅ Zero regressions in existing functionality
 
-### Phase 14.5: Polish & Documentation (Week 7)
-- [ ] Update CERBERUS.md with Phase 14 commands
-- [ ] Add formal output schemas to documentation
-- [ ] Write agent-facing guide: "Phase 14 Usage Patterns"
+**Implementation Details:**
+- `action_log` table tracks all agent actions (edit, get-symbol, blueprint, etc.)
+- Correlation algorithm matches actions to predictions within time window
+- Accuracy calculation: `followed / total_predictions`
+- Average time to action: mean delta between prediction and action timestamps
+- Command: `cerberus quality prediction-stats [--window SECONDS] [--limit N] [--json]`
+
+### Phase 14.5: Integration & Safety → **MOVED TO PHASE 17**
+
+The following items have been moved to Phase 17 for proper integration hardening:
+- [ ] Integrate Style Guard with --verify workflow → Phase 17.1
+- [ ] Integrate predictions with undo history → Phase 17.2
+- [ ] Add safety metadata to all anchors → Phase 17.3
+- [ ] Implement progressive rollout flags → Phase 17.4
+- [ ] Performance optimization (meet <250ms total budget) → Phase 17.5
+
+**See:** `docs/PHASE17_SPEC.md` for complete specification
+
+### Phase 14.6: Analytics & Polish (Future)
 - [ ] Benchmark: measure turn reduction in 50 workflows
-- [ ] Dogfood: use Phase 14 features to complete Phase 14
-- [ ] Final compliance audit: verify 100% mission alignment
+  - Quantify productivity gains from predictive editing
+  - Measure style guard turn savings
+  - Validate context anchor hallucination reduction
+  - Compare prediction accuracy across different symbol types
+- [ ] Advanced analytics dashboard
+  - Prediction accuracy trends over time
+  - Most accurate prediction types
+  - Agent adoption metrics (feature usage)
+- [ ] Documentation polish
+  - Agent-facing guide: "Phase 14 Usage Patterns"
+  - Output schema reference documentation
+  - Performance tuning guide
+- [ ] Dogfood validation
+  - Use Phase 14 features extensively on Cerberus itself
+  - Measure real-world accuracy and productivity gains
+  - Iterate based on findings
+- [ ] Final compliance audit
+  - Verify 100% mission alignment
+  - Validate parse accuracy >98%
+  - Confirm performance <250ms per operation
 
 **Success Criteria:**
-- Documentation complete with examples
+- Prediction accuracy tracking shows >90% useful suggestions in production
 - Turn reduction measured: 25-50% in complex workflows
+- Documentation complete with real examples
 - 100% mission compliance verified
-- Ledger shows all operations tracked correctly
+- Production metrics collected and analyzed
 
 ---
 

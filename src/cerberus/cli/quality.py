@@ -398,3 +398,92 @@ def related_changes_cmd(
         else:
             console.print(f"[red]Error: Related changes analysis failed: {e}[/red]")
         raise typer.Exit(code=1)
+
+
+@app.command("prediction-stats")
+def prediction_stats_cmd(
+    time_window: int = typer.Option(900, "--window", "-w", help="Time window in seconds to correlate actions (default: 900 = 15 min)"),
+    limit: int = typer.Option(100, "--limit", "-l", help="Number of recent predictions to analyze"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """
+    Phase 14.4: Show prediction accuracy statistics.
+
+    Correlates predictions with agent actions to calculate accuracy metrics.
+
+    Examples:
+      cerberus quality prediction-stats
+      cerberus quality prediction-stats --window 600 --limit 50
+      cerberus quality prediction-stats --json
+    """
+    try:
+        from cerberus.mutation.ledger import DiffLedger
+
+        ledger = DiffLedger()
+
+        # Get accuracy metrics
+        accuracy = ledger.get_prediction_accuracy(
+            time_window=float(time_window),
+            limit=limit
+        )
+
+        # Get basic prediction stats
+        basic_stats = ledger.get_prediction_stats(limit=limit)
+
+        if CLIConfig.is_machine_mode() or json_output:
+            # Machine mode: JSON output
+            output = {
+                "accuracy": accuracy,
+                "basic_stats": basic_stats
+            }
+            print(json.dumps(output, separators=(',', ':')))
+        else:
+            # Human mode: Rich formatted output
+            console.print("[bold cyan]Prediction Accuracy Statistics (Phase 14.4)[/bold cyan]\n")
+
+            # Accuracy metrics
+            console.print("[bold]Accuracy Metrics:[/bold]")
+            console.print(f"  Total Predictions: {accuracy['total_predictions']}")
+            console.print(f"  Predictions Followed: [green]{accuracy['predictions_followed']}[/green]")
+            console.print(f"  Predictions Ignored: [yellow]{accuracy['predictions_ignored']}[/yellow]")
+            console.print(f"  Accuracy Rate: [bold]{accuracy['accuracy_rate']:.1%}[/bold]")
+
+            if accuracy['predictions_followed'] > 0:
+                console.print(f"  Avg Time to Action: {accuracy['avg_time_to_action_seconds']:.1f}s")
+
+            console.print(f"  Time Window: {accuracy['time_window_seconds']}s ({accuracy['time_window_seconds']/60:.1f} min)")
+            console.print(f"  Sample Size: {accuracy['sample_size']} prediction logs\n")
+
+            # Basic stats
+            console.print("[bold]Prediction Stats:[/bold]")
+            console.print(f"  Total Prediction Logs: {basic_stats['total_prediction_logs']}")
+            console.print(f"  Avg Predictions Per Edit: {basic_stats['average_predictions_per_edit']:.1f}")
+
+            if basic_stats['top_predicted_symbols']:
+                console.print(f"\n[bold]Most Frequently Predicted Symbols:[/bold]")
+                for symbol, count in list(basic_stats['top_predicted_symbols'].items())[:5]:
+                    console.print(f"    {symbol}: {count} times")
+
+            # Interpretation
+            console.print(f"\n[dim]Interpretation:[/dim]")
+            accuracy_rate = accuracy['accuracy_rate']
+            if accuracy_rate >= 0.9:
+                console.print(f"[dim]  🟢 Excellent: {accuracy_rate:.1%} of predictions are followed by agents[/dim]")
+            elif accuracy_rate >= 0.7:
+                console.print(f"[dim]  🟡 Good: {accuracy_rate:.1%} of predictions are useful[/dim]")
+            elif accuracy_rate >= 0.5:
+                console.print(f"[dim]  🟠 Fair: {accuracy_rate:.1%} accuracy, room for improvement[/dim]")
+            else:
+                console.print(f"[dim]  🔴 Low: {accuracy_rate:.1%} accuracy, predictions may need tuning[/dim]")
+
+    except Exception as e:
+        logger.error(f"Failed to get prediction stats: {e}")
+        if CLIConfig.is_machine_mode() or json_output:
+            error = structured_error(
+                code="STATS_ERROR",
+                message=f"Failed to get prediction stats: {e}",
+            )
+            print(json.dumps(error, separators=(',', ':')))
+        else:
+            console.print(f"[red]Error: Failed to get prediction stats: {e}[/red]")
+        raise typer.Exit(code=1)
