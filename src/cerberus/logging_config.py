@@ -60,7 +60,7 @@ def setup_logging(level="INFO", suppress_console=None, enable_file_logging=None)
             retention="1 day",      # Keep logs for 1 day only
             compression="gz",       # Compress old logs
             catch=True,
-            serialize=False         # Plain text, not JSON (smaller)
+            serialize=True          # JSON for machine parsing (CERBERUS.md mandate)
         )
 
 
