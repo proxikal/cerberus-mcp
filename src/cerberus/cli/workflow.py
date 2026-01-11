@@ -22,6 +22,9 @@ from cerberus.cli.config import CLIConfig
 from cerberus.logging_config import logger
 # Phase 19.3: Efficiency tracking
 from cerberus.metrics.efficiency import get_efficiency_tracker
+# Phase 19.7: Protocol tracking
+from cerberus.protocol import get_protocol_tracker
+from cerberus.cli.hints import EfficiencyHints, HintCollector
 
 app = typer.Typer()
 console = get_console()
@@ -300,6 +303,18 @@ def start(
     except Exception:
         pass  # Don't fail command if metrics fail
 
+    # Phase 19.7: Track protocol usage and check for refresh hint
+    try:
+        protocol_tracker = get_protocol_tracker()
+        protocol_tracker.record_command("start")
+
+        # Check if refresh hint should be shown
+        hint = EfficiencyHints.check_protocol_refresh()
+        if hint and not json_output:
+            console.print(f"\n[dim]{hint.to_human()}[/dim]")
+    except Exception:
+        pass  # Don't fail command if protocol tracking fails
+
 
 @app.command()
 def go(
@@ -509,6 +524,22 @@ def go(
         tracker.record_command("go", flags, lines_returned=total_lines)
     except Exception:
         pass  # Don't fail command if metrics fail
+
+    # Phase 19.7: Track protocol usage and check for refresh hint
+    try:
+        protocol_tracker = get_protocol_tracker()
+        protocol_tracker.record_command("go")
+
+        # Check if refresh hint should be shown (append to output)
+        hint = EfficiencyHints.check_protocol_refresh()
+        if hint:
+            if json_output or CLIConfig.is_machine_mode():
+                # For JSON, append as hint
+                pass  # Already handled by HintCollector in JSON output
+            else:
+                console.print(f"\n[dim]{hint.to_human()}[/dim]")
+    except Exception:
+        pass  # Don't fail command if protocol tracking fails
 
 
 @app.command()
@@ -783,3 +814,14 @@ def orient(
     if mem_parts:
         console.print(f"\nSession Memory loaded: {', '.join(mem_parts)}")
     console.print()
+
+    # Phase 19.7: Track protocol usage and check for refresh hint
+    try:
+        protocol_tracker = get_protocol_tracker()
+        protocol_tracker.record_command("orient")
+
+        hint = EfficiencyHints.check_protocol_refresh()
+        if hint and not json_output:
+            console.print(f"[dim]{hint.to_human()}[/dim]")
+    except Exception:
+        pass  # Don't fail command if protocol tracking fails

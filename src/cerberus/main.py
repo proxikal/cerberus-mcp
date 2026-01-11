@@ -20,7 +20,7 @@ from cerberus.index import (
     read_range,
     semantic_search,
 )
-from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality, memory, workflow, metrics_cmd, docs_validator
+from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality, memory, workflow, metrics_cmd, docs_validator, refresh
 from cerberus.cli.config import CLIConfig
 from cerberus.cli.output import get_console
 from cerberus.cli.common import format_size
@@ -947,6 +947,9 @@ def clean_cmd(
 app.command(name="start")(workflow.start)
 app.command(name="go")(workflow.go)
 app.command(name="orient")(workflow.orient)
+
+# Phase 19.7: Protocol refresh command for AI agent memory restoration
+app.command(name="refresh")(refresh.refresh)
 
 
 if __name__ == "__main__":

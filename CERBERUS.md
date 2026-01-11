@@ -1,5 +1,5 @@
-# CERBERUS v0.19.9 | UACP/1.2 | Machine-First Protocol
-# Arch: AST/SQLite/FAISS | Tests: 586 pass | Updated: 2026-01-10
+# CERBERUS v0.20.0 | UACP/1.2 | Machine-First Protocol
+# Arch: AST/SQLite/FAISS | Tests: 610 pass | Updated: 2026-01-10
 # Mission: 100% Signal, 0% Noise. Deterministic AST > LLM Guesswork.
 
 ---
@@ -330,6 +330,16 @@ cerberus memory import backup.json          # Restore
 cerberus memory extract --from-git          # Extract from git history
 ```
 
+### Protocol Refresh (AI Memory Restoration)
+
+```bash
+cerberus refresh                            # Light refresh (~150 tokens) - critical rules
+cerberus refresh --rules                    # Standard refresh (~300 tokens) - tool selection + rules
+cerberus refresh --full                     # Full CERBERUS.md reload (~1500+ tokens)
+cerberus refresh --status                   # Check protocol tracking state
+cerberus refresh --json                     # Machine-parsable output
+```
+
 ### Watcher
 
 ```bash
@@ -398,6 +408,31 @@ ENFORCEMENT PHASES:
   3. Post-index: Validation health check (validate_index_health)
 ```
 
+### Protocol Refresh Tracking (AI Memory)
+
+```
+PURPOSE: Prevent AI agent protocol degradation over long sessions.
+         Auto-suggests refresh after threshold commands/time.
+
+THRESHOLDS:
+  Commands: 20 cerberus commands without refresh -> hint
+  Time: 10 minutes without refresh -> hint
+  Stale: 30 minutes since last refresh -> hint
+
+STATE FILE: .cerberus_protocol.json (session-based, 1hr expiry)
+
+REFRESH LEVELS:
+  light (~150 tokens): Critical rules only - TOOL SELECTION + FORBIDDEN
+  rules (~300 tokens): Tool selection table + core rules + violations
+  full (~1500+ tokens): Complete CERBERUS.md reload
+
+WHEN TO REFRESH:
+  - After context compaction (agent memory summarized)
+  - When hint suggests "Protocol memory may be degraded"
+  - Before complex multi-file operations
+  - If unsure which cerberus command to use
+```
+
 ### Operational Limits
 
 ```
@@ -457,6 +492,7 @@ P19.3  [METRICS]  Efficiency Metrics & Observability ✓
 P19.4  [DEBT]     Technical Debt Audit: Consolidated duplicates, verified health ✓
 P19.5  [DOCS]     Self-Maintaining Docs: validate-docs command ✓
 P19.6  [BLOAT]    Index Limits: Preflight, Enforcement, Validation (100K default cap) ✓
+P19.7  [REFRESH]  Protocol Refresh: AI memory restoration, auto-hints after 20 cmds ✓
 ```
 
 ---

@@ -289,6 +289,34 @@ class EfficiencyHints:
 
         return None
 
+    @staticmethod
+    def check_protocol_refresh() -> Optional[Hint]:
+        """
+        Check if protocol refresh should be suggested.
+
+        Returns a hint if:
+        - 20+ cerberus commands without refresh
+        - 10+ minutes since session start without refresh
+        - 30+ minutes since last refresh
+        """
+        try:
+            from cerberus.protocol import get_protocol_tracker
+
+            tracker = get_protocol_tracker()
+
+            if tracker.should_suggest_refresh():
+                reason = tracker.get_refresh_reason()
+                return Hint(
+                    type="efficiency",
+                    message=f"Protocol memory may be degraded: {reason}",
+                    alternative="Refresh CERBERUS.md rules to ensure compliance",
+                    command="cerberus refresh",
+                )
+        except Exception as e:
+            logger.debug(f"Error checking protocol refresh: {e}")
+
+        return None
+
 
 class HintCollector:
     """
