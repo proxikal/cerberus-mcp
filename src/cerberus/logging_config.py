@@ -56,9 +56,9 @@ def setup_logging(level="INFO", suppress_console=None, enable_file_logging=None)
         logger.add(
             log_dir / "cerberus.log",
             level="INFO",           # INFO level only (not DEBUG)
-            rotation="10 MB",       # Rotate at 10MB
-            retention="1 day",      # Keep logs for 1 day only
-            compression="gz",       # Compress old logs
+            rotation="100 lines",   # Rotate at 100 lines (~100KB)
+            retention=3,            # Keep only 3 rotated files (~300KB max total)
+            compression="gz",       # Gzip immediately on rotation
             catch=True,
             serialize=True          # JSON for machine parsing (CERBERUS.md mandate)
         )
