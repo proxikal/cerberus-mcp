@@ -3,16 +3,29 @@ import os
 from pathlib import Path
 from loguru import logger
 
-def setup_logging(level="INFO", suppress_console=None):
+# Flag to track if logging has been configured
+_logging_configured = False
+
+
+def setup_logging(level="INFO", suppress_console=None, enable_file_logging=None):
     """
-    Configures the global logger with the Two-Stream Strategy.
-    - Stream 1 (Human): Colorful, readable logs to the console.
-    - Stream 2 (Agent): Structured JSON logs to a rotating file in .logs/ directory.
+    Configures the global logger.
+
+    By default, only console logging is enabled. File logging is opt-in via
+    CERBERUS_FILE_LOGGING=1 environment variable or enable_file_logging=True.
 
     Args:
         level: Logging level (default: INFO)
         suppress_console: If True, suppress console logging. If None, check CERBERUS_MACHINE_MODE env var.
+        enable_file_logging: If True, enable file logging. If None, check CERBERUS_FILE_LOGGING env var.
     """
+    global _logging_configured
+
+    # Only configure once to avoid duplicate handlers
+    if _logging_configured:
+        return
+    _logging_configured = True
+
     logger.remove()
 
     # Check if console logging should be suppressed
@@ -28,19 +41,28 @@ def setup_logging(level="INFO", suppress_console=None):
             colorize=True
         )
 
-    # Stream 2: Machine-readable agent log file in .logs/ directory
-    # Create logs directory if it doesn't exist
-    log_dir = Path(".logs")
-    log_dir.mkdir(exist_ok=True)
+    # Stream 2: File logging is OPT-IN only (disabled by default)
+    # Enable via CERBERUS_FILE_LOGGING=1 or enable_file_logging=True
+    if enable_file_logging is None:
+        enable_file_logging = os.getenv("CERBERUS_FILE_LOGGING", "").lower() in ("1", "true", "yes")
 
-    logger.add(
-        log_dir / "cerberus_agent.log",
-        level="DEBUG",          # Capture all details for the agent
-        rotation="50 MB",       # Rotate at 50MB (increased from 10MB)
-        retention="3 days",     # Keep logs for 3 days (reduced from 7)
-        catch=True,             # Catch errors from logging itself
-        serialize=True          # Natively convert records to JSON
-    )
+    if enable_file_logging:
+        # Use .cerberus/logs/ directory
+        from cerberus.paths import get_paths
+        paths = get_paths()
+        paths.ensure_dirs()
+        log_dir = paths.logs_dir
+
+        logger.add(
+            log_dir / "cerberus.log",
+            level="INFO",           # INFO level only (not DEBUG)
+            rotation="10 MB",       # Rotate at 10MB
+            retention="1 day",      # Keep logs for 1 day only
+            compression="gz",       # Compress old logs
+            catch=True,
+            serialize=False         # Plain text, not JSON (smaller)
+        )
+
 
 # Configure the logger on import (will check env var for machine mode)
 setup_logging()
