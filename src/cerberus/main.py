@@ -24,6 +24,7 @@ from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations,
 from cerberus.cli.config import CLIConfig
 from cerberus.cli.output import get_console
 from cerberus.cli.common import format_size
+from cerberus.paths import get_paths
 
 app = typer.Typer()
 console = get_console()
@@ -211,8 +212,8 @@ def index(
     directory: Path = typer.Argument(
         ".", help="The directory to index.", exists=True, file_okay=False, readable=True
     ),
-    output: Path = typer.Option(
-        "cerberus.db", "--output", "-o", help="Path to save the index file."
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Path to save the index file. Defaults to .cerberus/cerberus.db"
     ),
     no_gitignore: bool = typer.Option(
         False, "--no-gitignore", help="Do not respect .gitignore files."
@@ -239,6 +240,12 @@ def index(
     """
     Runs a scan and writes the results to a SQLite index.
     """
+    # Use new default path if not specified
+    if output is None:
+        paths = get_paths()
+        paths.ensure_dirs()
+        output = paths.index_db
+
     respect_gitignore = not no_gitignore
     scan_result = build_index(
         directory,

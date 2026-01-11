@@ -77,6 +77,7 @@ def get_socket_file_path(project_path: Path) -> Path:
 
 def get_log_file_path(project_path: Path) -> Path:
     """Get log file path for a project."""
-    log_dir = project_path / ".cerberus"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    return log_dir / "watcher.log"
+    from cerberus.paths import get_paths
+    paths = get_paths(project_path)
+    paths.ensure_dirs()
+    return paths.logs_dir / "watcher.log"

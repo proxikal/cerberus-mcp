@@ -1,6 +1,6 @@
 """
 Session persistence for token savings tracking.
-Manages .cerberus_session.json file.
+Manages session file in .cerberus/ directory.
 Phase 16.2: Session state persistence for token tracking.
 """
 import json
@@ -9,8 +9,9 @@ import time
 from pathlib import Path
 from typing import Dict, Any
 
+from cerberus.paths import get_paths
 
-SESSION_FILE = ".cerberus_session.json"
+
 SESSION_TIMEOUT = 3600  # 1 hour (configurable via env)
 
 
@@ -19,7 +20,9 @@ class SessionManager:
 
     def __init__(self):
         """Initialize session manager."""
-        self.session_file = Path(os.getcwd()) / SESSION_FILE
+        paths = get_paths()
+        paths.ensure_dirs()  # Ensure .cerberus directory exists
+        self.session_file = paths.get_session_file()
         self.data = self._load_or_create()
 
     def _load_or_create(self) -> Dict[str, Any]:

@@ -39,18 +39,26 @@ package-lock.json
 # AI Agent Context (local only, not version controlled)
 AGENT_INSTRUCTIONS.md
 
-# Databases and test data
-*.db
+# Databases
 *.db-shm
 *.db-wal
 test_data/
-cerberus_agent.log
-.logs/
+
+# Cerberus runtime directory (all runtime data)
+.cerberus/
+
+# Legacy Cerberus files (pre-consolidation, for backward compatibility)
+cerberus.db
+.cerberus_ledger.db
 .cerberus_session.json
 .cerberus_dev_session.json
-
-# Cerberus runtime files
-.cerberus/history/
 .cerberus_backups/
+vectors.faiss
+vector_id_map.pkl
+
+# Cerberus logs
+cerberus_agent.log
+.logs/
+
+# Misc
 *_ops.json
-PROJECT_PARITY.md

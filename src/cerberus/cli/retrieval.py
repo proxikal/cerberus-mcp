@@ -537,13 +537,17 @@ def search(
     from cerberus.retrieval.utils import estimate_tokens
     from cerberus.retrieval.config import AUTO_SKELETONIZE_CONFIG
     from cerberus.synthesis import get_synthesis_facade
+    from cerberus.paths import find_index_path, get_paths
 
-    # Default to cerberus.db in CWD if not provided
+    # Use centralized path resolution
     if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+        index_path = find_index_path()
+        if index_path is None:
+            paths = get_paths()
+            console.print("[red]Error: Index not found. Checked:[/red]")
+            console.print(f"[dim]  - {paths.index_db}[/dim]")
+            console.print(f"[dim]  - {paths.legacy_index_db}[/dim]")
+            console.print("[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
             raise typer.Exit(code=1)
 
     try:

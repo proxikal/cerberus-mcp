@@ -8,11 +8,14 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from cerberus.paths import get_paths, CerberusPaths
+
+
 class CLIConfig:
     """Configuration for CLI commands"""
 
-    # Default index path
-    DEFAULT_INDEX_NAME = "cerberus.db"
+    # Default index name (filename only, not full path)
+    DEFAULT_INDEX_NAME = CerberusPaths.INDEX_DB_NAME
 
     # Default batch sizes for operations
     DEFAULT_BATCH_SIZE = 100
@@ -98,7 +101,10 @@ class CLIConfig:
 
     @staticmethod
     def get_default_index_path(cwd: Optional[Path] = None) -> Path:
-        """Get the default index path in the current working directory"""
-        if cwd is None:
-            cwd = Path.cwd()
-        return cwd / CLIConfig.DEFAULT_INDEX_NAME
+        """
+        Get the default index path with legacy fallback.
+
+        Checks new .cerberus/ location first, falls back to legacy root location.
+        """
+        paths = get_paths(cwd)
+        return paths.get_index_path()

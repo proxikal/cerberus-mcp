@@ -14,10 +14,18 @@ from rich.table import Table
 
 from cerberus.scanner import scan as perform_scan
 from cerberus.index import build_index
+from cerberus.paths import get_paths
 from .output import get_console
 
 app = typer.Typer()
 console = get_console()
+
+
+def _get_default_index_output() -> Path:
+    """Get default output path for index, ensuring directory exists."""
+    paths = get_paths()
+    paths.ensure_dirs()
+    return paths.index_db
 
 
 @app.command()
@@ -71,8 +79,8 @@ def index(
     directory: Path = typer.Argument(
         ".", help="The directory to index.", exists=True, file_okay=False, readable=True
     ),
-    output: Path = typer.Option(
-        "cerberus.db", "--output", "-o", help="Path to save the index file."
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Path to save the index file. Defaults to .cerberus/cerberus.db"
     ),
     no_gitignore: bool = typer.Option(
         False, "--no-gitignore", help="Do not respect .gitignore files."
@@ -99,6 +107,10 @@ def index(
     """
     Runs a scan and writes the results to a SQLite index.
     """
+    # Use new default path if not specified
+    if output is None:
+        output = _get_default_index_output()
+
     respect_gitignore = not no_gitignore
     scan_result = build_index(
         directory,
