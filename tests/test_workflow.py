@@ -11,6 +11,8 @@ import json
 import pytest
 import tempfile
 from pathlib import Path
+
+pytestmark = pytest.mark.integration
 from typer.testing import CliRunner
 from unittest.mock import patch, MagicMock
 

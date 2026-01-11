@@ -6,6 +6,8 @@ Tests recursive call graphs, type resolution, and import linkage.
 
 import pytest
 from pathlib import Path
+
+pytestmark = [pytest.mark.fast, pytest.mark.phase1]
 from cerberus.graph import build_recursive_call_graph, format_call_graph, get_recursive_callers
 from cerberus.parser.type_resolver import (
     extract_python_types,

@@ -13,6 +13,8 @@ import os
 import pytest
 import tempfile
 import time
+
+pytestmark = pytest.mark.integration  # Uses CliRunner which spawns slow CLI
 from pathlib import Path
 from unittest.mock import patch
 from typer.testing import CliRunner

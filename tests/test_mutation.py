@@ -9,6 +9,8 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
+
+pytestmark = [pytest.mark.fast, pytest.mark.mutation]
 from cerberus.mutation import (
     SymbolLocator,
     CodeEditor,

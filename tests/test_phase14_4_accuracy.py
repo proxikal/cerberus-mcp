@@ -11,6 +11,8 @@ import time
 import json
 from pathlib import Path
 
+pytestmark = pytest.mark.fast
+
 from cerberus.mutation.ledger import DiffLedger
 
 

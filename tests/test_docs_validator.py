@@ -11,6 +11,8 @@ import json
 import pytest
 import tempfile
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 from typer.testing import CliRunner
 
 from cerberus.cli.docs_validator import (

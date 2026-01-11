@@ -8,6 +8,8 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
+
+pytestmark = [pytest.mark.integration, pytest.mark.mutation]
 from cerberus.mutation import MutationFacade
 from cerberus.storage.sqlite_store import SQLiteIndexStore
 from cerberus.index import build_index

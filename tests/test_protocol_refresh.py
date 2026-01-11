@@ -10,6 +10,8 @@ import tempfile
 import time
 import pytest
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 from unittest.mock import patch, MagicMock
 
 from cerberus.protocol.tracker import (

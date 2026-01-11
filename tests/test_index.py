@@ -1,4 +1,9 @@
+"""Unit tests for index operations."""
+
+import pytest
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 
 from cerberus.index import build_index, load_index, JSONIndexStore, compute_stats
 

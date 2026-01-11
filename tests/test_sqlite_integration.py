@@ -7,6 +7,8 @@ Tests the full pipeline: scan → SQLite write → load → query
 import pytest
 from pathlib import Path
 
+pytestmark = pytest.mark.integration
+
 from cerberus.index import build_index, load_index
 from cerberus.storage import ScanResultAdapter, SQLiteIndexStore
 

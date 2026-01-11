@@ -13,6 +13,8 @@ import tempfile
 import time
 import sys
 from pathlib import Path
+
+pytestmark = [pytest.mark.fast, pytest.mark.blueprint]
 from unittest.mock import Mock, patch, MagicMock
 
 from cerberus.blueprint.cache_manager import BlueprintCache

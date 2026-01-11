@@ -4,6 +4,8 @@ Integration tests for Phase 1 using real file scanning.
 
 import pytest
 from pathlib import Path
+
+pytestmark = [pytest.mark.integration, pytest.mark.phase1]
 from cerberus.scanner import scan
 from cerberus.graph import build_recursive_call_graph, format_call_graph
 from cerberus.parser.type_resolver import build_type_map, resolve_type

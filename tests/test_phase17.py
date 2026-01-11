@@ -13,6 +13,8 @@ Tests for Phase 17 changes to get-symbol:
 import pytest
 import json
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 from typer.testing import CliRunner
 from cerberus.main import app
 

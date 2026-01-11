@@ -7,6 +7,8 @@ Tests inheritance resolution, MRO calculation, and context assembly features.
 import pytest
 import tempfile
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 from cerberus.storage.sqlite_store import SQLiteIndexStore
 from cerberus.resolution import (
     resolve_inheritance,

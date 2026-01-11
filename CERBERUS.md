@@ -1,5 +1,5 @@
 # CERBERUS v0.20.0 | UACP/1.2 | Machine-First Protocol
-# Arch: AST/SQLite/FAISS | Tests: 610 pass | Updated: 2026-01-10
+# Arch: AST/SQLite/FAISS | Tests: 606 pass | Updated: 2026-01-11
 # Mission: 100% Signal, 0% Noise. Deterministic AST > LLM Guesswork.
 
 ---

@@ -1,5 +1,10 @@
+"""Unit tests for the parser module."""
+
 import pytest
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
+
 from cerberus.parser import parse_file
 
 TEST_FILES_DIR = Path(__file__).parent / "test_files"

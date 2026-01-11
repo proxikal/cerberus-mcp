@@ -10,6 +10,8 @@ Tests for:
 import pytest
 import tempfile
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 from unittest.mock import patch, MagicMock
 
 from cerberus.cli.hints import (

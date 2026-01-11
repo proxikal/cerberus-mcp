@@ -6,6 +6,8 @@ Tests BM25 search, vector search, ranking fusion, and query detection.
 
 import pytest
 from pathlib import Path
+
+pytestmark = [pytest.mark.fast, pytest.mark.phase3]
 from cerberus.schemas import CodeSymbol, SearchResult, CodeSnippet
 from cerberus.retrieval.bm25_search import BM25Index
 from cerberus.retrieval.hybrid_ranker import (
@@ -13,7 +15,6 @@ from cerberus.retrieval.hybrid_ranker import (
     reciprocal_rank_fusion,
     weighted_score_fusion,
 )
-
 
 class TestBM25Search:
     """Test BM25 keyword search."""
@@ -118,7 +119,6 @@ class TestBM25Search:
 
         assert len(results) == 0
 
-
 class TestQueryTypeDetection:
     """Test query type auto-detection."""
 
@@ -148,7 +148,6 @@ class TestQueryTypeDetection:
         """Test long natural language queries as semantic."""
         query = "what is the implementation of user authentication and authorization"
         assert detect_query_type(query) == "semantic"
-
 
 class TestRankingFusion:
     """Test ranking fusion methods."""
@@ -266,43 +265,3 @@ class TestRankingFusion:
         fused2 = reciprocal_rank_fusion(results, empty)
         assert len(fused2) == 1
         assert fused2[0].match_type == "keyword"
-
-
-if __name__ == "__main__":
-    # Run tests manually (if pytest not available)
-    import sys
-
-    test_classes = [
-        TestBM25Search,
-        TestQueryTypeDetection,
-        TestRankingFusion,
-    ]
-
-    total_tests = 0
-    passed_tests = 0
-
-    for test_class in test_classes:
-        print(f"\n{'=' * 60}")
-        print(f"Testing: {test_class.__name__}")
-        print('=' * 60)
-
-        instance = test_class()
-        methods = [m for m in dir(instance) if m.startswith("test_")]
-
-        for method_name in methods:
-            total_tests += 1
-            try:
-                method = getattr(instance, method_name)
-                method()
-                print(f"✓ {method_name}")
-                passed_tests += 1
-            except AssertionError as e:
-                print(f"✗ {method_name}: {e}")
-            except Exception as e:
-                print(f"✗ {method_name}: ERROR: {e}")
-
-    print(f"\n{'=' * 60}")
-    print(f"Results: {passed_tests}/{total_tests} tests passed")
-    print('=' * 60)
-
-    sys.exit(0 if passed_tests == total_tests else 1)

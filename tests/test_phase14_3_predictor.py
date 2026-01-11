@@ -9,6 +9,8 @@ import sqlite3
 import tempfile
 from pathlib import Path
 
+pytestmark = pytest.mark.fast
+
 from cerberus.quality.predictor import PredictionEngine, Prediction, PredictionStats
 
 

@@ -8,6 +8,8 @@ import os
 import tempfile
 import pytest
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 from unittest.mock import patch, MagicMock
 
 from cerberus.limits.config import (

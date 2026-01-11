@@ -1,7 +1,12 @@
+"""Unit tests for doctor command."""
+
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
+
+pytestmark = pytest.mark.fast
 
 from cerberus.main import app
 
