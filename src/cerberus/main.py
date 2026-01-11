@@ -797,6 +797,17 @@ def clean_cmd(
             "description": "Cache directory (logs, backups, watcher data)"
         })
 
+    # Legacy .logs directory (pre-Phase 19 log bloat fix)
+    legacy_logs_dir = project_path / ".logs"
+    if legacy_logs_dir.exists():
+        size = sum(f.stat().st_size for f in legacy_logs_dir.rglob('*') if f.is_file())
+        items_to_clean.append({
+            "path": legacy_logs_dir,
+            "type": "directory",
+            "size": size,
+            "description": "Legacy logs directory (pre-consolidation)"
+        })
+
     # Main index database
     if not preserve_index:
         index_db = project_path / "cerberus.db"
