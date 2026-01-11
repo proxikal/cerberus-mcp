@@ -1,4 +1,4 @@
-# CERBERUS v0.19.5 | UACP/1.2 | Machine-First Protocol
+# CERBERUS v0.19.6 | UACP/1.2 | Machine-First Protocol
 # Arch: AST/SQLite/FAISS | Tests: 562 pass | Updated: 2026-01-10
 
 ---
@@ -113,6 +113,28 @@ FORMAT: Unambiguous delimiters, structured data, strict schemas
 🟡 MEDIUM: Warning shown, mutation allowed
 🔴 HIGH: Mutation BLOCKED (use --force to override)
 Factors: Reference count, stability score, test coverage
+```
+
+### Risk Prevention [AGENT PRE-FLIGHT]
+
+```
+BEFORE IMPLEMENTING, WARN DEVELOPER IF:
+  1. FILE_LOGGING: Adding always-on file logging or disk writes
+  2. UNBOUNDED_STORAGE: Caching/storage without size limits or rotation
+  3. IMPORT_SIDE_EFFECTS: Code that runs on every import (not lazy)
+  4. BACKGROUND_PROCESSES: Daemons/watchers without auto-shutdown
+  5. ROOT_FILE_CREATION: Creating files outside .cerberus/ directory
+  6. LARGE_DEFAULTS: Default values >1MB or >1000 items
+
+WARNING FORMAT (context-light):
+  ⚠️ RISK: [CATEGORY] - [1-line description]
+  IMPACT: [potential consequence]
+  SAFER: [alternative approach]
+  PROCEED? [wait for user confirmation]
+
+HISTORICAL ISSUES (learn from past):
+  - Phase 17: Logging on import → 3.3GB bloat
+  - Always validate: rotation limits, retention policies, lazy init
 ```
 
 ---
