@@ -33,6 +33,10 @@ class DependencyOverlay:
         """
         Query dependencies for a symbol with confidence scores.
 
+        Phase 16.4: Fixed to query by line range instead of source_symbol.
+        symbol_references stores the receiver (e.g., 'self') as source_symbol,
+        not the function/method name.
+
         Args:
             symbol: CodeSymbol to get dependencies for
 
@@ -40,7 +44,8 @@ class DependencyOverlay:
             List of DependencyInfo objects with confidence scores
         """
         try:
-            # Query symbol_references table
+            # Query symbol_references by file and line range
+            # This finds all references within this symbol's definition
             cursor = self.conn.execute(
                 """
                 SELECT DISTINCT
@@ -50,10 +55,12 @@ class DependencyOverlay:
                     resolution_method,
                     reference_type
                 FROM symbol_references
-                WHERE source_file = ? AND source_symbol = ?
+                WHERE source_file = ?
+                  AND source_line >= ?
+                  AND source_line <= ?
                 ORDER BY confidence DESC, target_symbol ASC
                 """,
-                (symbol.file_path, symbol.name)
+                (symbol.file_path, symbol.start_line, symbol.end_line)
             )
 
             dependencies = []

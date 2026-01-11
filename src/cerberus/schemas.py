@@ -23,6 +23,7 @@ class CodeSymbol(BaseModel):
     # Phase 1.2: Type-aware resolution
     return_type: Optional[str] = None  # Return type annotation/hint
     parameters: Optional[List[str]] = None  # Parameter names
+    parameter_types: Optional[Dict[str, str]] = None  # Phase 16.4: param_name -> type_name
     parent_class: Optional[str] = None  # For methods, the containing class
 
 class ImportReference(BaseModel):

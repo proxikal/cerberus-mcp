@@ -16,6 +16,7 @@ from rich.markup import escape
 from cerberus.logging_config import logger
 from cerberus.agent_session import display_session_summary, get_session_tracker, clear_session
 from .output import get_console
+from .common import format_size
 
 app = typer.Typer()
 console = get_console()
@@ -658,15 +659,6 @@ def clean_cmd(
 
     # Calculate total size
     total_size = sum(item["size"] for item in items_to_clean)
-
-    # Format size for display
-    def format_size(size_bytes):
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        else:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
 
     # Dry run mode
     if dry_run:

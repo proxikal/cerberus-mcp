@@ -264,7 +264,7 @@ class CycleDetector:
             # Query dependencies
             query = """
                 SELECT DISTINCT source_file, target_file
-                FROM dependencies
+                FROM symbol_references
                 WHERE target_file IS NOT NULL
             """
             params = ()
@@ -300,7 +300,7 @@ class CycleDetector:
             # Query function calls from dependencies
             query = """
                 SELECT DISTINCT source_symbol, target_symbol
-                FROM dependencies
+                FROM symbol_references
                 WHERE reference_type IN ('method_call', 'function_call')
             """
             params = ()
@@ -337,7 +337,7 @@ class CycleDetector:
             # Query inheritance relationships
             query = """
                 SELECT DISTINCT source_symbol, target_symbol
-                FROM dependencies
+                FROM symbol_references
                 WHERE reference_type = 'inherits_from'
             """
             params = ()

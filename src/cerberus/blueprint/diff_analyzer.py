@@ -134,6 +134,15 @@ class DiffAnalyzer:
                 # Create unique key
                 key = (name, sym_type, parent_class or "")
 
+                # Parse parameters from JSON string if needed
+                import json as json_lib
+                params_list = None
+                if parameters:
+                    try:
+                        params_list = json_lib.loads(parameters) if isinstance(parameters, str) else parameters
+                    except (json_lib.JSONDecodeError, TypeError):
+                        params_list = None
+
                 symbols[key] = CodeSymbol(
                     name=name,
                     type=sym_type,
@@ -142,7 +151,7 @@ class DiffAnalyzer:
                     end_line=end_line,
                     signature=signature,
                     return_type=return_type,
-                    parameters=parameters,
+                    parameters=params_list,
                     parent_class=parent_class
                 )
 
@@ -185,26 +194,28 @@ class DiffAnalyzer:
             file_content = result.stdout
 
             # Parse the content to extract symbols
-            # Use Cerberus parser
-            from cerberus.parser import get_parser
+            # Use Cerberus parsers directly
+            from cerberus.parser.python_parser import parse_python_file
+            from cerberus.parser.javascript_parser import parse_javascript_file
+            from cerberus.parser.typescript_parser import parse_typescript_file
+            from cerberus.parser.go_parser import parse_go_file
 
             # Determine language from file extension
             extension = abs_file_path.suffix
-            lang_map = {
-                ".py": "python",
-                ".js": "javascript",
-                ".ts": "typescript",
-                ".go": "go"
+            parser_map = {
+                ".py": parse_python_file,
+                ".js": parse_javascript_file,
+                ".ts": parse_typescript_file,
+                ".go": parse_go_file
             }
-            language = lang_map.get(extension)
+            parser_func = parser_map.get(extension)
 
-            if not language:
+            if not parser_func:
                 logger.warning(f"Unsupported file extension: {extension}")
                 return {}
 
             # Parse the old version
-            parser = get_parser(language)
-            parsed_symbols = parser.parse(file_content, str(abs_file_path))
+            parsed_symbols = parser_func(abs_file_path, file_content)
 
             # Convert to dict with same key format
             symbols = {}

@@ -26,9 +26,11 @@ from cerberus.schemas import (
 # Check if FAISS is actually available (not just if the module can be imported)
 try:
     import faiss  # Try to import faiss directly
+    from cerberus.storage.faiss_store import FAISSVectorStore
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
+    FAISSVectorStore = None  # Placeholder for type hints
 
 # Skip marker for FAISS tests
 requires_faiss = pytest.mark.skipif(

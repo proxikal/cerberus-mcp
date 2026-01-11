@@ -73,15 +73,92 @@ class TypeTracker:
                     # The imported symbol IS the type (class/function definition)
                     self._type_map[key] = link.definition_symbol
 
-        logger.debug(f"Type map built: {len(self._type_map)} type mappings")
-
-        # Build symbol lookup cache
+        # Build symbol lookup cache FIRST (needed for Strategy 3)
         for symbol in self.store.query_symbols():
             name = symbol.name
             if name not in self._symbol_by_name:
                 self._symbol_by_name[name] = []
             self._symbol_by_name[name].append(symbol)
 
+        # Strategy 3 (Phase 16.3): Map 'self' to containing class for method resolution
+        # This dramatically improves resolution of self.method() calls
+        self_mappings = 0
+        for symbol in self.store.query_symbols():
+            if symbol.type == "method" and symbol.parent_class:
+                # Map 'self' in this file to the parent class
+                key = (symbol.file_path, "self")
+                # Only set if not already set (prefer explicit annotations)
+                if key not in self._type_map:
+                    self._type_map[key] = symbol.parent_class
+                    self_mappings += 1
+
+        # Strategy 4 (Phase 16.4): Module imports for unresolved external modules
+        # Maps imported module names to themselves to enable recognition as valid receivers
+        # This enables resolution of calls like datetime.now(), os.path.exists()
+        # IMPORTANT: Only track TRUE module imports (import X), not symbol imports (from X import Y)
+        module_mappings = 0
+        self._module_imports: set = set()  # Track which symbols are true module imports
+        for link in self.store.query_import_links():
+            for imported_symbol in link.imported_symbols:
+                key = (link.importer_file, imported_symbol)
+                # Check if this is a true module import (symbol == module base name)
+                # For "import datetime" -> module="datetime", symbol="datetime" -> TRUE module
+                # For "import os.path" -> module="os.path", symbol="path" -> TRUE module
+                # For "from typing import List" -> module="typing", symbol="List" -> NOT a module
+                module_base = link.imported_module.split(".")[-1]
+                is_module_import = (imported_symbol == module_base)
+
+                if is_module_import:
+                    self._module_imports.add(key)
+
+                # Only set if not already set (prefer resolved imports)
+                if key not in self._type_map:
+                    self._type_map[key] = imported_symbol
+                    module_mappings += 1
+
+        # Strategy 5 (Phase 16.4): Parameter type annotations from function/method definitions
+        # Maps parameter names to their annotated types within the function's file
+        # This enables resolution of calls like: def foo(x: SomeClass): x.method()
+        param_mappings = 0
+        for symbol in self.store.query_symbols():
+            if symbol.type in ("function", "method") and symbol.parameter_types:
+                for param_name, param_type in symbol.parameter_types.items():
+                    # Skip 'self' as it's already handled by Strategy 3
+                    if param_name == "self":
+                        continue
+                    key = (symbol.file_path, param_name)
+                    # Only set if not already set (prefer earlier strategies)
+                    if key not in self._type_map:
+                        base_type = self._extract_base_type(param_type)
+                        self._type_map[key] = base_type
+                        param_mappings += 1
+
+        # Strategy 6 (Phase 16.4): Return type propagation from function calls
+        # When we see `x = some_function()` and some_function has `-> ReturnType`
+        # We propagate ReturnType to x, enabling `x.method()` resolution
+        return_type_mappings = 0
+        for type_info in self.store.query_type_infos():
+            if type_info.inferred_type:
+                key = (type_info.file_path, type_info.name)
+                # Skip if already mapped (e.g., via type annotation)
+                if key in self._type_map:
+                    continue
+
+                # Check if inferred_type refers to a function (not a class)
+                candidates = self._symbol_by_name.get(type_info.inferred_type, [])
+                for candidate in candidates:
+                    if candidate.type == "function" and candidate.return_type:
+                        # Use function's return type
+                        return_type = self._extract_base_type(candidate.return_type)
+                        self._type_map[key] = return_type
+                        return_type_mappings += 1
+                        break
+                    elif candidate.type == "class":
+                        # It's a class instantiation, use the class name directly
+                        # (This is already handled, but let's be explicit)
+                        break
+
+        logger.debug(f"Type map built: {len(self._type_map)} type mappings (+{self_mappings} 'self', +{module_mappings} module, +{param_mappings} param, +{return_type_mappings} return)")
         logger.debug(f"Symbol cache built: {len(self._symbol_by_name)} unique symbol names")
 
     def _extract_base_type(self, type_str: str) -> str:
@@ -107,16 +184,29 @@ class TypeTracker:
 
         # Extract from generics like List[X], Optional[X]
         if "[" in type_str:
-            # Get the inner type for Optional, List, etc.
-            if type_str.startswith(("Optional[", "Union[")):
-                inner = type_str[type_str.index("[") + 1 : type_str.rindex("]")]
-                # Take first type in Union
-                if "," in inner:
-                    inner = inner.split(",")[0].strip()
-                return self._extract_base_type(inner)
-            else:
-                # For List[X], Dict[X,Y], return the container type
-                return type_str[:type_str.index("[")]
+            # Phase 16.3: Safe extraction with malformed type handling
+            try:
+                # Get the inner type for Optional, List, etc.
+                if type_str.startswith(("Optional[", "Union[")):
+                    # Safely find matching brackets
+                    if "]" not in type_str:
+                        # Malformed type annotation, return as-is
+                        logger.debug(f"Malformed type annotation (no closing bracket): {type_str}")
+                        return type_str.split("[")[0]  # Return container type
+
+                    inner = type_str[type_str.index("[") + 1 : type_str.rindex("]")]
+                    # Take first type in Union
+                    if "," in inner:
+                        inner = inner.split(",")[0].strip()
+                    return self._extract_base_type(inner)
+                else:
+                    # For List[X], Dict[X,Y], return the container type
+                    return type_str[:type_str.index("[")]
+            except (ValueError, IndexError) as e:
+                # Malformed type annotation, log and return best effort
+                logger.debug(f"Failed to parse type annotation '{type_str}': {e}")
+                # Return first word before "[" as fallback
+                return type_str.split("[")[0].strip()
 
         # Extract class name from module path
         if "." in type_str:
@@ -196,6 +286,19 @@ class TypeTracker:
         ]
 
         if not class_candidates:
+            # Phase 16.4: Module-level call fallback
+            # Only create module_import reference if this is a TRUE module import
+            # (e.g., "import datetime" not "from typing import List")
+            # This prevents false positives for type annotations like List, Dict, etc.
+            receiver_key = (call.caller_file, call.receiver)
+            if receiver_key in self._module_imports:
+                return (
+                    None,  # target_file unknown (external module)
+                    call.method,
+                    receiver_type,  # target_type is the module/import name
+                    CONFIDENCE_THRESHOLDS["heuristic"],
+                    "module_import"
+                )
             return None
 
         # Use the first class definition (could be improved with better disambiguation)

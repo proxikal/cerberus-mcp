@@ -20,9 +20,10 @@ from cerberus.index import (
     read_range,
     semantic_search,
 )
-from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality
+from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality, memory, workflow, metrics_cmd, docs_validator
 from cerberus.cli.config import CLIConfig
 from cerberus.cli.output import get_console
+from cerberus.cli.common import format_size
 
 app = typer.Typer()
 console = get_console()
@@ -92,6 +93,13 @@ app.add_typer(symbolic.app, name="symbolic", help="Symbolic intelligence command
 app.add_typer(dogfood.app, name="dogfood", help="Dogfooding commands (read, inspect, tree, ls, grep)")
 app.add_typer(mutations.app, name="mutations", help="Code mutation commands (edit, delete, insert, batch-edit)")
 app.add_typer(quality.app, name="quality", help="Quality commands (style-check, style-fix) - Phase 14.1")
+app.add_typer(memory.app, name="memory", help="Session Memory commands (learn, show, context) - Phase 18")
+app.add_typer(workflow.app, name="workflow", help="Streamlined workflow commands (start, go, orient) - Phase 19")
+app.add_typer(metrics_cmd.app, name="metrics", help="Efficiency metrics and reports - Phase 19.3")
+
+# Register validate-docs as a top-level command
+app.command(name="validate-docs")(docs_validator.validate_docs_cmd)
+
 
 @app.command()
 def hello():
@@ -832,15 +840,6 @@ def clean_cmd(
     # Calculate total size
     total_size = sum(item["size"] for item in items_to_clean)
 
-    # Format size for display
-    def format_size(size_bytes):
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        else:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
-
     # Dry run mode
     if dry_run:
         if json_output:
@@ -923,6 +922,13 @@ def clean_cmd(
         if failed_items:
             console.print(f"[bold red]✗ Failed to delete {len(failed_items)} items[/bold red]")
             raise typer.Exit(code=1)
+
+
+# Phase 19.1: Add streamlined workflow commands as top-level commands
+# These are aliases to the workflow module commands for convenience
+app.command(name="start")(workflow.start)
+app.command(name="go")(workflow.go)
+app.command(name="orient")(workflow.orient)
 
 
 if __name__ == "__main__":

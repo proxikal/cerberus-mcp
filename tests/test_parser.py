@@ -23,11 +23,11 @@ def test_parse_python_file():
     assert symbol_map["MyClass"].start_line == 5
     
     assert "__init__" in symbol_map
-    assert symbol_map["__init__"].type == "function"
+    assert symbol_map["__init__"].type == "method"  # Methods inside class are 'method' type
     assert symbol_map["__init__"].start_line == 7
 
     assert "greet" in symbol_map
-    assert symbol_map["greet"].type == "function"
+    assert symbol_map["greet"].type == "method"  # Methods inside class are 'method' type
     assert symbol_map["greet"].start_line == 10
     
     assert "top_level_function" in symbol_map

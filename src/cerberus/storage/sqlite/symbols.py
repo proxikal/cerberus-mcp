@@ -97,11 +97,12 @@ class SQLiteSymbolsOperations:
                 for s in chunk:
                     cursor = _conn.execute("""
                         INSERT INTO symbols (name, type, file_path, start_line, end_line,
-                                           signature, return_type, parameters, parent_class)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                           signature, return_type, parameters, parameter_types, parent_class)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (s.name, s.type, s.file_path, s.start_line, s.end_line,
                          s.signature, s.return_type,
                          json.dumps(s.parameters) if s.parameters else None,
+                         json.dumps(s.parameter_types) if s.parameter_types else None,
                          s.parent_class))
                     chunk_ids.append(cursor.lastrowid)
 
@@ -259,6 +260,7 @@ class SQLiteSymbolsOperations:
                         signature=row['signature'],
                         return_type=row['return_type'],
                         parameters=json.loads(row['parameters']) if row['parameters'] else None,
+                        parameter_types=json.loads(row['parameter_types']) if row['parameter_types'] else None,
                         parent_class=row['parent_class'],
                     )
         finally:
@@ -293,7 +295,7 @@ class SQLiteSymbolsOperations:
             fts_query = """
                 SELECT
                     s.id, s.name, s.type, s.file_path, s.start_line, s.end_line,
-                    s.signature, s.return_type, s.parameters, s.parent_class,
+                    s.signature, s.return_type, s.parameters, s.parameter_types, s.parent_class,
                     -fts.rank as score
                 FROM symbols_fts fts
                 JOIN symbols s ON s.id = fts.rowid
@@ -320,6 +322,7 @@ class SQLiteSymbolsOperations:
                         signature=row['signature'],
                         return_type=row['return_type'],
                         parameters=json.loads(row['parameters']) if row['parameters'] else None,
+                        parameter_types=json.loads(row['parameter_types']) if row['parameter_types'] else None,
                         parent_class=row['parent_class'],
                     )
                     # Normalize score to 0-1 range (FTS5 scores are typically 0-10)
@@ -362,6 +365,7 @@ class SQLiteSymbolsOperations:
                     signature=row['signature'],
                     return_type=row['return_type'],
                     parameters=json.loads(row['parameters']) if row['parameters'] else None,
+                    parameter_types=json.loads(row['parameter_types']) if row['parameter_types'] else None,
                     parent_class=row['parent_class'],
                 )
             return None

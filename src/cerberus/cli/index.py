@@ -84,7 +84,7 @@ def index(
         False, "--incremental", help="Reuse existing index to skip unchanged files."
     ),
     store_embeddings: bool = typer.Option(
-        False, "--store-embeddings/--no-store-embeddings", help="Persist embeddings in the index for faster search."
+        True, "--store-embeddings/--no-store-embeddings", help="Persist embeddings in the index for faster semantic search. Default: enabled."
     ),
     model_name: str = typer.Option(
         "all-MiniLM-L6-v2", "--model-name", help="Embedding model name when storing embeddings."

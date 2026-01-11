@@ -107,12 +107,19 @@ def extract_import_links(file_path: Path, content: str) -> List[ImportLink]:
         # import X as Y
         for match in PY_IMPORT_AS.finditer(content):
             module = match.group(1)
+            alias = match.group(2)  # May be None if no alias
             line_num = content.count("\n", 0, match.start()) + 1
+
+            # Phase 16.4: Include module/alias name in imported_symbols
+            # For "import datetime" -> use "datetime" (base module name)
+            # For "import datetime as dt" -> use "dt" (the alias)
+            # This enables resolution of module-level calls like datetime.now()
+            symbol_name = alias if alias else module.split(".")[-1]
 
             import_links.append(ImportLink(
                 importer_file=file_str,
                 imported_module=module,
-                imported_symbols=[],  # Full module import
+                imported_symbols=[symbol_name],  # Module/alias for method resolution
                 import_line=line_num,
             ))
 

@@ -75,3 +75,21 @@ def format_file_location(file_path: str, line: Optional[int] = None) -> str:
     if line is not None:
         return f"{file_path}:{line}"
     return file_path
+
+
+def format_size(size_bytes: int) -> str:
+    """
+    Format byte size to human-readable string.
+
+    Args:
+        size_bytes: Size in bytes
+
+    Returns:
+        Formatted string like "1.5 KB" or "2.3 MB"
+    """
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"

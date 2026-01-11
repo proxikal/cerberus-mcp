@@ -121,6 +121,7 @@ class BlueprintFormatter:
             result["dependencies"] = [
                 {
                     "target": dep.target,
+                    "target_file": dep.target_file,  # Phase 16.4: Required for hydration
                     "confidence": dep.confidence,
                     "resolution_method": dep.resolution_method,
                     "dependency_type": dep.dependency_type  # Phase 13.5
@@ -162,6 +163,12 @@ class BlueprintFormatter:
                 "level": overlay.stability.level,
                 "factors": overlay.stability.factors
             }
+
+        # Phase 13.3: Cycle detection and diff annotations
+        if overlay.in_cycle:
+            result["in_cycle"] = overlay.in_cycle
+        if overlay.cycle_info:
+            result["annotation"] = overlay.cycle_info
 
         # Add children (methods for classes)
         if node.children:
