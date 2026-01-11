@@ -42,7 +42,17 @@ AGENT_INSTRUCTIONS.md
 # Databases
 *.db-shm
 *.db-wal
-test_data/
+
+# Test/Coverage artifacts
+.coverage
+coverage.json
+htmlcov/
+.pytest_cache/
+tests_output.log
+
+# Test data (large benchmark repos)
+test_data/tensorflow/
+test_data/benchmark_report.json
 
 # Cerberus runtime directory (all runtime data)
 .cerberus/
