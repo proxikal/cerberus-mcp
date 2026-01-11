@@ -25,3 +25,33 @@ class IndexCorruptionError(CerberusError):
 class ConfigError(CerberusError):
     """Raised for configuration-related problems."""
     pass
+
+
+class IndexLimitExceeded(CerberusError):
+    """Raised when an index limit is exceeded."""
+
+    def __init__(
+        self,
+        limit_name: str,
+        current: int,
+        maximum: int,
+        remediation: str = "",
+    ):
+        self.limit_name = limit_name
+        self.current = current
+        self.maximum = maximum
+        self.remediation = remediation
+        message = (
+            f"Index limit '{limit_name}' exceeded: {current:,} > {maximum:,}."
+        )
+        if remediation:
+            message += f" {remediation}"
+        super().__init__(message)
+
+
+class PreflightError(CerberusError):
+    """Raised when pre-flight checks fail."""
+
+    def __init__(self, message: str, checks: list = None):
+        self.checks = checks or []
+        super().__init__(message)

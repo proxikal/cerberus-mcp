@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from cerberus.logging_config import logger
+from cerberus.limits import run_preflight_checks, validate_index_health, get_limits_config
 
 
 def _check_index_health(index_path: Path) -> Dict:
@@ -132,6 +133,91 @@ def _check_permissions() -> Dict:
     return {"name": "permissions", "status": "ok", "detail": "build/vendor writable", "remediation": ""}
 
 
+def _check_disk_space(target_path: Optional[Path] = None) -> Dict:
+    """
+    Check available disk space using limits preflight.
+
+    Uses the configured minimum free disk space from limits config.
+    """
+    target = target_path or Path.cwd()
+
+    try:
+        preflight = run_preflight_checks(target)
+
+        # Find the disk_space check
+        disk_check = next(
+            (c for c in preflight.checks if c.get("name") == "disk_space"),
+            None
+        )
+
+        if disk_check:
+            return disk_check
+
+        # Fallback if disk_space check not in results
+        return {
+            "name": "disk_space",
+            "status": preflight.status,
+            "detail": preflight.summary,
+            "remediation": "",
+        }
+
+    except Exception as exc:
+        return {
+            "name": "disk_space",
+            "status": "warn",
+            "detail": f"Could not check disk space: {exc}",
+            "remediation": "",
+        }
+
+
+def _check_index_bloat(index_path: Path) -> Dict:
+    """
+    Check index size and symbol counts against limits.
+
+    Uses validate_index_health from limits module.
+    """
+    try:
+        validation = validate_index_health(index_path)
+
+        # Summarize the validation checks
+        checks_summary = []
+        for check in validation.checks:
+            if check.get("status") != "ok":
+                checks_summary.append(f"{check['name']}: {check.get('detail', 'issue')}")
+
+        if validation.status == "fail":
+            return {
+                "name": "index_bloat",
+                "status": "fail",
+                "detail": "; ".join(checks_summary) if checks_summary else validation.summary,
+                "remediation": "Reduce scope with --ext filter or increase limits via env vars",
+            }
+        elif validation.status == "warn":
+            return {
+                "name": "index_bloat",
+                "status": "warn",
+                "detail": "; ".join(checks_summary) if checks_summary else validation.summary,
+                "remediation": "Monitor growth; consider scope reduction",
+            }
+
+        # Get current limits for display
+        config = get_limits_config()
+        return {
+            "name": "index_bloat",
+            "status": "ok",
+            "detail": f"Index within limits (max {config.max_total_symbols:,} symbols, {config.max_index_size_mb}MB)",
+            "remediation": "",
+        }
+
+    except Exception as exc:
+        return {
+            "name": "index_bloat",
+            "status": "warn",
+            "detail": f"Could not validate index bloat: {exc}",
+            "remediation": "",
+        }
+
+
 def run_diagnostics(index_path: Optional[Path] = None) -> List[Dict]:
     """
     Run all diagnostic checks.
@@ -142,10 +228,17 @@ def run_diagnostics(index_path: Optional[Path] = None) -> List[Dict]:
     Returns:
         List of diagnostic results.
     """
-    checks = [_check_grammars(), _check_embeddings(), _check_faiss(), _check_permissions()]
+    checks = [
+        _check_grammars(),
+        _check_embeddings(),
+        _check_faiss(),
+        _check_permissions(),
+        _check_disk_space(),  # Bloat protection: disk space
+    ]
 
     if index_path:
         checks.append(_check_index_health(index_path))
+        checks.append(_check_index_bloat(index_path))  # Bloat protection: index limits
 
     logger.info("Doctor diagnostics completed.")
     return checks

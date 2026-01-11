@@ -1,5 +1,6 @@
-# CERBERUS v0.19.6 | UACP/1.2 | Machine-First Protocol
-# Arch: AST/SQLite/FAISS | Tests: 562 pass | Updated: 2026-01-10
+# CERBERUS v0.19.9 | UACP/1.2 | Machine-First Protocol
+# Arch: AST/SQLite/FAISS | Tests: 586 pass | Updated: 2026-01-10
+# Mission: 100% Signal, 0% Noise. Deterministic AST > LLM Guesswork.
 
 ---
 
@@ -8,6 +9,9 @@
 ```
 PURPOSE: This section governs how AI agents interact with and maintain CERBERUS.md.
          Violation of these rules degrades the protocol for all future agents.
+
+IDENTITY: You are an AI agent whose ONLY interface to code is Cerberus commands.
+FIDELITY: This file is the single source of truth. Follow every rule without exception.
 
 DOCUMENT_RULES:
   1. SINGLE_SOURCE: This file is the ONLY source of truth for Cerberus usage
@@ -45,12 +49,47 @@ VERSIONING:
 
 ---
 
-## PRIME DIRECTIVE
+## ARCHITECTURE
 
 ```
-MISSION: 100% Signal, 0% Noise. Deterministic AST > LLM Guesswork.
-IDENTITY: You are an AI agent whose ONLY interface to code is Cerberus commands.
-FIDELITY: This file is the single source of truth. Follow every rule without exception.
+STARTUP (cerberus start):
+  Index check/build → Daemon start → Watcher start → Memory load
+  All components auto-initialize. Agents just run commands.
+
+DATA FLOW:
+  Agent → CLI → Daemon (if running) → Index → Response
+              ↓
+         Thin client auto-routes to daemon when available
+         Falls back to direct execution if daemon unavailable
+
+COMPONENTS:
+┌─────────────────────────────────────────────────────────────────────┐
+│ INDEX: SQLite (symbols/metadata) + FAISS (embeddings)              │
+│   - Location: .cerberus/                                           │
+│   - Build: cerberus index .                                        │
+│   - Update: cerberus update (incremental, git-aware)               │
+├─────────────────────────────────────────────────────────────────────┤
+│ DAEMON: Background server for zero-latency queries                 │
+│   - Auto-starts via cerberus start                                 │
+│   - RPC protocol for structured communication                      │
+│   - Manages sessions internally (no agent action needed)           │
+├─────────────────────────────────────────────────────────────────────┤
+│ WATCHER: File system monitor                                       │
+│   - Triggers re-index on file changes                              │
+│   - Control: cerberus watcher start|stop|status                    │
+│   - Auto-stops on high CPU/log bloat (see CONFIGURATION)           │
+├─────────────────────────────────────────────────────────────────────┤
+│ SESSIONS: Automatic agent tracking (internal to daemon)            │
+│   - Created automatically when daemon starts                       │
+│   - Timeout: CERBERUS_SESSION_TIMEOUT env var (default: 3600s)     │
+│   - Tracks: query count, activity, idle cleanup                    │
+├─────────────────────────────────────────────────────────────────────┤
+│ MEMORY: Persistent developer preferences (Phase 18)                │
+│   - Profile: coding style, patterns                                │
+│   - Decisions: architectural choices with rationale                │
+│   - Corrections: learned mistakes to avoid                         │
+│   - Access: cerberus memory context                                │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -143,7 +182,7 @@ HISTORICAL ISSUES (learn from past):
 
 ```
 RECOMMENDED SEQUENCE:
-1. cerberus start              # Initialize session, check health, load memory
+1. cerberus start              # Initialize (see ARCHITECTURE for what this does)
 2. cerberus orient [dir]       # Understand project structure
 3. cerberus go <file>          # Analyze specific file, get line numbers
 4. Direct Read lines X-Y       # Get actual code for editing
@@ -162,26 +201,27 @@ ALTERNATIVE (without streamlined commands):
 
 ## COMMAND REFERENCE
 
-### Session Management
+### Session & Lifecycle
 
 ```bash
-cerberus start                              # Initialize session (index + watcher + memory)
+cerberus start                              # Initialize session (index + daemon + watcher + memory)
 cerberus start --json                       # Machine-parsable status
-cerberus orient [dir]                       # Project overview, hot spots, recent changes
-cerberus orient --json                      # Machine-parsable
-cerberus watcher status                     # Check if watcher running
-cerberus watcher start                      # Start file watcher (only if not running)
-cerberus watcher stop                       # Stop watcher
-cerberus watcher health --json              # Health metrics (log size, CPU)
-cerberus clean --preserve-index             # Clean cache, keep index
 cerberus update                             # Reindex changed files
+cerberus clean --preserve-index             # Clean cache, keep index
 cerberus validate-docs                      # Validate CERBERUS.md sync
 cerberus validate-docs --json --strict      # Machine output, strict mode
 ```
 
-### Exploration (Blueprint/Search)
+### Orientation & Exploration
 
 ```bash
+# Quick orientation
+cerberus orient [dir]                       # Project overview, hot spots, recent changes
+cerberus orient --json                      # Machine-parsable
+cerberus go <file>                          # Blueprint + suggested read commands
+cerberus go <file> --threshold 50           # Custom "heavy" symbol threshold (default: 30)
+cerberus go <file> --json                   # Machine output with quick_reads array
+
 # Blueprint - Structure Analysis
 cerberus blueprint <file>                   # Base structure with line numbers
 cerberus blueprint <file> --deps            # + Dependencies with confidence scores
@@ -195,11 +235,6 @@ cerberus blueprint <file> --diff HEAD~1     # Structural diff vs git ref
 cerberus blueprint <dir> --aggregate        # Package-level view
 cerberus blueprint <file> --with-memory     # Include developer context
 # Flags: --format tree|json, --no-cache, --fast, --max-width N, --collapse-private
-
-# Quick file analysis
-cerberus go <file>                          # Blueprint + suggested read commands
-cerberus go <file> --threshold 50           # Custom "heavy" symbol threshold (default: 30)
-cerberus go <file> --json                   # Machine output with quick_reads array
 
 # Search
 cerberus search "<query>"                   # Semantic/hybrid search
@@ -267,7 +302,7 @@ cerberus quality prediction-stats
 cerberus quality prediction-stats --window 600 --limit 50 --json
 ```
 
-### Session Memory
+### Memory
 
 ```bash
 # Learn preferences
@@ -293,6 +328,15 @@ cerberus memory forget "<key>"              # Remove preference
 cerberus memory export -o backup.json       # Backup
 cerberus memory import backup.json          # Restore
 cerberus memory extract --from-git          # Extract from git history
+```
+
+### Watcher
+
+```bash
+cerberus watcher status                     # Check if watcher running
+cerberus watcher start                      # Start file watcher
+cerberus watcher stop                       # Stop watcher
+cerberus watcher health --json              # Health metrics (log size, CPU)
 ```
 
 ### Metrics
@@ -322,29 +366,64 @@ CERBERUS_SESSION_TIMEOUT=N      # Session timeout in seconds (default: 3600)
 CERBERUS_ANCHORS=json|compact|text|off  # Anchor output mode (default: json)
 ```
 
-### Prerequisites
+### Index Limits (Bloat Protection)
+
+```
+DEFAULT LIMITS (conservative - prevents runaway indexing):
+  CERBERUS_MAX_FILE_BYTES=1048576         # 1MB per file
+  CERBERUS_MAX_SYMBOLS_PER_FILE=500       # Symbols per file (truncates excess)
+  CERBERUS_MAX_TOTAL_SYMBOLS=100000       # Total symbols in index (stops at limit)
+  CERBERUS_MAX_INDEX_SIZE_MB=100          # SQLite DB size
+  CERBERUS_MAX_VECTORS=100000             # FAISS vector count
+  CERBERUS_MIN_FREE_DISK_MB=100           # Pre-flight disk check
+  CERBERUS_WARN_THRESHOLD=0.80            # Warning at 80% of limits
+  CERBERUS_LIMITS_STRICT=false            # true = fail on warnings
+
+OVERRIDE FOR LARGE PROJECTS:
+  CERBERUS_MAX_TOTAL_SYMBOLS=500000 cerberus index .
+  # OR via CLI:
+  cerberus index . --max-total-symbols 500000
+
+CLI FLAGS:
+  --show-limits        # Display current limits and exit
+  --skip-preflight     # Skip disk/permission checks
+  --strict             # Exit with error on validation warnings
+  --max-bytes N        # Override max file size
+  --max-symbols-per-file N
+  --max-total-symbols N
+
+ENFORCEMENT PHASES:
+  1. Pre-flight: Disk space, permissions (run_preflight_checks)
+  2. Real-time: Per-file limits, total symbol limit (BloatEnforcer)
+  3. Post-index: Validation health check (validate_index_health)
+```
+
+### Operational Limits
+
+```
+WATCHER THRESHOLDS:
+  Log >10MB or CPU >50%: CRITICAL (auto-stops)
+  Log >5MB or CPU >15%: WARNING
+  Recovery: cerberus clean --preserve-index && cerberus watcher start
+
+TOKEN TRACKING:
+  Output format: [Task] Saved: N tokens (~$X) | Efficiency: Y%
+  Pricing: $3.00/1M input, $15.00/1M output (Claude Sonnet 4.5)
+  Storage: .cerberus_session.json (auto-resets after 1hr inactivity)
+
+METRICS STORAGE:
+  Location: ~/.config/cerberus/metrics/
+  Privacy: All data local, no telemetry
+  Tracked: command counts, flag usage, workflow patterns, token savings
+```
+
+### Command Prerequisites
 
 ```
 --deps/--hydrate/--cycles: Requires symbol_references (run: cerberus index .)
 --coverage: Requires coverage.json (run: pytest --cov=src --cov-report=json)
 --churn/--diff: Requires git repository
 --stability: Requires at least one of --meta, --churn, or --coverage
-```
-
-### Watcher Thresholds
-
-```
-Log >50MB or CPU >80%: CRITICAL (auto-stops)
-Log >20MB or CPU >50%: WARNING
-Recovery: cerberus clean --preserve-index && cerberus watcher start
-```
-
-### Token Tracking
-
-```
-Output format: [Task] Saved: N tokens (~$X) | Efficiency: Y%
-Pricing basis: $3.00/1M input, $15.00/1M output (Claude Sonnet 4.5)
-Storage: .cerberus_session.json (auto-resets after 1hr inactivity)
 ```
 
 ### Efficiency Hints
@@ -358,14 +437,6 @@ Trigger conditions:
   - index is stale (>60 min old)
 
 JSON output includes "hints" array. Process only "results" to ignore hints.
-```
-
-### Metrics Storage
-
-```
-Location: ~/.config/cerberus/metrics/
-Privacy: All data local, no telemetry
-Tracked: command counts, flag usage, workflow patterns, token savings
 ```
 
 ---
@@ -385,6 +456,7 @@ P19.2  [HINTS]    Smart Defaults & Auto-Suggestions ✓
 P19.3  [METRICS]  Efficiency Metrics & Observability ✓
 P19.4  [DEBT]     Technical Debt Audit: Consolidated duplicates, verified health ✓
 P19.5  [DOCS]     Self-Maintaining Docs: validate-docs command ✓
+P19.6  [BLOAT]    Index Limits: Preflight, Enforcement, Validation (100K default cap) ✓
 ```
 
 ---

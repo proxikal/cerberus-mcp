@@ -1,3 +1,4 @@
+import json
 import time
 from pathlib import Path
 from typing import List, Optional, Union
@@ -8,6 +9,13 @@ from cerberus.logging_config import logger
 from cerberus.tracing import trace
 from cerberus.scanner import scan
 from cerberus.schemas import ScanResult, SymbolEmbedding
+from cerberus.exceptions import PreflightError
+from cerberus.limits import (
+    run_preflight_checks,
+    BloatEnforcer,
+    validate_index_health,
+    get_limits_config,
+)
 from .json_store import JSONIndexStore
 from .index_loader import is_sqlite_index, load_index
 from cerberus.storage import SQLiteIndexStore, FAISSVectorStore, ScanResultAdapter
@@ -26,6 +34,7 @@ def build_index(
     padding: int = 3,
     model_name: str = "all-MiniLM-L6-v2",
     max_bytes: Optional[int] = None,
+    skip_preflight: bool = False,
 ) -> Union[ScanResult, ScanResultAdapter]:
     """
     Run a scan and persist the results to an index.
@@ -33,6 +42,11 @@ def build_index(
     Automatically detects output format:
     - .json extension -> Legacy format (full memory load)
     - Directory or .db -> SQLite + FAISS format (streaming, constant memory)
+
+    Includes bloat protection:
+    - Pre-flight checks (disk space, permissions)
+    - Real-time enforcement (file size, symbol limits)
+    - Post-index validation
 
     Args:
         directory: Project root to scan
@@ -43,13 +57,26 @@ def build_index(
         store_embeddings: Generate and store vector embeddings
         padding: Context lines around symbols for embeddings
         model_name: Embedding model name
-        max_bytes: Skip files larger than this
+        max_bytes: Skip files larger than this (default: 1MB from limits config)
+        skip_preflight: Skip disk space and permission checks
 
     Returns:
         ScanResult (JSON) or ScanResultAdapter (SQLite)
+
+    Raises:
+        PreflightError: If pre-flight checks fail
     """
     start_time = time.time()
     logger.info(f"Building index for directory '{directory}' -> '{output_path}'")
+
+    # Pre-flight checks (bloat protection)
+    if not skip_preflight:
+        preflight = run_preflight_checks(output_path)
+        if not preflight.can_proceed:
+            logger.error(f"Pre-flight failed: {preflight.summary}")
+            raise PreflightError(preflight.summary, preflight.checks)
+        if preflight.status == "warn":
+            logger.warning(f"Pre-flight warnings: {preflight.summary}")
 
     # Detect output format
     use_sqlite = not (str(output_path).endswith('.json'))
@@ -150,8 +177,20 @@ def _build_sqlite_index(
 
     Achieves constant memory usage by parsing and writing files one batch at a time.
     Never accumulates all symbols in memory.
+
+    Includes bloat protection:
+    - BloatEnforcer wraps file stream for real-time enforcement
+    - Post-index validation checks health
     """
     logger.info("Using SQLite format (TRUE streaming, constant memory)")
+
+    # Initialize bloat enforcer for real-time limit enforcement
+    enforcer = BloatEnforcer()
+    limits_config = get_limits_config()
+    logger.info(
+        f"Bloat protection active: max {limits_config.max_symbols_per_file} symbols/file, "
+        f"{limits_config.max_total_symbols:,} total"
+    )
 
     # Initialize stores
     sqlite_store = SQLiteIndexStore(output_path)
@@ -190,14 +229,18 @@ def _build_sqlite_index(
 
     logger.info(f"Streaming files from {directory}...")
 
-    for file_result in scan_files_streaming(
+    # Wrap scanner stream with bloat enforcer for real-time limit enforcement
+    raw_stream = scan_files_streaming(
         directory=directory,
         respect_gitignore=respect_gitignore,
         extensions=extensions,
         previous_files=previous_files,
         incremental=incremental,
         max_bytes=max_bytes,
-    ):
+    )
+    enforced_stream = enforcer.wrap_file_stream(raw_stream)
+
+    for file_result in enforced_stream:
         # Accumulate into batches
         file_batch.append(file_result.file_obj)
         symbol_batch.extend(file_result.symbols)
@@ -278,6 +321,26 @@ def _build_sqlite_index(
         logger.info(f"Saved FAISS index with {len(faiss_store)} vectors")
 
     logger.info(f"SQLite streaming index complete: {total_files} files, {total_symbols} symbols in {scan_duration:.2f}s")
+
+    # Log enforcement summary (bloat protection stats)
+    enforcer.log_summary()
+
+    # Store enforcement stats in metadata
+    enforcement_summary = enforcer.get_summary()
+    sqlite_store.set_metadata('enforcement_stats', json.dumps(enforcement_summary['stats']))
+    if enforcer.stats.limit_reached:
+        sqlite_store.set_metadata('limit_reached', 'true')
+        sqlite_store.set_metadata('limit_reason', enforcer.stats.limit_reached_reason)
+
+    # Post-index validation (bloat protection health check)
+    validation = validate_index_health(output_path)
+    if validation.status == "fail":
+        logger.error(f"Post-index validation failed: {validation.summary}")
+    elif validation.status == "warn":
+        logger.warning(f"Post-index validation: {validation.summary}")
+    else:
+        logger.info(f"Post-index validation: {validation.summary}")
+    sqlite_store.set_metadata('validation_status', validation.status)
 
     # Phase 5.2: Post-processing - Import resolution
     try:
