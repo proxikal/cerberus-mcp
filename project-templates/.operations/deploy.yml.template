@@ -1,0 +1,64 @@
+# {{PROJECT_NAME}} Deployment Checklist
+# See {{PROJECT_NAME}}-VPS-OPS.md for full command explanations
+# Quick reference for agents
+
+deploy_full:
+  description: "Complete deployment workflow (test → commit → deploy → build → verify)"
+  steps:
+    - step: "edit_local"
+      location: "{{LOCAL_DIR}}"
+      action: "Edit code locally (never edit on remote)"
+
+    - step: "test"
+      command: "{{TEST_COMMAND}}"
+      note: "Run tests before deploying"
+
+    - step: "commit"
+      command: "git add . && git commit -m 'Description'"
+      note: "Required before deploy"
+
+    - step: "sync_to_vps"
+      command: "rsync -avz --delete -e ssh {{SYNC_SOURCE}}/ {{VPS_USER}}@{{VPS_HOST}}:{{VPS_DIR}}/{{SYNC_SOURCE}}/"
+      critical: "ONLY sync {{SYNC_SOURCE}}/ directory"
+      never_sync: ["*.md", "*.env", ".DS_Store", "*.log"]
+
+    - step: "build_vps"
+      command: "ssh {{VPS_USER}}@{{VPS_HOST}} 'cd {{VPS_DIR}} && {{BUILD_COMMAND}} && {{RESTART_COMMAND}}'"
+      note: "Build and restart on VPS"
+
+    - step: "verify"
+      command: "{{VERIFY_COMMAND}}"
+      expect: "{{EXPECTED_RESPONSE}}"
+
+quick_deploy:
+  description: "One-liner for fast deploys (combines sync + build + restart)"
+  command: |
+    rsync -avz --delete -e ssh {{SYNC_SOURCE}}/ {{VPS_USER}}@{{VPS_HOST}}:{{VPS_DIR}}/{{SYNC_SOURCE}}/ && \
+    ssh {{VPS_USER}}@{{VPS_HOST}} "cd {{VPS_DIR}} && {{BUILD_COMMAND}} && {{RESTART_COMMAND}}"
+
+health_check:
+  description: "Verify all services running"
+  steps:
+    - check: "service_status"
+      command: "ssh {{VPS_USER}}@{{VPS_HOST}} '{{SERVICE_STATUS_COMMAND}}'"
+      expect: "{{SERVICE_NAME}} (online/active)"
+
+    - check: "app_health"
+      command: "{{VERIFY_COMMAND}}"
+      expect: "{{EXPECTED_RESPONSE}}"
+
+troubleshoot:
+  description: "Common troubleshooting steps"
+  build_fails:
+    - "Check logs: ssh {{VPS_USER}}@{{VPS_HOST}} '{{LOG_COMMAND}}'"
+    - "Clear cache: ssh {{VPS_USER}}@{{VPS_HOST}} 'cd {{VPS_DIR}} && rm -rf {{CACHE_DIR}} && {{BUILD_COMMAND}}'"
+
+  service_down:
+    - "Check status: ssh {{VPS_USER}}@{{VPS_HOST}} '{{SERVICE_STATUS_COMMAND}}'"
+    - "Restart: ssh {{VPS_USER}}@{{VPS_HOST}} '{{RESTART_COMMAND}}'"
+    - "Check logs: ssh {{VPS_USER}}@{{VPS_HOST}} '{{LOG_COMMAND}}'"
+
+vps_accounts:
+  primary: "{{VPS_USER}}@{{VPS_HOST}}"
+  never_use: ["root"]
+  reason: "Security and permission isolation"
