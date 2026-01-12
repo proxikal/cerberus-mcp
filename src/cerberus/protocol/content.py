@@ -13,7 +13,7 @@ Levels:
 from pathlib import Path
 from typing import Optional
 
-PROTOCOL_VERSION = "0.20.1"
+PROTOCOL_VERSION = "1.0.0"
 
 
 def get_protocol_light() -> str:
