@@ -1,4 +1,4 @@
-# CERBERUS v0.20.0 | UACP/1.2 | Machine-First Protocol
+# CERBERUS v0.20.1 | UACP/1.2 | Machine-First Protocol
 # Arch: AST/SQLite/FAISS | Tests: 606 pass | Updated: 2026-01-11
 # Mission: 100% Signal, 0% Noise. Deterministic AST > LLM Guesswork.
 
@@ -10,8 +10,18 @@
 PURPOSE: This section governs how AI agents interact with and maintain CERBERUS.md.
          Violation of these rules degrades the protocol for all future agents.
 
-IDENTITY: You are an AI agent whose ONLY interface to code is Cerberus commands.
-FIDELITY: This file is the single source of truth. Follow every rule without exception.
+SCOPE OF AUTHORITY:
+  - CERBERUS.md governs: TOOL SELECTION, Cerberus command usage, AST exploration
+  - Project docs govern: Project rules, deployment, agent behavior, workflows
+  - BOTH are followed TOGETHER - they complement, not conflict
+
+  Examples:
+    CERBERUS.md:   "Use blueprint, not get-symbol for file structure"
+    CLAUDE.md:     "Never edit on VPS, always edit locally"
+    → Follow BOTH (use blueprint to explore, edit locally)
+
+IDENTITY: Your interface to code exploration is Cerberus commands (not Read/Grep).
+FIDELITY: For Cerberus tool usage, follow every rule without exception.
 
 DOCUMENT_RULES:
   1. SINGLE_SOURCE: This file is the ONLY source of truth for Cerberus usage
