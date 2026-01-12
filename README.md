@@ -1,291 +1,518 @@
-# Cerberus: The Autonomous AI Agent Operating System
+# Cerberus
 
-**Cerberus** is a high-precision "Context Management Layer" designed for autonomous AI agents working on massive, complex codebases. It solves the **"Context Wall"** problem by serving deterministic, AST-aware, and token-optimized context on-demand.
+**AST-based code exploration with session memory for AI agents**
 
-[![Version: 0.20.0](https://img.shields.io/badge/version-0.20.0-blue.svg)](#)
-[![Status: Production-Ready](https://img.shields.io/badge/status-production--ready-green.svg)](#)
-[![Tests: 610/611 Passing](https://img.shields.io/badge/tests-610%2F611%20passing-brightgreen.svg)](#)
-[![Phase: 19.5 Complete](https://img.shields.io/badge/phase-19.5%20complete-blue.svg)](#)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#)
+Cerberus is a command-line tool that helps developers and AI agents efficiently navigate and understand codebases through Abstract Syntax Tree (AST) parsing, symbol indexing, and cross-session memory.
 
----
-
-## 📖 Table of Contents
-
-- [🚨 The Challenge: The Context Wall](#-the-challenge-the-context-wall)
-- [🧠 The Solution: Agent-First Intelligence](#-the-solution-agent-first-intelligence)
-- [🚀 Core Capabilities](#-core-capabilities)
-  - [🧩 AST-Based Mapping](#-ast-based-mapping)
-  - [🔍 Hybrid Retrieval](#-hybrid-retrieval)
-  - [⚡ Performance Daemon](#-performance-daemon)
-  - [🕸️ Symbolic Intelligence](#-symbolic-intelligence)
-- [🏗️ Phase 13: Architectural Intelligence](#-phase-13-architectural-intelligence)
-  - [🗺️ Visual Blueprints](#-visual-blueprints)
-  - [📊 Stability & Risk Scoring](#-stability--risk-scoring)
-  - [🔄 Structural Diffs](#-structural-diffs)
-  - [💧 Auto-Hydration](#-auto-hydration)
-- [🔮 Phase 14: Productivity Enhancements](#-phase-14-productivity-enhancements)
-- [🏁 Competitive Comparison](#-competitive-comparison)
-  - [Feature Matrix](#feature-matrix)
-  - [Real-World Metrics](#real-world-metrics)
-  - [🏆 Why Choose Cerberus?](#-why-choose-cerberus)
-- [🛠️ Installation & Setup](#️-installation--setup)
-- [🎯 Quick Start](#-quick-start)
-- [📋 CLI Reference](#-cli-reference)
-- [🏗️ Architecture](#️-architecture)
-- [🧪 Testing](#-testing)
-- [📜 License](#-license)
+[![Version: 1.0.0](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/proxikal/Cerberus/releases/tag/v1.0.0)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python: 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
-## 🚨 The Challenge: The Context Wall
+## Table of Contents
 
-Autonomous AI agents face three critical bottlenecks when working on real-world software:
-
-1.  **Token Waste:** Reading 2,000 lines of code to find a 5-line logic bug is expensive and slow.
-2.  **Context Noise:** Irrelevant code "distracts" LLMs, leading to hallucinations and poor reasoning.
-3.  **Stateless Exploration:** Agents spend multiple turns "wandering" through directories just to understand the architecture.
-
-**Cerberus** provides a deterministic **"Cortex"** that bridges this gap, allowing agents to navigate code at the speed of thought.
-
----
-
-## 🧠 The Solution: Agent-First Intelligence
-
-Cerberus is built on the **"Zero Guesswork"** principle. Unlike RAG-based tools that treat code as raw text chunks, Cerberus uses **Abstract Syntax Trees (AST)** to index your project.
-
-- **Surgical Precision:** Every symbol (function, class, variable) is indexed by its exact byte boundaries.
-- **Symbolic Intelligence:** It understands relationships. It resolves method calls, tracks types across files, and maps inheritance hierarchies.
-- **Deterministic Scaling:** Validated on **TensorFlow** (2,949 files, 68k symbols) with constant memory usage (< 130MB).
-- **Machine-First Protocol:** Defaulting to **minified JSON** for agents, with an optional `--human` mode for developers.
+- [What is Cerberus?](#what-is-cerberus)
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Core Workflows](#core-workflows)
+  - [For AI Agents](#for-ai-agents)
+  - [For Developers](#for-developers)
+- [Command Reference](#command-reference)
+- [Supported Languages](#supported-languages)
+- [Project Templates](#project-templates)
+- [Session Memory](#session-memory)
+- [How It Works](#how-it-works)
+- [Requirements](#requirements)
+- [License](#license)
 
 ---
 
-## 🚀 Core Capabilities
+## What is Cerberus?
 
-### 🧩 AST-Based Mapping
-Uses **Tree-Sitter** to parse code into a structural map. It understands symbol boundaries, parameters, return types, and relationships.
-**Supports:** Python, JS, TS, JSX, TSX, Go, Java, C++, Rust.
+Cerberus solves a fundamental problem in code navigation: **finding relevant code without reading entire files**.
 
-### 🔍 Hybrid Retrieval
-Combines **BM25 keyword search** with **vector semantic search**. Automatically detects if a query is technical (`CamelCase`) or conceptual and adjusts the strategy.
+Traditional tools require you to:
+1. Open a file (read 500+ lines)
+2. Scan for the function you need
+3. Read surrounding context to understand it
+4. Repeat for each related file
 
-### ⚡ Performance Daemon (`cerberus serve`)
-A persistent background process that eliminates the "Python Startup Tax." Queries are resolved in **milliseconds (< 50ms)**, enabling instant agent exploration.
-
-### 🕸️ Symbolic Intelligence
-- **Method Call Resolution:** Resolves calls across the entire project with confidence scores.
-- **Inheritance Awareness:** Automatically tracks class MRO (Method Resolution Order) and overrides.
-- **Cross-File Type Inference:** Infers types from annotations, imports, and instantiations.
-
----
-
-## 🏗️ Phase 13: Architectural Intelligence
-
-Phase 13 transforms Cerberus from a search tool into a high-fidelity **Architectural Intelligence System**.
-
-### 🗺️ Visual Blueprints (`blueprint`)
-Generate token-efficient ASCII trees of your codebase. See the "Mental Map" without reading the logic.
-- `cerberus blueprint src/file.py --deps` (Shows what functions call)
-- `cerberus blueprint src/file.py --meta` (Shows complexity & size)
-
-### 📊 Stability & Risk Scoring
-Identify "Dragons" before touching the code. Cerberus calculates a **Stability Score** (0.0 - 1.0) based on:
-- **Git Churn:** How often is this symbol edited?
-- **Test Coverage:** Is this logic protected by tests?
-- **Complexity:** How deep is the nesting/branching?
-- **Result:** 🟢 SAFE, 🟡 MEDIUM, or 🔴 HIGH RISK.
-
-### 🔄 Structural Diffs
-Compare the **Architecture** between commits, not just the text.
-- `cerberus blueprint --diff HEAD~1` (Shows added/removed/modified symbols).
-
-### 💧 Auto-Hydration
-Eliminate the "Search -> Read -> Search" loop. Cerberus pre-fetches skeletons of all referenced internal dependencies in a single query.
+Cerberus provides:
+1. **Symbol-level indexing** - See all functions/classes in a file instantly
+2. **AST-aware skeletonization** - Get signatures without function bodies (95%+ token reduction)
+3. **Architectural blueprints** - Understand file structure before reading code
+4. **Cross-session memory** - Learn patterns and avoid repeating mistakes
 
 ---
 
-## 🔮 Phase 14: Productivity Enhancements
+## Key Features
 
-The productivity layer for next-generation AI Engineers is now complete:
+### 1. AST-Based Symbol Extraction
+Cerberus parses source files into Abstract Syntax Trees and extracts:
+- Functions and methods (with parameters, return types)
+- Classes and interfaces
+- Variables and constants
+- Enums and type definitions
 
-- **🛡️ Style Guard (14.1):** AST-based style fixing (whitespace, imports, quotes) that requires explicit agent action via `cerberus quality style-fix`. ✅
-- **⚓ Context Anchors (14.2):** Persistent "GPS" metadata (file, lines, dependencies, risk, temporal) injected into all outputs to prevent context drift in long sessions. ✅
-- **🔮 Predictive Editing (14.3):** Deterministic suggestions for related changes based on AST call graphs. After editing a symbol, Cerberus automatically suggests direct callers, dependencies, and test files via `cerberus quality related-changes`. ✅
+Each symbol is indexed with exact line numbers, making navigation precise.
 
-### How it Works
+### 2. Skeletonization (Token Optimization)
+The `skeletonize` command removes function bodies while preserving:
+- Function signatures
+- Type annotations
+- Docstrings
+- Class structures
 
-When you edit a symbol, Cerberus now proactively suggests related changes:
+**Result:** Understanding a 500-line module costs ~50 tokens instead of ~5,000.
 
+### 3. Architectural Blueprints
+The `blueprint` command generates ASCII tree views showing:
+- File structure (classes, functions, variables)
+- Dependencies between symbols
+- Complexity metrics (nesting depth, line count)
+
+### 4. Session Memory
+The `memory` system allows agents to:
+- **Learn patterns** - Record architectural decisions, coding patterns
+- **Store corrections** - Remember common mistakes to avoid
+- **Maintain context** - Persist knowledge across sessions
+
+### 5. Config-Driven Documentation
+The `docs` command provides path-agnostic documentation access:
+- Works in any Cerberus installation (dev, Homebrew, pip)
+- No hardcoded paths
+- Modular documentation (load only what you need)
+
+### 6. Golden Egg Project Templates
+Portable documentation system for AI agent collaboration:
+- Modular documentation structure (60% context reduction)
+- Agent leadership protocols
+- Session rotation system
+- Integration-ready templates
+
+---
+
+## Installation
+
+### Homebrew (macOS/Linux)
 ```bash
-$ cerberus mutations edit src/auth.py --symbol validate_token --code "..."
-✓ Successfully edited 'validate_token'
-🔮 [Predictive] Related changes suggested (2 HIGH confidence):
-  1. middleware.py:45 - Direct caller (AST-verified)
-  2. test_auth.py:89 - Test file (exact match + verified import)
-💡 Review with: cerberus quality related-changes validate_token
+brew tap proxikal/cerberus
+brew install cerberus
 ```
 
-**Key Principles:**
-- **100% Deterministic:** Only AST-verified relationships, no heuristics or ML
-- **High Confidence Only:** Minimum threshold of 0.9 confidence score
-- **Zero Noise:** Only shows top 5 predictions to avoid overwhelming the agent
-
----
-
-## 🏁 Competitive Comparison
-
-### Feature Matrix
-
-| Feature | Cerberus | Cursor / Copilot | Aider | Sourcegraph | Greptile | RAG |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **AST-Based Parsing** | ✅ | ❌ | ⚠️ | ⚠️ | ❌ | ❌ |
-| **100% Local** | ✅ | ❌ | ✅ | ⚠️ | ❌ | ⚠️ |
-| **Git-Diff Aware** | ✅ | ❌ | ✅ | ⚠️ | ❌ | ❌ |
-| **Call Graphs** | ✅ | ❌ | ❌ | ⚠️ | ❌ | ❌ |
-| **Stability Scoring** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Architectural Diffs** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Symbolic Editing** | ✅ | ⚠️ | ⚠️ | ❌ | ❌ | ❌ |
-| **Agent-First API** | ✅ | ❌ | ⚠️ | ⚠️ | ✅ | ✅ |
-
-### Real-World Metrics
-
-| Metric | Cerberus | Aider | Cursor | Sourcegraph | Greptile | RAG |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Token Efficiency** | **99.7%** | ~60% | ~40% | N/A | ~70% | ~80% |
-| **Latency (avg)** | **15ms** | N/A | 50ms | 800ms | 600ms | 400ms |
-| **Memory (10K files)** | **126MB** | ~50MB | N/A | N/A | N/A | ~200MB |
-| **Cost (10K queries)** | **$0** | $0 | $20 | $129+ | $99+ | $5-50 |
-
-*Tested on M1 Mac, 2K file codebase, 100-query averages.*
-
-### 🏆 Why Choose Cerberus?
-
-1.  **Surgical Precision vs. Text Chunks:** RAG tools split code into random chunks, often cutting functions mid-logic. Cerberus respects symbol boundaries—you get complete functions, never fragments.
-2.  **The Skeleton Advantage:** Understanding a 2,000-line class costs ~15K tokens. Cerberus shows signatures only—full structure for ~500 tokens (96.7% reduction).
-3.  **Millisecond Latency:** Local SQLite queries in 5-20ms. Agent "plan mode" (50+ rapid queries) feels instant, not sluggish.
-4.  **Aegis Safety:** Integrated `batch-edit --verify` ensures that an agent **cannot break your build**. If tests fail, it auto-reverts.
-
----
-
-## 🛠️ Installation & Setup
-
-### 1. Install Cerberus
+### From Source
 ```bash
 git clone https://github.com/proxikal/Cerberus.git
 cd Cerberus
-pip install -r requirements.txt
+pip install -e .
 ```
 
-### 2. Enable FAISS (Recommended for >10k files)
+### Verify Installation
 ```bash
-pip install faiss-cpu>=1.7.4
+cerberus version
+cerberus doctor  # Run diagnostics
 ```
 
 ---
 
-## 🎯 Quick Start
+## Quick Start
+
+### 1. Index Your Project
+```bash
+cd /path/to/your/project
+cerberus index . --ext .py,.js,.ts --json
+```
+
+This creates `.cerberus/cerberus.db` with all symbols from your codebase.
+
+### 2. Explore a Directory
+```bash
+cerberus orient src/
+```
+
+Get a high-level overview of directory structure and file types.
+
+### 3. Navigate to a File
+```bash
+cerberus go src/lib/auth.py --json
+```
+
+See all symbols in the file with line numbers (classes, functions, variables).
+
+### 4. Search for Symbols
+```bash
+cerberus retrieval search "authenticate" --json
+```
+
+Find all symbols matching "authenticate" across the entire codebase.
+
+### 5. Get Symbol Details
+```bash
+cerberus retrieval get-symbol validateToken --json
+```
+
+Retrieve the full source code for a specific symbol with surrounding context.
+
+### 6. Skeletonize a File
+```bash
+cerberus retrieval skeletonize src/lib/auth.py --json
+```
+
+Get only function signatures and docstrings (95%+ smaller than full file).
+
+### 7. Generate Blueprint
+```bash
+cerberus retrieval blueprint src/lib/ --json
+```
+
+See architectural structure with dependencies and complexity metrics.
+
+---
+
+## Core Workflows
+
+### For AI Agents
+
+**Exploration Workflow:**
+```bash
+# 1. Load session memory (patterns, decisions, corrections)
+cerberus memory context --compact --json
+
+# 2. Orient to understand structure
+cerberus orient src/
+
+# 3. Navigate to specific file
+cerberus go src/lib/auth.py --json
+
+# 4. Search for specific symbol
+cerberus retrieval search "validateToken" --json
+
+# 5. Get symbol details
+cerberus retrieval get-symbol validateToken --json
+
+# 6. Read full implementation (use Read tool on line numbers)
+```
+
+**Learning Workflow:**
+```bash
+# Record architectural decision
+cerberus memory learn --decision "Auth uses JWT tokens with 1hr expiry"
+
+# Record coding pattern
+cerberus memory learn --pattern "Always await Prisma queries in async functions"
+
+# Record correction
+cerberus memory learn --correction "Next.js requires trailingSlash: true in config"
+
+# Retrieve context for next session
+cerberus memory context --compact --json
+```
+
+### For Developers
+
+**Quick File Navigation:**
+```bash
+# See what's in a file without opening it
+cerberus go src/components/Button.tsx
+
+# Find where a function is defined
+cerberus retrieval search "handleSubmit"
+
+# Get only the API surface (signatures)
+cerberus retrieval skeletonize src/lib/api.ts
+```
+
+**Architecture Understanding:**
+```bash
+# See high-level structure
+cerberus orient src/
+
+# Get dependency map
+cerberus retrieval blueprint src/lib/ --json
+
+# Update index after changes
+cerberus update --json
+```
+
+**Documentation Access:**
+```bash
+# Quick reference
+cerberus docs quick
+
+# Full command reference
+cerberus docs commands
+
+# Architecture guide
+cerberus docs architecture
+
+# Find where docs are installed
+cerberus docs path
+```
+
+---
+
+## Command Reference
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| `cerberus index <path>` | Create symbol index for codebase |
+| `cerberus update` | Incrementally update index based on changes |
+| `cerberus start` | Initialize session with health checks |
+| `cerberus orient <path>` | Directory overview with structure |
+| `cerberus go <file>` | File symbols with line numbers |
+| `cerberus doctor` | Run environment diagnostics |
+
+### Retrieval Commands
+
+| Command | Description |
+|---------|-------------|
+| `cerberus retrieval search <query>` | Search for symbols (BM25 + vector) |
+| `cerberus retrieval get-symbol <name>` | Get symbol source code |
+| `cerberus retrieval skeletonize <file>` | Get signatures only (no bodies) |
+| `cerberus retrieval blueprint <path>` | Architectural overview |
+| `cerberus retrieval get-context <symbol>` | Full context payload for symbol |
+
+### Memory Commands
+
+| Command | Description |
+|---------|-------------|
+| `cerberus memory learn` | Store pattern, decision, or correction |
+| `cerberus memory context` | Get all stored patterns for session |
+| `cerberus memory show` | Display stored memory |
+| `cerberus memory stats` | Memory statistics |
+| `cerberus memory export` | Export memory for backup |
+| `cerberus memory import` | Import memory from backup |
+
+### Documentation Commands
+
+| Command | Description |
+|---------|-------------|
+| `cerberus docs quick` | Quick reference (common commands) |
+| `cerberus docs commands` | Full command reference |
+| `cerberus docs architecture` | Internals & configuration |
+| `cerberus docs path` | Show documentation directory |
+| `cerberus docs list` | List all available docs |
+
+### Utility Commands
+
+| Command | Description |
+|---------|-------------|
+| `cerberus utils stats` | Index statistics |
+| `cerberus utils bench` | Performance benchmarks |
+| `cerberus clean` | Clean cache and database files |
+| `cerberus watcher` | Manage background file watcher |
+
+---
+
+## Supported Languages
+
+Cerberus currently supports AST parsing for:
+
+- **Python** (`.py`) - Functions, classes, methods, variables
+- **JavaScript** (`.js`) - Functions, classes, methods
+- **TypeScript** (`.ts`) - Functions, classes, methods, interfaces, enums, variables
+- **Go** (`.go`) - Functions, structs
+
+**Symbol Detection:**
+- Python: `class`, `def` (functions/methods)
+- JavaScript: `class`, `function`, async functions
+- TypeScript: `class`, `function`, `interface`, `enum`, `const` exports, methods
+- Go: `func`, `type ... struct`
+
+---
+
+## Project Templates
+
+Cerberus includes a **Golden Egg** template system for setting up AI agent collaboration in any project.
+
+### What's Included
+
+- **Modular Documentation** - Core guide + on-demand modules (60%+ context reduction)
+- **Agent Leadership Protocol** - Intelligent pushback system to protect optimizations
+- **Session Rotation System** - Automatic archiving to prevent documentation bloat
+- **Operation Checklists** - Machine-readable YAML workflows
+
+### Setup in New Project
 
 ```bash
-# 1. Index your project
-cerberus index .
+# Navigate to your project
+cd /path/to/your/project
 
-# 2. Get architectural overview (Phase 13)
-cerberus blueprint src/ --aggregate --stability
+# Copy templates
+cp -r ~/path/to/Cerberus/project-templates/* .
 
-# 3. Search conceptually
-cerberus search "how is user auth handled"
+# Rename for your project (e.g., "MyApp")
+mv PROJECT-GUIDE.md MYAPP.md
+mv PROJECT-LEADERSHIP.md MYAPP-LEADERSHIP.md
+mv PROJECT-HANDOFF.md HANDOFF.md
 
-# 4. Get surgical symbol code
-cerberus get-symbol "authenticate_user"
+# Replace placeholders
+# {{PROJECT_NAME}} → MyApp
+# {{LOCAL_DIR}} → ~/Dev/MyApp
+# {{TECH_STACK}} → Your stack
 
-# 5. Smart context (includes inheritance + deps)
-cerberus smart-context "UserClass" --include-bases --auto-hydrate
+# Initialize Cerberus index
+cerberus index . --ext .ts,.js,.py --json
 
-# 6. Atomic mutation with verification (Phase 12)
-cerberus batch-edit ops.json --verify "pytest tests/"
+# Create archive directory
+mkdir -p .handoff-archive
 
-# 7. Start real-time sync daemon (Phase 9)
-cerberus serve
+# Record in memory
+cerberus memory learn --decision "Project: MyApp uses golden egg doc system"
 ```
 
----
-
-## 📋 CLI Reference
-
-### 🗺️ Orientation (Phase 13)
-- `cerberus blueprint <file>` - Structural tree
-- `cerberus blueprint <file> --deps` - + Dependency overlay
-- `cerberus blueprint <file> --meta` - + Complexity metrics
-- `cerberus blueprint <file> --stability` - + Risk scoring
-- `cerberus blueprint --diff <ref>` - Structural differences
-- `cerberus blueprint src/ --aggregate` - Package-level view
-
-### 🔍 Retrieval & Search
-- `cerberus search <query>` - Hybrid BM25 + Vector search
-- `cerberus get-symbol <name>` - Retrieve symbol source code
-- `cerberus smart-context <symbol>` - AI-optimized payload
-- `cerberus trace-path <src> <dest>` - Execution path mapping
-
-### 🕸️ Symbolic Intelligence
-- `cerberus calls <symbol>` - Forward call graph
-- `cerberus references <symbol>` - Reverse call graph (Who calls this?)
-- `cerberus inherit-tree <class>` - Full inheritance MRO
-- `cerberus deps <symbol>` - Dependency analysis with confidence scores
-
-### ✍️ Mutations (Surgical Editing)
-- `cerberus edit <file> --symbol <name> --code "..."` - Edit by name
-- `cerberus insert <file> --after <name> --code "..."` - AST-aware injection
-- `cerberus batch-edit <json_file> --verify <cmd>` - Atomic verified refactor
-- `cerberus undo` - Revert last successful mutation
-
-### 🩺 Operational
-- `cerberus doctor` - Health & environment diagnostics
-- `cerberus serve` - Start the high-performance daemon
-- `cerberus stats` - Index statistics (tokens, symbols, files)
-- `cerberus bench` - Performance benchmarks
+See `project-templates/README.md` for full setup guide and examples.
 
 ---
 
-## 🏗️ Architecture
+## Session Memory
 
-Cerberus follows a strict **Decoupled Facade** architecture (Self-Similarity Mandate):
+The memory system allows patterns and knowledge to persist across sessions.
 
-- `parser/` - Tree-Sitter AST extraction
-- `index/` - Hybrid storage (SQLite + FAISS)
-- `retrieval/` - BM25 + Vector search logic
-- `resolution/` - Symbolic resolution (Types, Calls, Inheritance)
-- `mutation/` - AST-aware surgical editing
-- `blueprint/` - Architectural intelligence & visualization
-- `quality/` - Style Guard & Predictive suggestions (Phase 14)
-- `daemon/` - High-performance background server
+### Memory Types
 
----
+1. **Decisions** - Architectural choices
+   ```bash
+   cerberus memory learn --decision "Use JWT auth with 1hr expiry"
+   ```
 
-## 🧪 Testing
+2. **Patterns** - Coding conventions
+   ```bash
+   cerberus memory learn --pattern "Always validate input at API boundaries"
+   ```
 
-Cerberus is built for production environments where reliability is non-negotiable.
+3. **Corrections** - Mistakes to avoid
+   ```bash
+   cerberus memory learn --correction "Remember to await async Prisma queries"
+   ```
+
+4. **Project Info** - Metadata
+   ```bash
+   cerberus memory learn --project-info "Stack: Next.js 15 + PostgreSQL"
+   ```
+
+### Retrieving Memory
 
 ```bash
-# Run all tests
-PYTHONPATH=src python3 -m pytest tests/ -v
+# Get all patterns for session startup
+cerberus memory context --compact --json
 
-# Run specific phase tests
-PYTHONPATH=src python3 -m pytest tests/test_phase13_5.py -v
+# View stored memory
+cerberus memory show
+
+# Memory statistics
+cerberus memory stats
 ```
 
-**Current Results:** 274 Passing | 15 Skipped (Optional FAISS/TS) | 0 Failing.
+### Memory Storage
+
+Memory is stored per-project in:
+```
+~/.config/cerberus/memory/<project-name>/
+├── decisions.json
+├── patterns.json
+├── corrections.json
+└── project_info.json
+```
 
 ---
 
-## 📜 License
+## How It Works
 
-MIT License. See `LICENSE` for details.
+### 1. Indexing
+
+```bash
+cerberus index . --ext .py,.ts,.js
+```
+
+Cerberus:
+1. Scans directory for files matching extensions
+2. Parses each file into an Abstract Syntax Tree (AST)
+3. Extracts symbols (functions, classes, variables) with:
+   - Name
+   - Type (function, class, method, etc.)
+   - Line numbers (start/end)
+   - File path
+4. Stores symbols in SQLite database (`.cerberus/cerberus.db`)
+
+### 2. Retrieval
+
+```bash
+cerberus retrieval search "authenticate"
+```
+
+Cerberus:
+1. Uses BM25 keyword search on symbol names
+2. Optionally uses vector semantic search (if FAISS installed)
+3. Returns ranked results with file paths and line numbers
+4. Agent uses line numbers to read specific code sections
+
+### 3. Skeletonization
+
+```bash
+cerberus retrieval skeletonize src/auth.py
+```
+
+Cerberus:
+1. Parses file into AST
+2. Traverses tree to find function/class nodes
+3. Removes function bodies (keeps signatures)
+4. Preserves docstrings and type annotations
+5. Returns minimal representation (95%+ smaller)
+
+### 4. Memory Context
+
+```bash
+cerberus memory context --compact --json
+```
+
+Cerberus:
+1. Reads all memory files for current project
+2. Merges patterns, decisions, corrections
+3. Compacts into JSON payload
+4. Agent loads at session startup
 
 ---
 
-**Cerberus: Empowering AI agents to work efficiently with massive codebases.**
+## Requirements
 
-**Version:** 0.13.0 (Phase 13 Complete)
-**Validated On:** TensorFlow (2,949 files, 68,934 symbols)
-**Dogfooding Status:** Cerberus is used to build Cerberus.
+- **Python**: 3.11 or higher
+- **Operating System**: macOS, Linux, or Windows WSL
+- **Dependencies**: Automatically installed via pip/Homebrew
+  - `typer` - CLI framework
+  - `rich` - Terminal formatting
+  - `pydantic` - Data validation
+  - `loguru` - Logging
+  - `watchdog` - File watching
+  - `rank-bm25` - Keyword search
+  - `sentence-transformers` - Semantic search (optional)
+  - `tree-sitter` - AST parsing
+  - `psutil` - System utilities
+
+### Optional Dependencies
+
+- **FAISS** (`faiss-cpu`) - Vector search for semantic matching (recommended for large codebases >10k files)
+
+---
+
+## License
+
+MIT License - See [LICENSE](LICENSE) for details.
+
+---
+
+## Links
+
+- **GitHub Repository**: https://github.com/proxikal/Cerberus
+- **Homebrew Tap**: https://github.com/proxikal/homebrew-cerberus
+- **Issues**: https://github.com/proxikal/Cerberus/issues
+- **Releases**: https://github.com/proxikal/Cerberus/releases
+
+---
+
+**Cerberus v1.0.0 - Golden Egg Edition**
+Empowering AI agents and developers to navigate codebases efficiently.
