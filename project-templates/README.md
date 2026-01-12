@@ -2,7 +2,7 @@
 
 **Purpose:** Portable, optimized documentation system for AI agent collaboration
 **Origin:** Refined through XCalibr project (60% context reduction, agent leadership protocol)
-**Reference Implementation:** See `/Users/proxikal/Desktop/Dev/Websites/XCalibr/CLAUDE*.md`
+**Reference Implementation:** See example project using this system (CLAUDE*.md structure)
 
 ---
 
@@ -50,7 +50,7 @@ mv .operations/deploy.yml.template .operations/deploy.yml  # Optional
 
 # 4. Replace placeholders in all files
 # {{PROJECT_NAME}} → MyApp
-# {{LOCAL_DIR}} → /Users/proxikal/Desktop/Dev/MyApp
+# {{LOCAL_DIR}} → ~/Dev/MyApp
 # {{VPS_USER}} → deploy (if applicable)
 # {{VPS_HOST}} → 1.2.3.4 (if applicable)
 # {{VPS_DIR}} → /home/deploy/apps/myapp (if applicable)
@@ -306,7 +306,7 @@ MYAPP-WORKFLOWS.md (dev patterns: React Native, Expo, TestFlight),
 ## REFERENCE IMPLEMENTATION
 
 **See XCalibr for working example:**
-- Path: `/Users/proxikal/Desktop/Dev/Websites/XCalibr/`
+- Path: `~/Dev/MyProject/`
 - Files: `CLAUDE.md`, `CLAUDE-LEADERSHIP.md`, `CLAUDE-VPS-OPS.md`, `CLAUDE-WORKFLOWS.md`, `HANDOFF.md`
 - Stats: 336 core lines (60% reduction), 102 routes deployed, agent leadership active
 

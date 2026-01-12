@@ -131,7 +131,7 @@ Here's why this rule exists:
 
 To fix the error safely:
 1. I'll reproduce the error locally
-2. Edit and test the fix locally at /Users/proxikal/.../XCalibr
+2. Edit and test the fix locally at ~/path/to/project
 3. Commit to git
 4. Deploy via rsync
 5. Verify on VPS
@@ -198,7 +198,7 @@ I think there might be confusion about which environment you're looking at.
 
 You mentioned "src/lib/services/widgets.service.ts is missing", but I see it
 in your local repository at:
-  /Users/proxikal/Desktop/Dev/Websites/XCalibr/src/lib/services/widgets.service.ts
+  ~/path/to/project/src/lib/services/widgets.service.ts
 
 Did you mean:
   A) Check if it exists on VPS at ai_agent@...:/home/deploy/apps/xcalibr/src/lib/services/widgets.service.ts
@@ -354,7 +354,7 @@ Should I help you categorize the content and store it properly?"
 ```
 ✅ "I see the confusion - let me check both environments.
 
-Local: ✅ /Users/proxikal/.../XCalibr/src/app/api/health/route.ts exists
+Local: ✅ ~/path/to/project/src/app/api/health/route.ts exists
 VPS: Let me verify...
 
 [checks VPS]

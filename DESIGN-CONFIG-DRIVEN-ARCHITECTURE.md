@@ -80,7 +80,7 @@ AegisIO/
 ```json
 {
   "project_name": "XCalibr",
-  "local_dir": "/Users/proxikal/Desktop/Dev/Websites/XCalibr",
+  "local_dir": "~/Dev/MyProject",
   "tech_stack": "Next.js 16 + PostgreSQL + Prisma + JWT",
   "vps": {
     "user": "ai_agent",
@@ -233,7 +233,7 @@ cd ~/Desktop/Dev/Websites/XCalibr
 cat > .cerberus/config.json << 'EOF'
 {
   "project_name": "XCalibr",
-  "local_dir": "/Users/proxikal/Desktop/Dev/Websites/XCalibr",
+  "local_dir": "~/Dev/MyProject",
   "tech_stack": "Next.js 16 + PostgreSQL + Prisma + JWT",
   "vps": {
     "user": "ai_agent",
@@ -440,7 +440,7 @@ Agent reads config, knows where to find CERBERUS-COMMANDS.md.
 **Solution B: Auto-Discovery**
 ```bash
 which cerberus
-# Returns: /Users/proxikal/Desktop/Dev/Cerberus/bin/cerberus
+# Returns: ~/Desktop/Dev/Cerberus/bin/cerberus
 # Agent infers: docs are in ~/Desktop/Dev/Cerberus/CERBERUS-COMMANDS.md
 ```
 
