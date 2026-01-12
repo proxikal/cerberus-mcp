@@ -20,7 +20,7 @@
 2. Read HANDOFF.md - Current state and active tasks
 3. Load Cerberus memory - `cerberus memory context --compact --json`
 4. Execute user request following project workflows
-5. Update HANDOFF.md when complete - metrics, session summary, next priority
+5. Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 6. Only update {{PROJECT_NAME}}.md if rules/workflows change
 
 ---
@@ -150,9 +150,9 @@ Question: Where is feature X implemented?
 - When unclear: Report error + attempted solutions + ask for guidance
 
 **DOCUMENTATION:**
-- Update HANDOFF.md after every feature completion
+- Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 - Update {{PROJECT_NAME}}.md when workflow changes
-- Track progress in HANDOFF.md (never let it go stale)
+- Track progress in HANDOFF.md during requested handoffs
 - Rotate HANDOFF.md when >3 sessions exist
 
 **COMMUNICATION:**
@@ -316,7 +316,7 @@ cerberus memory context --compact --json
 5. Commit: `git add . && git commit -m "Description"`
 6. Deploy: [your deployment command]
 7. Verify: [your verification command]
-8. Update HANDOFF.md: metrics, session summary
+8. Update HANDOFF.md when requested: metrics, session summary
 
 ### Example: Bug Fix Workflow
 
@@ -407,7 +407,7 @@ Load when you need:
 ## REFERENCE FILES
 
 **HANDOFF.md** - Current state, progress metrics, active tasks, recent sessions
-- Update after every significant change
+- Update only when the orchestrator explicitly requests a handoff
 - Source of truth for project progress
 - Rotate when >3 sessions exist
 

@@ -282,7 +282,7 @@ git commit -m "Remove CLAUDE-CERBERUS.md - replaced with config + memory system"
    - Project metadata: VPS, tech stack, deployment commands
    - Auto-discoverable, machine-readable
 5. **Execute user request** following deployment workflow
-6. **Update HANDOFF.md** when complete
+6. **Update HANDOFF.md** only when the orchestrator explicitly requests a handoff
 
 ---
 

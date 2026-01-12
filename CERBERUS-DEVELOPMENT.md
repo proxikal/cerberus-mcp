@@ -163,7 +163,7 @@ pytest --cov=src --cov-report=html
 3. Update relevant docs:
    - CERBERUS-COMMANDS.md (if new commands)
    - CERBERUS-ARCHITECTURE.md (if new config/components)
-   - HANDOFF.md (progress update)
+   - HANDOFF.md (progress update, only when requested)
 4. Run: cerberus validate-docs --strict
 5. Commit with Co-Authored-By if applicable
 ```
@@ -174,7 +174,7 @@ pytest --cov=src --cov-report=html
 1. Add failing test that reproduces bug
 2. Fix bug
 3. Verify test passes
-4. Update HANDOFF.md if significant
+4. Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 5. Commit
 ```
 
@@ -198,7 +198,7 @@ Z = Patch (bug fixes, doc updates)
    - CERBERUS.md header
    - src/cerberus/protocol/content.py (PROTOCOL_VERSION)
    - setup.py or pyproject.toml
-2. Update HANDOFF.md with release notes
+2. Update HANDOFF.md with release notes when explicitly requested
 3. Run: pytest (all tests must pass)
 4. Run: cerberus validate-docs --strict
 5. Tag: git tag -a vX.Y.Z -m "Release X.Y.Z"
@@ -273,7 +273,7 @@ mutations: <100ms for validation, depends on --verify command
    - CERBERUS-COMMANDS.md (when adding commands)
    - CERBERUS-ARCHITECTURE.md (when changing internals)
    - CERBERUS-DEVELOPMENT.md (this file, when contributing)
-4. Update HANDOFF.md after completing features
+4. Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 5. Rotate sessions when >3 exist in HANDOFF.md
 ```
 

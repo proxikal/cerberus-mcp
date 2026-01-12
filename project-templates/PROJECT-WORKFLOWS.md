@@ -36,7 +36,7 @@ git add . && git commit -m "Add {{FEATURE_NAME}}: {{DESCRIPTION}}"
 # 8. Verify
 {{VERIFY_COMMAND}}
 
-# 9. Update HANDOFF.md
+# 9. Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 # - Mark feature complete
 # - Update metrics
 # - Add session summary

@@ -1,7 +1,7 @@
 # AI Agent Handoff Document
 
 **Project:** Cerberus - AST-based Code Exploration Tool
-**Last Updated:** 2026-01-11T23:45:00Z
+**Last Updated:** 2026-01-12T08:45:00Z
 **Updated By:** Claude Sonnet 4.5
 
 **Cross-Reference:** See CERBERUS.md for rules, tool selection, workflows
@@ -114,7 +114,7 @@ grep -c "## RECENT SESSION SUMMARY" HANDOFF.md
 **Next Priority: None** (Cerberus is stable and feature-complete)
 
 **Maintenance:**
-- Keep HANDOFF.md updated with development progress
+- Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 - Rotate sessions when >3 exist
 - Run `cerberus validate-docs --strict` before releases
 

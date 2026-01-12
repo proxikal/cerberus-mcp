@@ -1,5 +1,5 @@
 # CERBERUS v1.0.0 | Golden Egg Edition | Machine-First Protocol
-# Arch: AST/SQLite/FAISS | Tests: 606 pass | Updated: 2026-01-11
+# Arch: AST/SQLite/FAISS | Tests: 606 pass | Updated: 2026-01-12
 # Mission: 100% Signal, 0% Noise. Deterministic AST > LLM Guesswork.
 
 **📚 Documentation Suite:**
@@ -50,7 +50,7 @@ Edit src/main.py
 # 2. Read HANDOFF.md - Current development state
 # 3. Load Cerberus memory: cerberus memory context --compact --json
 # 4. Load modules as needed (CERBERUS-COMMANDS.md, etc.)
-# 5. Update HANDOFF.md after completing features
+# 5. Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 ```
 
 ---

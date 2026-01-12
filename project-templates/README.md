@@ -213,7 +213,7 @@ Read MYAPP-LEADERSHIP.md   # If confused about pushback
 - Cerberus-first for exploration (orient, go, search)
 - Autonomous execution (don't ask permission for clear tasks)
 - Intelligent pushback (protect optimizations via leadership protocol)
-- Update HANDOFF.md after completing features
+- Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 - Rotate sessions when >3 exist
 
 ---
