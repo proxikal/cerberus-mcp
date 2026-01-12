@@ -6,6 +6,8 @@ Tests git diff parsing, change analysis, and surgical update logic.
 
 import pytest
 from pathlib import Path
+
+pytestmark = [pytest.mark.fast, pytest.mark.phase3]
 from cerberus.schemas import (
     LineRange,
     ModifiedFile,
@@ -23,7 +25,6 @@ from cerberus.incremental.change_analyzer import (
     calculate_affected_files,
     _ranges_overlap,
 )
-
 
 class TestLineRangeParsing:
     """Test parsing of git diff line ranges."""
@@ -81,7 +82,6 @@ class TestLineRangeParsing:
         assert len(ranges) == 2
         assert ranges[0].start == 10
         assert ranges[1].start == 26
-
 
 class TestGitDiffParsing:
     """Test parsing of complete git diff output."""
@@ -144,7 +144,6 @@ index abc1234..def5678 100644
         assert modified[0].path == "src/modified.py"
         assert len(modified[0].changed_lines) > 0
 
-
 class TestRangeOverlap:
     """Test line range overlap detection."""
 
@@ -170,7 +169,6 @@ class TestRangeOverlap:
         range1 = LineRange(start=10, end=20, change_type="modified")
         assert _ranges_overlap(12, 18, range1) is True
         assert _ranges_overlap(5, 25, range1) is True
-
 
 class TestChangeAnalysis:
     """Test change analysis and symbol identification."""
@@ -374,7 +372,6 @@ class TestChangeAnalysis:
         assert "file3.py" in affected
         assert "file5.py" in affected
 
-
 class TestSchemas:
     """Test Phase 3 schemas."""
 
@@ -427,45 +424,3 @@ class TestSchemas:
         assert result.elapsed_time == 1.5
         assert result.strategy == "incremental"
         assert len(result.removed_symbols) == 1
-
-
-if __name__ == "__main__":
-    # Run tests manually (if pytest not available)
-    import sys
-
-    test_classes = [
-        TestLineRangeParsing,
-        TestGitDiffParsing,
-        TestRangeOverlap,
-        TestChangeAnalysis,
-        TestSchemas,
-    ]
-
-    total_tests = 0
-    passed_tests = 0
-
-    for test_class in test_classes:
-        print(f"\n{'=' * 60}")
-        print(f"Testing: {test_class.__name__}")
-        print('=' * 60)
-
-        instance = test_class()
-        methods = [m for m in dir(instance) if m.startswith("test_")]
-
-        for method_name in methods:
-            total_tests += 1
-            try:
-                method = getattr(instance, method_name)
-                method()
-                print(f"✓ {method_name}")
-                passed_tests += 1
-            except AssertionError as e:
-                print(f"✗ {method_name}: {e}")
-            except Exception as e:
-                print(f"✗ {method_name}: ERROR: {e}")
-
-    print(f"\n{'=' * 60}")
-    print(f"Results: {passed_tests}/{total_tests} tests passed")
-    print('=' * 60)
-
-    sys.exit(0 if passed_tests == total_tests else 1)

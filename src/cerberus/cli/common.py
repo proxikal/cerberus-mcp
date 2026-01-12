@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Optional
 import typer
 from cerberus.index import load_index, ScanResult
+from cerberus.paths import get_paths, find_index_path
 from .output import get_console
 
 console = get_console()
@@ -18,20 +19,27 @@ def get_default_index(index_path: Optional[Path] = None) -> Path:
     """
     Get default index path, checking existence.
 
+    Uses centralized path configuration with legacy fallback.
+    Checks .cerberus/cerberus.db first, then cerberus.db in root.
+
     Args:
         index_path: Optional explicit index path
 
     Returns:
-        Path to index file (defaults to cerberus.db in CWD)
+        Path to index file (defaults to .cerberus/cerberus.db or legacy location)
 
     Raises:
         typer.Exit: If index file doesn't exist
     """
     if index_path is None:
-        index_path = Path("cerberus.db")
+        # Use centralized path finder that checks all locations
+        index_path = find_index_path()
 
-    if not index_path.exists():
-        console.print("[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
+    if index_path is None or not index_path.exists():
+        paths = get_paths()
+        console.print("[red]Error: Index not found. Checked:[/red]")
+        console.print(f"[dim]  - {paths.index_db}[/dim]")
+        console.print(f"[dim]  - {paths.legacy_index_db}[/dim]")
         console.print("[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
         raise typer.Exit(code=1)
 
@@ -75,3 +83,21 @@ def format_file_location(file_path: str, line: Optional[int] = None) -> str:
     if line is not None:
         return f"{file_path}:{line}"
     return file_path
+
+
+def format_size(size_bytes: int) -> str:
+    """
+    Format byte size to human-readable string.
+
+    Args:
+        size_bytes: Size in bytes
+
+    Returns:
+        Formatted string like "1.5 KB" or "2.3 MB"
+    """
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"

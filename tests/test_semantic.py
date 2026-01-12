@@ -1,4 +1,9 @@
+"""Unit tests for semantic search."""
+
+import pytest
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 
 from cerberus.index import build_index
 from cerberus.semantic.search import semantic_search

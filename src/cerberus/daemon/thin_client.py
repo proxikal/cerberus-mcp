@@ -322,7 +322,7 @@ def get_routing_stats() -> Dict[str, Any]:
             response = requests.get(url, timeout=1.0)
             if response.status_code == 200:
                 stats["daemon_status"] = response.json()
-        except:
+        except Exception:
             pass
 
     return stats

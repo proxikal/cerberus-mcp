@@ -317,60 +317,6 @@ def health_check(project_path: Optional[Path] = None) -> Dict[str, Any]:
     }
 
 
-# === Session Management ===
-
-def create_session(agent_id: str = None) -> Dict[str, Any]:
-    """
-    Create a new agent session.
-
-    Args:
-        agent_id: Optional agent identifier
-
-    Returns:
-        Dict with session info: {
-            "session_id": str,
-            "agent_id": str,
-            "created_at": float,
-        }
-
-    Phase: 9.7 (Placeholder for implementation)
-    """
-    logger.info(f"create_session called with agent_id={agent_id}")
-
-    # TODO Phase 9.7: Implement session creation
-    # - Generate session ID
-    # - Initialize seen-set tracker
-    # - Store session metadata
-
-    raise NotImplementedError("Phase 9.7: create_session implementation pending")
-
-
-def close_session(session_id: str) -> Dict[str, Any]:
-    """
-    Close an agent session.
-
-    Args:
-        session_id: Session identifier
-
-    Returns:
-        Dict with status: {
-            "status": "closed",
-            "symbols_seen": int,
-            "duration_seconds": float,
-        }
-
-    Phase: 9.7 (Placeholder for implementation)
-    """
-    logger.info(f"close_session called with session_id={session_id}")
-
-    # TODO Phase 9.7: Implement session cleanup
-    # - Clear seen-set
-    # - Persist session logs
-    # - Free resources
-
-    raise NotImplementedError("Phase 9.7: close_session implementation pending")
-
-
 # === Client Communication ===
 
 def is_daemon_running(project_path: Optional[Path] = None) -> bool:
@@ -498,8 +444,6 @@ __all__ = [
     "stop_daemon",
     "daemon_status",
     "health_check",
-    "create_session",
-    "close_session",
     "is_daemon_running",
     "send_rpc_request",
     "get_socket_path",

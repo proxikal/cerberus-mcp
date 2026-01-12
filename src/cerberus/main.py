@@ -20,9 +20,11 @@ from cerberus.index import (
     read_range,
     semantic_search,
 )
-from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality
+from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality, memory, workflow, metrics_cmd, docs_validator, refresh, docs
 from cerberus.cli.config import CLIConfig
 from cerberus.cli.output import get_console
+from cerberus.cli.common import format_size
+from cerberus.paths import get_paths
 
 app = typer.Typer()
 console = get_console()
@@ -92,6 +94,14 @@ app.add_typer(symbolic.app, name="symbolic", help="Symbolic intelligence command
 app.add_typer(dogfood.app, name="dogfood", help="Dogfooding commands (read, inspect, tree, ls, grep)")
 app.add_typer(mutations.app, name="mutations", help="Code mutation commands (edit, delete, insert, batch-edit)")
 app.add_typer(quality.app, name="quality", help="Quality commands (style-check, style-fix) - Phase 14.1")
+app.add_typer(memory.app, name="memory", help="Session Memory commands (learn, show, context) - Phase 18")
+app.add_typer(docs.app, name="docs", help="Documentation access commands (commands, architecture, quick, path)")
+app.add_typer(workflow.app, name="workflow", help="Streamlined workflow commands (start, go, orient) - Phase 19")
+app.add_typer(metrics_cmd.app, name="metrics", help="Efficiency metrics and reports - Phase 19.3")
+
+# Register validate-docs as a top-level command
+app.command(name="validate-docs")(docs_validator.validate_docs_cmd)
+
 
 @app.command()
 def hello():
@@ -203,8 +213,8 @@ def index(
     directory: Path = typer.Argument(
         ".", help="The directory to index.", exists=True, file_okay=False, readable=True
     ),
-    output: Path = typer.Option(
-        "cerberus.db", "--output", "-o", help="Path to save the index file."
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Path to save the index file. Defaults to .cerberus/cerberus.db"
     ),
     no_gitignore: bool = typer.Option(
         False, "--no-gitignore", help="Do not respect .gitignore files."
@@ -231,6 +241,12 @@ def index(
     """
     Runs a scan and writes the results to a SQLite index.
     """
+    # Use new default path if not specified
+    if output is None:
+        paths = get_paths()
+        paths.ensure_dirs()
+        output = paths.index_db
+
     respect_gitignore = not no_gitignore
     scan_result = build_index(
         directory,
@@ -782,6 +798,17 @@ def clean_cmd(
             "description": "Cache directory (logs, backups, watcher data)"
         })
 
+    # Legacy .logs directory (pre-Phase 19 log bloat fix)
+    legacy_logs_dir = project_path / ".logs"
+    if legacy_logs_dir.exists():
+        size = sum(f.stat().st_size for f in legacy_logs_dir.rglob('*') if f.is_file())
+        items_to_clean.append({
+            "path": legacy_logs_dir,
+            "type": "directory",
+            "size": size,
+            "description": "Legacy logs directory (pre-consolidation)"
+        })
+
     # Main index database
     if not preserve_index:
         index_db = project_path / "cerberus.db"
@@ -831,15 +858,6 @@ def clean_cmd(
 
     # Calculate total size
     total_size = sum(item["size"] for item in items_to_clean)
-
-    # Format size for display
-    def format_size(size_bytes):
-        if size_bytes < 1024:
-            return f"{size_bytes} B"
-        elif size_bytes < 1024 * 1024:
-            return f"{size_bytes / 1024:.1f} KB"
-        else:
-            return f"{size_bytes / (1024 * 1024):.1f} MB"
 
     # Dry run mode
     if dry_run:
@@ -923,6 +941,16 @@ def clean_cmd(
         if failed_items:
             console.print(f"[bold red]✗ Failed to delete {len(failed_items)} items[/bold red]")
             raise typer.Exit(code=1)
+
+
+# Phase 19.1: Add streamlined workflow commands as top-level commands
+# These are aliases to the workflow module commands for convenience
+app.command(name="start")(workflow.start)
+app.command(name="go")(workflow.go)
+app.command(name="orient")(workflow.orient)
+
+# Phase 19.7: Protocol refresh command for AI agent memory restoration
+app.command(name="refresh")(refresh.refresh)
 
 
 if __name__ == "__main__":

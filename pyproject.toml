@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cerberus-context"
-version = "0.10.0"
-description = "Autonomous Context Engine for AI agents"
+version = "1.0.0"
+description = "AST-based code exploration with session memory for AI agents"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}

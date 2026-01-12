@@ -5,6 +5,6 @@ Modular command-line interface following the self-similarity mandate.
 Each module contains a logical group of related commands.
 """
 
-from cerberus.cli import index, operational, utils, retrieval, symbolic, dogfood, config, output
+from cerberus.cli import index, operational, utils, retrieval, symbolic, dogfood, config, output, memory
 
-__all__ = ['index', 'operational', 'utils', 'retrieval', 'symbolic', 'dogfood', 'config', 'output']
+__all__ = ['index', 'operational', 'utils', 'retrieval', 'symbolic', 'dogfood', 'config', 'output', 'memory']

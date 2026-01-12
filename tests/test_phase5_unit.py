@@ -7,6 +7,8 @@ Tests method call extraction, symbol resolution, and type tracking.
 import pytest
 from pathlib import Path
 
+pytestmark = pytest.mark.fast
+
 from cerberus.parser.dependencies import extract_method_calls
 from cerberus.schemas import MethodCall
 

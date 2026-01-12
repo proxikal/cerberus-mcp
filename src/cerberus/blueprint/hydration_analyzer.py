@@ -169,12 +169,21 @@ class HydrationAnalyzer:
         
         # Check if it's a stdlib module (common Python stdlib paths)
         try:
-            # Get Python's stdlib path
+            # Get Python's stdlib path - exclude project root and its subdirectories
             stdlib_paths = set()
+            project_root_resolved = self.project_root.resolve()
             for path_item in sys.path:
                 if 'site-packages' not in path_item and 'dist-packages' not in path_item:
-                    stdlib_paths.add(Path(path_item).resolve())
-            
+                    resolved_path = Path(path_item).resolve()
+                    # Phase 16.4: Don't treat project root or its children as stdlib
+                    try:
+                        resolved_path.relative_to(project_root_resolved)
+                        # This path is under project root - skip it
+                        continue
+                    except ValueError:
+                        # Not under project root - it's a real stdlib path
+                        stdlib_paths.add(resolved_path)
+
             # Check if file is under any stdlib path
             for stdlib_path in stdlib_paths:
                 try:
@@ -184,7 +193,7 @@ class HydrationAnalyzer:
                     continue
         except Exception:
             pass
-        
+
         return True
 
     def _estimate_symbol_count(self, file_path: str) -> int:

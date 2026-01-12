@@ -1,9 +1,14 @@
+"""Benchmark tests for CLI performance."""
+
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from cerberus.main import app
+
+pytestmark = [pytest.mark.benchmark, pytest.mark.slow]
 
 runner = CliRunner()
 TEST_FILES_DIR = Path(__file__).parent / "test_files"

@@ -1,7 +1,12 @@
+"""Unit tests for retrieval operations."""
+
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
+
+pytestmark = pytest.mark.fast
 
 from cerberus.index import build_index, load_index
 from cerberus.main import app

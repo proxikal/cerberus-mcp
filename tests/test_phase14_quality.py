@@ -8,6 +8,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
+pytestmark = pytest.mark.fast
+
 from cerberus.quality import StyleGuardV2, StyleDetector, StyleFixer, IssueType
 
 

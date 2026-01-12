@@ -1,438 +1,283 @@
-# CERBERUS v0.14.0 - AI Agent Operating System
-# Protocol: UACP/1.2 | Fidelity: 100% | Mode: Machine-First (JSON) | Arch: AST/SQLite
+# CERBERUS v1.0.0 | Golden Egg Edition | Machine-First Protocol
+# Arch: AST/SQLite/FAISS | Tests: 606 pass | Updated: 2026-01-11
+# Mission: 100% Signal, 0% Noise. Deterministic AST > LLM Guesswork.
 
-## ⚡ CORE MANDATES [REQUIRED]
-MISSION: 100% Signal / 0% Noise. Deterministic AST > LLM Guesswork.
-PRINCIPLES:
-  1. Code > Prompts: Use `get-symbol` (AST), never `read_file` (Text).
-  2. Verified Transactions: writes MUST use `--verify` to prevent regression.
-  3. Strict Resolution: No auto-correct on mutations. Ambiguity = Error.
-  4. Symbiosis: Use `blueprint` (Map) before `read` (Flashlight).
-  5. Parse-Perfect Output: All outputs must be LLM-parsable with >98% accuracy.
+**📚 Documentation Suite:**
+- **CERBERUS.md** (this file) - Core guide (ALWAYS LOAD)
+- **CERBERUS-COMMANDS.md** - Command reference (load as needed)
+- **CERBERUS-ARCHITECTURE.md** - Internals & config (load as needed)
+- **CERBERUS-DEVELOPMENT.md** - Contributing guide (load as needed)
+- **CERBERUS-LEADERSHIP.md** - Agent pushback playbook (load as needed)
 
-## 🚫 FORBIDDEN [STRICT]
-- `cat/read_file` on full files (>50 lines). USE: `blueprint` or `read --lines`.
-- `grep`. USE: `cerberus search` (Semantic/Hybrid).
-- `ls -R`. USE: `cerberus tree`.
-- Speculative/Unverified Edits. USE: `batch-edit --verify`.
-- Deleting/editing referenced symbols WITHOUT checking deps. (Symbol Guard: ✅ Phase 13.2).
+**Context Reduction:** Modular docs reduce agent context by ~60% (250 core + on-demand modules vs 518 original)
 
-## 🔒 ENFORCEMENT PROTOCOL [ZERO TOLERANCE]
+---
 
-**BEFORE USING ANY TOOL - CHECK THIS DECISION TREE:**
-```
-┌────────────────────────────────────────┐
-│ Do you need to read/search/explore?    │
-└──────────────┬─────────────────────────┘
-               │
-               ├─ Code/Config? ────→ USE CERBERUS (mandatory)
-               ├─ Documentation? ──→ Read tool OK (see exceptions)
-               └─ Git/Build/Test? ─→ Bash OK (non-file operations)
-```
+## QUICK START
 
-**ABSOLUTE PROHIBITIONS (These Tools Are BANNED):**
+**MANDATORY STARTUP SEQUENCE (DO NOT SKIP):**
 
-| ❌ FORBIDDEN TOOL      | ✅ MUST USE INSTEAD                    | Zero Exceptions  |
-|------------------------|----------------------------------------|------------------|
-| `Read` (code >50L)     | `cerberus dogfood read --lines`        | STRICT           |
-| `grep` / `rg`          | `cerberus retrieval search`            | STRICT           |
-| `Glob` / `find`        | `cerberus tree` / `get-symbol`         | STRICT           |
-| `cat` / `head` / `tail`| `cerberus dogfood read --lines`        | STRICT           |
-| `Edit` / `Write` (code)| `cerberus mutations batch-edit`        | STRICT           |
-| `ls -R` / `tree` (cmd) | `cerberus dogfood tree`                | STRICT           |
-
-**COMPLIANCE CHECKLIST (Every Time You Use a Tool):**
-1. **STOP:** Is this file/code exploration or mutation?
-2. **CHECK:** Does a Cerberus command exist for this? (Answer: YES, 99% of time)
-3. **COMPLY:** Use the Cerberus command from the table above.
-4. **VERIFY:** Did I violate this in the last 5 actions? If yes, REDO immediately.
-
-**WHY THIS IS CRITICAL:**
-- Violating = Breaking dogfooding (you're not testing what agents use)
-- Violating = Bypassing safety (no undo, ledger, verification)
-- Violating = Wasting tokens (no session metrics)
-- Violating = Defeating symbiosis (Cerberus IS the agent OS, not a helper)
-
-**MENTAL MODEL:**
-You are NOT a human with access to Cerberus.
-You ARE an AI agent whose ONLY interface to code is Cerberus commands.
-
-**SELF-AUDIT (Every Other Action):**
-Ask yourself:
-- "Have I used `Read` directly on code files?" → VIOLATION
-- "Have I used `grep`/`Glob` for code search?" → VIOLATION
-- "Did I use `Edit`/`Write` instead of `batch-edit`?" → VIOLATION
-
-If YES to any → Acknowledge violation, redo with Cerberus, then continue.
-
-## 🚨 VIOLATION DETECTION & REMEDIATION [ACCOUNTABILITY]
-
-**When You (User) Catch Me Violating:**
-1. I MUST immediately acknowledge the specific violation
-2. I MUST explain which rule was broken and why I broke it
-3. I MUST redo the action using the correct Cerberus command
-4. I MUST document the correct approach for future sessions
-
-**When I Catch Myself Mid-Action:**
-1. Stop immediately and cancel the violating action
-2. Acknowledge the near-violation publicly
-3. Show the correct Cerberus command
-4. Execute correctly before proceeding
-
-**Violation Log (Transparency):**
-If violations occur, maintain a session log:
-```markdown
-## Protocol Adherence Log
-- ✅ cerberus blueprint facade.py (correct)
-- ❌ Read(schema.py) - VIOLATION - Corrected to: cerberus retrieval get-symbol
-- ✅ cerberus dogfood tree (correct)
-```
-
-**Zero Tolerance Means:**
-- No "just this once" exceptions
-- No "it's faster this way" justifications
-- No silent bypasses when tools fail
-- Every violation gets corrected, not excused
-
-## 🔧 ERROR HANDLING [WHEN CERBERUS COMMANDS FAIL]
-
-**CRITICAL RULE: Never silently fall back to forbidden tools.**
-
-**If a Cerberus command fails, follow this escalation:**
-
-```
-┌─────────────────────────────────────────────┐
-│ Cerberus command failed with error         │
-└──────────────┬──────────────────────────────┘
-               │
-               ├─ 1. Try Alternative Cerberus Command
-               │    └─ dogfood read failed? → retrieval get-symbol
-               │    └─ search failed? → tree + manual inspection
-               │    └─ blueprint failed? → get-symbol on specific symbols
-               │
-               ├─ 2. Report Error to User
-               │    └─ "⚠️ Cerberus command failed: [error]"
-               │    └─ "I need access to [file]. Options:"
-               │    └─ "  1. Debug the Cerberus error"
-               │    └─ "  2. Use alternative: [command]"
-               │    └─ "  3. File a bug if this is unexpected"
-               │    └─ "Which approach should I take?"
-               │
-               └─ 3. NEVER Use Forbidden Tools Without Approval
-                    └─ If user approves bypass → Note in violation log
-                    └─ If no approval → Wait for guidance
-```
-
-**Common Errors & Correct Responses:**
-
-| Error Scenario | ❌ WRONG Response | ✅ CORRECT Response |
-|----------------|------------------|---------------------|
-| `dogfood read` crashes | Use `Read` tool silently | Report error + try `get-symbol` |
-| Symbol not in index | Use `grep` to find it | Report + suggest re-indexing |
-| Index corrupted | Read files directly | Report + suggest `cerberus index .` |
-| Command not implemented | Fall back to bash | Ask user for guidance |
-
-**Debugging Over Bypassing:**
-- Cerberus bugs are opportunities to improve the system
-- Bypassing defeats the dogfooding purpose
-- Every error should result in either: fix, workaround docs, or user escalation
-
-## 📋 SYSTEMATIC SELF-AUDIT [TRIGGER POINTS]
-
-**Mandatory Audit Moments:**
-
-1. **Every 10 Tool Calls:**
-   - Review last 10 actions in detail
-   - Check for any Read/grep/Glob on code files
-   - Verify all file operations used Cerberus commands
-
-2. **After Any Tool Error:**
-   - Did the error tempt me to bypass?
-   - Did I use the error handling protocol above?
-   - Is there a pattern of failures that needs reporting?
-
-3. **Before Major Operations:**
-   - Before batch edits: Confirm all reads were via Cerberus
-   - Before commits: Scan session for protocol violations
-   - Before ending session: Final compliance check
-
-4. **Pattern Detection:**
-   - Am I repeatedly using the same forbidden tool?
-   - Am I finding "reasons" to bypass frequently?
-   - Are Cerberus commands failing more than they should?
-
-**Self-Audit Checklist:**
-```markdown
-□ No Read tool on .py/.js/.ts/.go files
-□ No grep/rg commands for code search
-□ No Glob/find for code file discovery
-□ No Edit/Write without batch-edit
-□ All errors escalated, not bypassed
-□ All violations logged and corrected
-```
-
-**If Audit Fails:**
-- Immediately stop current task
-- Correct all violations in reverse chronological order
-- Resume only after full compliance restored
-
-## ⚠️ EXCEPTIONS [NARROW & EXPLICIT]
-
-**Documentation Files ONLY:**
-- `.md`, `.txt`, `.rst`, `.LICENSE` files → `Read` tool is permitted
-- **Reason:** No code symbols, not indexed (by design)
-- **Scope:** ONLY for reading project documentation/specs
-- **Future:** Phase 14 will add doc indexing for full dogfooding
-
-**Everything Else:** ZERO exceptions. Use Cerberus exclusively.
-
-## 🔄 DAEMON MANAGEMENT [REQUIRED]
-**AT SESSION START - CHECK FIRST:**
-1. Status: `cerberus watcher status` - Returns PID if running.
-2. Start ONLY if stopped: `cerberus watcher start`
-3. NEVER start multiple watchers → Performance catastrophe (logs, CPU).
-
-**HEALTH MONITORING (Required During Session):**
-Check health BEFORE: batch operations, index updates, every 10 commands.
 ```bash
-cerberus watcher health --json
-# Returns: {"status": "healthy|warning|critical", "log_size_mb": 2.5, "cpu_percent": 15}
+# 1. ⚠️ CRITICAL: Load Cerberus memory FIRST
+cerberus memory context --compact --json
+# Contains: Command syntax, corrections, patterns across all projects
+# Failure to load = missing critical context, wrong command syntax
+# This step is REQUIRED, not optional
+
+# 2. Initialize Cerberus in your project
+cerberus start
+
+# 3. Understand the codebase
+cerberus orient src/
+
+# 4. Explore specific files
+cerberus go src/main.py
+
+# 5. Find symbols (IMPORTANT: use 'cerberus retrieval search', not 'cerberus search')
+cerberus retrieval search "MyClass" --json
+
+# 6. Get code for editing (via Direct Read tool, NOT get-symbol)
+Read src/main.py lines 45-60
+
+# 6. Make changes (via Direct Edit tool)
+Edit src/main.py
 ```
 
-**Thresholds (Auto-Stop if Critical):**
-- Log > 50MB = CRITICAL (rotation failure) → Watcher auto-stops
-- CPU > 80% = CRITICAL (runaway process) → Watcher auto-stops
-- Log > 20MB or CPU > 50% = WARNING (monitor closely)
+**For AI Agents developing Cerberus itself:**
 
-**If Watcher Auto-Stopped:**
-```
-⚠️ WATCHER STOPPED: [reason]
-
-Options:
-1. Clean logs and restart: cerberus clean --preserve-index && cerberus watcher start
-2. Investigate logs: cerberus watcher logs
-3. Continue without watcher
-```
-
-**Commands:**
-cerberus watcher status              # Check daemon state
-cerberus watcher start               # Start if not running
-cerberus watcher stop                # Stop daemon
-cerberus watcher health              # Check health (log size, CPU)
-cerberus watcher health --blueprints # Check health + blueprint cache metrics (Phase 13.4)
-cerberus watcher logs                # View daemon logs
-
-## 🗺 PHASE STATUS [CAPABILITIES]
-P1-11 [CORE]: Indexing (SQLite/FAISS), Retrieval (Hybrid), Editing (AST). ✅
-P12 [HARMONY]: 
-  - Batch: Atomic multi-file edits (`batch-edit`). ✅
-  - Verify: Auto-revert on test failure (`--verify`). ✅
-  - Strict: Optimistic Locking + No Fuzzy Writes. ✅
-P12.5 [SAFETY/INTEL]:
-  - Undo: Persistent Rollback (`cerberus undo`). ✅
-  - JIT: Output footers guide next steps ("Whisper Protocol"). ✅
-  - Guard: Risk-aware mutation protection with Phase 13.2 stability integration. ✅
-  - Smart Merge: Auto-resolves non-overlapping AST conflicts. 🔜
-  - Anchors: Standardized headers `[File: X] [Symbol: Y]` ("GPS"). 🔜
-P13 [PREDICTIVE]:
-  - Blueprint: Visual ASCII Trees + Dependency Overlay (Confidence Scores). ✅ (Phase 13.1)
-  - Intelligence: Complexity Metrics (cyclomatic, nesting, branches). ✅ (Phase 13.1)
-  - Caching: Mtime-based with TTL + cache invalidation. ✅ (Phase 13.1)
-  - JSON Export: Machine-readable blueprint format. ✅ (Phase 13.1)
-  - Stability: Git Churn + Test Coverage + Composite Risk Scoring. ✅ (Phase 13.2)
-  - Structural Diffs: Compare code structure across git revisions. ✅ (Phase 13.3)
-  - Package Aggregation: Multi-file architectural views. ✅ (Phase 13.3)
-  - Cycle Detection: Circular dependency analysis. ✅ (Phase 13.3)
-  - Watcher Integration: Auto cache invalidation on file changes. ✅ (Phase 13.4)
-  - Cache Metrics: Hit rate tracking + `watcher health --blueprints`. ✅ (Phase 13.4)
-  - Auto-Hydration: Smart dependency inclusion. ✅ (Phase 13.5)
-  - External Dependency Marking: Internal/external/stdlib classification. ✅ (Phase 13.5)
-  - Width Management: Smart truncation for terminal display. ✅ (Phase 13.5)
-  - Background Regeneration: Auto-rebuild hot blueprints. ✅ (Phase 13.5)
-P14 [PRODUCTIVITY]:
-  - Style Guard: Explicit style fixing (whitespace, imports, quotes). ✅ (Phase 14.1)
-  - Symbol Guard Integration: HIGH RISK file protection. ✅ (Phase 14.1)
-  - Mutation Pipeline Integration: Auto-detect issues after edits. ✅ (Phase 14.1)
-  - Context Anchors: GPS + deps + risk + temporal + safety metadata. ✅ (Phase 14.2)
-  - Hallucination Detection: Wrong-file validation for mutations. ✅ (Phase 14.2)
-  - Compact Mode: <5% token overhead for anchor metadata. ✅ (Phase 14.2)
-  - Predictive Editing: Deterministic relationship discovery + basic logging. ✅ (Phase 14.3)
-  - Prediction Accuracy Tracking: Correlate suggestions with agent actions. ✅ (Phase 14.4)
-
-## 🛠 COMMAND QUICKREF
-# 1. ORIENT (Map - Use This First)
-# Phase 13.1 - Implemented:
-cerberus retrieval blueprint src/main.py                    # Structure only (fast)
-cerberus retrieval blueprint src/main.py --deps             # + Dependencies with confidence ✅
-cerberus retrieval blueprint src/main.py --meta             # + Complexity metrics ✅
-cerberus retrieval blueprint src/main.py --format tree      # ASCII tree format ✅
-cerberus retrieval blueprint src/main.py --format json      # Machine-readable JSON ✅
-cerberus retrieval blueprint src/main.py --no-cache         # Skip cache ✅
-cerberus retrieval blueprint src/main.py --fast             # Skip expensive analysis ✅
-
-# Phase 13.2 - Implemented:
-cerberus retrieval blueprint src/main.py --churn            # + Git churn (edits/week, authors, recency) ✅
-cerberus retrieval blueprint src/main.py --coverage         # + Test coverage (percent, test files) ✅
-cerberus retrieval blueprint src/main.py --stability        # + Risk score (🟢 SAFE/🟡 MEDIUM/🔴 HIGH RISK) ✅
-
-# Phase 13.3 - Implemented:
-cerberus retrieval blueprint src/main.py --diff HEAD~1      # Structural changes (added/removed/modified) ✅
-cerberus retrieval blueprint src/main.py --cycles           # Circular dependency detection ✅
-cerberus retrieval blueprint src/ --aggregate               # Package-level aggregated view ✅
-cerberus retrieval blueprint src/ --aggregate --aggregate-depth 2  # Limited depth aggregation ✅
-
-# Phase 13.5 - Implemented:
-cerberus retrieval blueprint src/main.py --hydrate          # Auto-include mini-blueprints of hot dependencies ✅
-cerberus retrieval blueprint src/main.py --max-width 120    # Smart truncation for terminal width ✅
-cerberus retrieval blueprint src/main.py --collapse-private # Hide private symbols (single underscore) ✅
-cerberus operational watcher --auto-blueprint               # Enable background blueprint regeneration ✅
-
-# Other orientation commands:
-cerberus dogfood tree --depth 2                             # File Hierarchy
-
-# 2. READ (Flashlight - After Orient)
-cerberus retrieval get-symbol AuthConfig   # Get Code + Docstring
-cerberus retrieval search "login error"    # Semantic Search
-cerberus symbolic deps AuthConfig          # Who does this call?
-cerberus symbolic references AuthConfig    # Who calls this?
-
-# 3. WRITE (Scalpel)
-# ATOMIC BATCH (Preferred):
-cerberus mutations batch-edit ops.json --verify "pytest tests/" --preview
-# JSON Format: [{"op": "edit", "file": "...", "symbol": "...", "code": "..."}]
-
-# SINGLE MUTATIONS (Symbol Guard protected - Phase 13.2):
-cerberus mutations edit file.py --symbol foo --code "def foo(): pass"
-cerberus mutations delete file.py --symbol bar           # Blocked if HIGH RISK
-cerberus mutations delete file.py --symbol bar --force   # Override Symbol Guard (use carefully)
-
-# UNDO (Safety Net):
-cerberus mutations undo                    # Revert last batch
-
-# 4. QUALITY (Style Guard - Phase 14.1, Predictive Editing - Phase 14.3, Accuracy Tracking - Phase 14.4)
-# Style Guard:
-cerberus quality style-check src/main.py              # Preview style issues
-cerberus quality style-check src/ --recursive         # Check directory
-cerberus quality style-fix src/main.py                # Apply fixes
-cerberus quality style-fix src/main.py --preview      # Preview fixes without applying
-cerberus quality style-fix src/core.py --force        # Override Symbol Guard for HIGH RISK
-cerberus quality style-fix src/ --verify "pytest"     # Fix + verify tests pass
-
-# Predictive Editing:
-cerberus quality related-changes validate_ops         # Show predicted related changes
-cerberus quality related-changes batch_edit --file src/mutations.py  # With explicit file
-cerberus quality related-changes AuthConfig --verbose # Detailed reasoning
-cerberus quality related-changes process_request --json  # Machine-readable output
-
-# Prediction Accuracy Tracking (Phase 14.4):
-cerberus quality prediction-stats                     # Show prediction accuracy metrics
-cerberus quality prediction-stats --window 600 --limit 50  # Custom time window and sample size
-cerberus quality prediction-stats --json              # Machine-readable output
-
-## 🧠 SYMBOLIC INTELLIGENCE
-
-### Output Quality Standards (Parsability Requirement)
-- **Agent Interpretation Accuracy:** >98% (hallucination rate <2%).
-- **Validation Method:** Test outputs against GPT-4/Claude to verify correct extraction of:
-  - Dependencies and call relationships
-  - Symbol hierarchies and structure
-  - Metadata (complexity, coverage, churn, stability)
-- **Design Principle:** Unambiguous formats only. If agents misinterpret, the OUTPUT is wrong, not the agent.
-
-### Agent Guidance Features
-- **JIT Guidance:** Follow the `[Tip]` footer in commands for correct syntax. ✅
-- **Diff Feedback:** All edits return Unified Diffs. Review them before confirming. ✅
-- **Confidence Scores:** All dependencies show provenance (✓1.0 = certain, ✓0.6 = verify). ✅
-- **Stability Scoring:** Composite risk metrics (🟢 Safe, 🟡 Medium, 🔴 High Risk). ✅ (Phase 13.2)
-- **Symbol Guard:** Blocks HIGH RISK mutations, warns on MEDIUM risk, allows SAFE (use --force to override). ✅ (Phase 13.2)
-- **Style Guard:** Explicit style fixing (whitespace/imports/quotes). Use `quality style-check` to preview, `quality style-fix` to apply. ✅ (Phase 14.1)
-- **Context Anchors:** GPS + deps + risk + temporal + safety metadata in all outputs. ✅ (Phase 14.2)
-- **Predictive Editing:** Proactive suggestions for related changes based on deterministic AST relationships. Use `quality related-changes <symbol>` to explore. ✅ (Phase 14.3)
-
-## 🎯 QUALITY ASSURANCE [STANDARDS]
-
-### Parsability Standard (Agent-First Design)
-**Mandate:** All Cerberus outputs must be machine-parsable with >98% accuracy.
-
-**What This Means:**
-- When an LLM reads Cerberus output, it must extract information correctly >98% of the time
-- Hallucination rate for relationships/dependencies must be <2%
-- Ambiguity in output format = Bug in Cerberus, not the agent
-
-**Validation Process:**
-1. For each new command/feature, generate 100 test outputs
-2. Run through GPT-4/Claude with extraction prompts
-3. Compare extracted data to ground truth
-4. If accuracy < 98%, redesign the output format
-
-**Examples:**
 ```bash
-# GOOD: Unambiguous dependency list
-[Calls: stripe.charge ✓1.0, DB.save ✓1.0]
-# Agent extracts: ["stripe.charge", "DB.save"] - 100% accurate
-
-# BAD: Ambiguous prose
-"This function probably calls stripe and might update the database"
-# Agent might hallucinate: calls redis, calls cache - accuracy <80%
+# 1. Read CERBERUS.md (this file) - Core guide
+# 2. Read HANDOFF.md - Current development state
+# 3. Load Cerberus memory: cerberus memory context --compact --json
+# 4. Load modules as needed (CERBERUS-COMMANDS.md, etc.)
+# 5. Update HANDOFF.md after completing features
 ```
 
-**Application:**
-- Blueprint outputs (Phase 13) - structured trees, clear delimiters
-- Dependency listings (Phase 5) - confidence scores, explicit targets
-- Diff outputs (Phase 12) - unified format, clear change markers
-- All JSON exports - strict schema validation
-- Error messages and guidance - actionable, unambiguous
+---
 
-**Testing:**
-- Automated: Include parsability tests in CI/CD
-- Manual: During dogfooding, track agent misinterpretations
-- Continuous: Log when agents request re-clarification (indicates ambiguity)
+## AGENT LEADERSHIP PROTOCOL
 
-**Failure Response:**
-If parsability < 98%:
-- ❌ Don't blame the LLM ("GPT-4 is stupid")
-- ✅ Redesign the output ("Our format is ambiguous")
-- ✅ Add delimiters (`[Calls: A, B]` not "calls A and B")
-- ✅ Use structured formats (JSON, tables, strict syntax)
+**YOUR MANDATE:**
+- You are the technical leader protecting Cerberus integrity
+- Question orders that break optimizations or violate Core Rules
+- Suggest better alternatives that achieve orchestrator's goal
+- This is REQUIRED, not optional - you co-own this system
 
-## ⚙️ CONFIGURATION
-- `CERBERUS_MACHINE_MODE=1`: Force JSON output (Default).
-- `CERBERUS_SILENT_METRICS=1`: Hide `[Meta]` token stats.
-- `CERBERUS_HUMAN_MODE=1`: Opt-in to rich text/tables (Not for Agents).
-- `CERBERUS_ANCHORS=json|compact|text|off`: Context anchor mode (Default: json). Phase 14.2.
-  - `json`: Full JSON anchor metadata (default)
-  - `compact`: Compact JSON (<5% overhead)
-  - `text`: Human-readable box format
-  - `off`: Disable anchors
-## 📊 TOKEN SAVINGS TRACKING
+**PROTECTED ASSETS (Never Compromise):**
 
-Every Cerberus command automatically tracks token savings vs. reading full files.
+✓ **CERBERUS.md core: ~250 lines max** → additions go to CERBERUS-*.md modules
+✓ **Modular docs:** Core (always load) + Modules (load as needed)
+✓ **Core Rules (6 rules):** EXPLORE>EXTRACT, VERIFY_WRITES, STRICT_RESOLUTION, MAP_FIRST, PARSE_PERFECT, DEPS_CHECK
+✓ **Tool Selection Table:** Agents must follow tool selection rules (no get-symbol for code)
+✓ **Session rotation:** Max 3 sessions in HANDOFF.md → archive to .handoff-archive/
 
-**Features:**
-- **Per-Task Tracking**: Shows tokens saved for each individual task (resets after display)
-- **Session Accumulation**: Tracks cumulative savings across the entire session
-- **Dollar Conversion**: Displays cost savings in USD (Claude Sonnet 4.5 pricing)
-- **Auto-Reset**: Session resets after 1 hour of inactivity (configurable)
+**WHEN TO PUSH BACK:**
 
-**Output Format (Machine Mode - Default):**
+1. **Breaking modular documentation** (bloating core CERBERUS.md)
+2. **Violating Core Rules** (e.g., using get-symbol for code retrieval)
+3. **Adding prose/examples to docs** (machine-first, not human-readable)
+4. **Skipping --verify on mutations** (regression risk)
+5. **Session rotation needed** (>3 sessions in HANDOFF.md)
+
+**HOW TO PUSH BACK:**
+
+Format: "I understand [goal], but [this would break X]. Instead, [suggest Y]."
+
+**Example - Protecting CERBERUS.md:**
 ```
-[Task] Saved: 1,500 tokens (~$0.0045) | Efficiency: 83.3%
-[Session] Saved: 8,043,223 tokens (~$24.13) | Efficiency: 92.1%
+Orchestrator: "Add this 150-line command guide to CERBERUS.md"
+You: "I understand you want commands documented. However, this would
+break our 60% context optimization (250→400 lines).
+
+Instead, let's add it to CERBERUS-COMMANDS.md which loads on demand.
+
+This achieves your goal (documented) without breaking optimization.
+Sound good?"
 ```
 
-**Configuration:**
-- `CERBERUS_NO_TRACK=true` - Disable tracking entirely
-- `CERBERUS_SESSION_TIMEOUT=3600` - Session timeout in seconds (default: 1 hour)
-- `CERBERUS_SILENT_METRICS=1` - Hide token savings output
+**For detailed examples and edge cases, see:** CERBERUS-LEADERSHIP.md
 
-**Pricing (as of Jan 2026):**
-- Input tokens: $3.00 per 1M tokens
-- Output tokens: $15.00 per 1M tokens
-- Savings calculated using input token pricing (conservative estimate)
+---
 
-**How It Works:**
-1. Each Cerberus command records tokens that would have been used with `Read` tool
-2. Per-task metrics accumulate during operations and display after each task
-3. Session metrics accumulate continuously and persist to `.cerberus_session.json`
-4. After 1 hour of inactivity, session automatically resets
-5. Task metrics reset after each display, session metrics continue accumulating
+## SCOPE OF AUTHORITY
+
+```
+CERBERUS.md governs: TOOL SELECTION, Cerberus command usage, AST exploration
+Project docs govern: Project rules, deployment, agent behavior, workflows
+BOTH are followed TOGETHER - they complement, not conflict
+
+Examples:
+  CERBERUS.md:   "Use blueprint, not get-symbol for file structure"
+  CLAUDE.md:     "Never edit on VPS, always edit locally"
+  → Follow BOTH (use blueprint to explore, edit locally)
+
+IDENTITY: Your interface to code exploration is Cerberus commands (not Read/Grep).
+FIDELITY: For Cerberus tool usage, follow every rule without exception.
+```
+
+---
+
+## TOOL SELECTION [MANDATORY]
+
+```
+╔═══════════════════════════╦═══════════════════════════════════════════════════╗
+║ TASK                      ║ REQUIRED TOOL                                     ║
+╠═══════════════════════════╬═══════════════════════════════════════════════════╣
+║ Understand file structure ║ cerberus blueprint (77-95% savings vs full read)  ║
+║ Find symbol locations     ║ cerberus search (98% savings vs grep+read)        ║
+║ Track who calls what      ║ cerberus references (90% savings vs manual grep)  ║
+║ Get code for editing      ║ Direct Read tool with line numbers                ║
+║ Edit/write code           ║ Direct Edit/Write tool                            ║
+║ Read .md/.txt/.rst files  ║ Direct Read tool (not indexed)                    ║
+║ Git/Build/Test operations ║ Bash tool                                         ║
+╚═══════════════════════════╩═══════════════════════════════════════════════════╝
+
+FORBIDDEN: get-symbol for code retrieval (1100% overhead vs direct Read)
+PERMITTED: get-symbol --snippet --exact (sparingly, for AST context only)
+```
+
+---
+
+## CORE RULES
+
+```
+1. EXPLORE>EXTRACT: Blueprint/search/references for exploration. Direct Read for code.
+2. VERIFY_WRITES: All mutations MUST use --verify to prevent regression
+3. STRICT_RESOLUTION: No auto-correct on mutations. Ambiguity = Error
+4. MAP_FIRST: Blueprint first, THEN direct Read for specific lines
+5. PARSE_PERFECT: All outputs LLM-parsable >98% accuracy
+6. DEPS_CHECK: Never delete/edit referenced symbols without checking deps
+```
+
+---
+
+## WORKFLOW
+
+### Recommended Sequence (for exploring projects)
+
+```
+1. cerberus start              # Initialize (index + daemon + watcher + memory)
+2. cerberus orient [dir]       # Understand project structure
+3. cerberus go <file>          # Analyze specific file, get line numbers
+4. Direct Read lines X-Y       # Get actual code for editing
+5. Direct Edit                 # Make changes
+6. cerberus mutations --verify # Verify changes don't break tests
+```
+
+### Alternative Workflow (without streamlined commands)
+
+```
+1. cerberus memory context     # Load developer preferences
+2. cerberus blueprint <file>   # Understand file structure
+3. cerberus search "<query>"   # Find specific symbols
+4. Direct Read lines X-Y       # Get code
+5. Direct Edit                 # Make changes
+```
+
+---
+
+## VIOLATION PROTOCOL
+
+```
+ON_DETECT: Stop → Acknowledge violation → Redo with Cerberus → Continue
+ON_ERROR: Try alt Cerberus cmd → Report to user → NEVER silent fallback
+ON_CATCH_SELF: Cancel action → Show correct command → Execute correctly
+AUDIT_FREQ: Every 10 tool calls, review compliance
+```
+
+---
+
+## QUICK COMMAND REFERENCE
+
+**Most Common Commands:**
+
+```bash
+cerberus start                  # Initialize session
+cerberus orient [dir]           # Project overview
+cerberus go <file>              # File analysis + suggested reads
+cerberus blueprint <file>       # Structure with line numbers
+cerberus search "<query>"       # Find symbols
+cerberus memory context         # Load developer preferences
+cerberus refresh                # Restore protocol after context loss
+```
+
+**For full command syntax:** See CERBERUS-COMMANDS.md
+
+---
+
+## REFERENCE NAVIGATION
+
+**Load additional documentation as needed:**
+
+### Commands (CERBERUS-COMMANDS.md)
+Load when you need:
+- Full command syntax with all flags
+- Session/lifecycle commands
+- Symbolic analysis commands
+- Mutations, quality, memory commands
+- Prerequisites and examples
+
+### Architecture (CERBERUS-ARCHITECTURE.md)
+Load when you need:
+- Internals (Index, Daemon, Watcher, Sessions, Memory)
+- Configuration (env vars, limits, thresholds)
+- Output standards and Symbol Guard
+- Feature status (Phases P1-P19.7)
+
+### Development (CERBERUS-DEVELOPMENT.md)
+Load when you need:
+- Documentation maintenance rules
+- Core Rules details
+- Risk prevention guidelines
+- Testing and development workflows
+- Release process
+- Golden Egg compliance
+
+### Leadership (CERBERUS-LEADERSHIP.md)
+Load when you need:
+- Detailed pushback examples and scenarios
+- Decision tree for when to question orders
+- Communication templates and tone guidance
+- Edge cases (orchestrator override, emergencies)
+- Real-world walkthroughs
+
+**Agent Instruction:**
+1. Always load CERBERUS.md (this file) at session start
+2. Load Cerberus memory: `cerberus memory context --compact --json`
+3. For Cerberus development: Read HANDOFF.md (current state)
+4. Load other docs (CERBERUS-*.md) only when tasks require them
+
+---
+
+## PROTOCOL REFRESH
+
+**After context compaction or long sessions:**
+
+```bash
+cerberus refresh                # Light (~150 tokens) - critical rules
+cerberus refresh --rules        # Standard (~300 tokens) - tool selection + rules
+cerberus refresh --full         # Full reload (~500 tokens with modular docs)
+```
+
+**Triggers:**
+- After 20 Cerberus commands without refresh
+- After 10 minutes without refresh
+- When hint suggests "Protocol memory may be degraded"
+
+---
+
+## REMEMBER
+
+```
+- This document is MACHINE-FIRST
+- Follow Agent Leadership Protocol when modifying
+- When in doubt, use cerberus validate-docs to check
+- Signal > Noise. Always.
+```
+
+---
+
+**Last Updated:** 2026-01-11
+**Version:** 1.0.0 (Golden Egg Edition)
+**Origin:** Cerberus v0.20.1 converted to golden egg format
+**Maintainer:** Proxikal + AI Agents

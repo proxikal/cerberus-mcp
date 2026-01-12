@@ -9,6 +9,8 @@ import tempfile
 import os
 from pathlib import Path
 
+pytestmark = pytest.mark.fast
+
 from cerberus.anchoring import (
     ContextAnchorV2,
     AnchorConfig,

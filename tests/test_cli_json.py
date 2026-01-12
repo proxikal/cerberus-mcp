@@ -1,9 +1,14 @@
+"""CLI JSON output tests."""
+
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from cerberus.main import app
+
+pytestmark = pytest.mark.fast
 
 runner = CliRunner()
 TEST_FILES_DIR = Path(__file__).parent / "test_files"

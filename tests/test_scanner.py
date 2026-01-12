@@ -1,6 +1,10 @@
+"""Unit tests for the scanner module."""
+
 import os
 import pytest
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 
 # This import will fail until we create the scanner module
 # We are practicing Test-Driven Development (TDD)

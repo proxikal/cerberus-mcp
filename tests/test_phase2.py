@@ -8,6 +8,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
+pytestmark = [pytest.mark.fast, pytest.mark.phase2]
+
 from cerberus.schemas import (
     CodeSymbol,
     ScanResult,

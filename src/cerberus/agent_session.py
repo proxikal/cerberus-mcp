@@ -140,13 +140,13 @@ class SessionTracker:
 
         self.enabled = not no_track and track_session
 
-        # Dogfooding safeguard: if we are in the Cerberus repo itself, use a separate session file
-        # to avoid polluting user sessions.
-        is_dev = os.path.exists(os.path.join(os.getcwd(), ".git")) and "Cerberus" in os.getcwd()
-        if is_dev:
-            self.session_file = os.path.join(os.getcwd(), ".cerberus_dev_session.json")
-        else:
-            self.session_file = os.path.join(os.getcwd(), ".cerberus_session.json")
+        # Use centralized paths for session file location
+        from cerberus.paths import get_paths
+        paths = get_paths()
+        # Ensure .cerberus directory exists
+        paths.ensure_dirs()
+        # Get appropriate session file based on dev mode
+        self.session_file = str(paths.get_session_file())
 
         if self.enabled:
             # Load existing session or create new one

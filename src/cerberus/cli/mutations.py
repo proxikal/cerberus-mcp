@@ -20,6 +20,8 @@ from .common import load_index_or_exit, get_default_index
 from .config import CLIConfig
 from .guidance import GuidanceProvider
 from .anchoring import ContextAnchor
+# Phase 19.2: Efficiency Hints
+from .hints import EfficiencyHints
 
 app = typer.Typer()
 console = get_console()
@@ -37,6 +39,7 @@ def edit_cmd(
     no_format: bool = typer.Option(False, "--no-format", help="Skip auto-formatting"),
     no_imports: bool = typer.Option(False, "--no-imports", help="Skip import injection"),
     force: bool = typer.Option(False, "--force", help="Bypass Symbol Guard protection (Phase 13.2)"),
+    check_corrections: bool = typer.Option(False, "--check-corrections", help="[PHASE 18] Check code against Session Memory corrections"),
     index_path: Optional[Path] = typer.Option(
         None,
         "--index",
@@ -55,6 +58,7 @@ def edit_cmd(
 
     Phase 11: The Surgical Writer - replaces symbols without full-file rewrites.
     Phase 13.2: Symbol Guard protection with --force override.
+    Phase 18: Session Memory correction checking with --check-corrections.
     """
     # Validate input
     if not code and not code_file:
@@ -84,6 +88,30 @@ def edit_cmd(
             else:
                 console.print(f"[red]Error: Failed to read {code_file}: {e}[/red]")
             raise typer.Exit(code=1)
+
+    # Phase 18: Check code against Session Memory corrections
+    correction_warnings = []
+    if check_corrections and code:
+        try:
+            from cerberus.memory.corrections import CorrectionManager
+            correction_mgr = CorrectionManager()
+            corrections = correction_mgr.load_corrections()
+
+            code_lower = code.lower()
+            for c in corrections.corrections:
+                # Check if the pattern (or keywords from it) appears in the new code
+                pattern_keywords = [w for w in c.pattern.lower().split() if len(w) > 3]
+                for keyword in pattern_keywords:
+                    if keyword in code_lower:
+                        correction_warnings.append({
+                            "id": c.id,
+                            "pattern": c.pattern,
+                            "note": c.note or c.correction,
+                            "frequency": c.frequency
+                        })
+                        break  # One match per correction is enough
+        except Exception as e:
+            logger.debug(f"Session Memory correction check failed: {e}")
 
     # Load index
     index_path = get_default_index(index_path)
@@ -121,6 +149,10 @@ def edit_cmd(
     if CLIConfig.is_machine_mode() or json_output:
         # Machine mode: pure JSON with predictions
         output_data = result.model_dump()
+
+        # Phase 18: Add correction warnings to output
+        if correction_warnings:
+            output_data["correction_warnings"] = correction_warnings
 
         # Phase 14.4: Record action for accuracy tracking
         if result.success:
@@ -198,6 +230,13 @@ def edit_cmd(
                 for warning in result.warnings:
                     console.print(f"  - {warning}")
 
+            # Phase 18: Show Session Memory correction warnings
+            if correction_warnings:
+                console.print("[yellow]📝 Session Memory Correction Warnings:[/yellow]")
+                for cw in correction_warnings:
+                    console.print(f"  - {cw['note']} (corrected {cw['frequency']}x)")
+                console.print("[dim]   Review these patterns to avoid past mistakes[/dim]")
+
             # Phase 14.1: Style detection (suggest fixes if issues found)
             try:
                 detector = StyleDetector()
@@ -240,6 +279,16 @@ def edit_cmd(
                         console.print(f"[dim]💡 Review with: cerberus quality related-changes {symbol}[/dim]")
                 except Exception as e:
                     logger.debug(f"Prediction engine failed: {e}")
+
+            # Phase 19.2: Hint about corrections when not using --check-corrections
+            if not check_corrections and not correction_warnings:
+                correction_hint = EfficiencyHints.check_corrections_available(
+                    file_path=str(file),
+                    symbol_name=symbol,
+                    used_check_corrections=check_corrections,
+                )
+                if correction_hint:
+                    console.print(f"\n[cyan]{correction_hint.to_human()}[/cyan]")
 
             # Phase 12.5: JIT Guidance
             if GuidanceProvider.should_show_guidance(CLIConfig.is_machine_mode()):

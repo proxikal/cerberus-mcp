@@ -187,12 +187,14 @@ class BlueprintGenerator:
         Returns:
             List of CodeSymbol objects (deduplicated)
         """
+        import json as json_lib  # Avoid collision with outer json import
+
         try:
             cursor = self.conn.execute(
                 """
                 SELECT
                     name, type, file_path, start_line, end_line,
-                    signature, return_type, parameters, parent_class
+                    signature, return_type, parameters, parameter_types, parent_class
                 FROM symbols
                 WHERE file_path = ?
                 ORDER BY start_line ASC, name ASC
@@ -204,8 +206,12 @@ class BlueprintGenerator:
             for row in cursor.fetchall():
                 (
                     name, sym_type, fp, start_line, end_line,
-                    signature, return_type, parameters, parent_class
+                    signature, return_type, parameters, parameter_types, parent_class
                 ) = row
+
+                # Parse JSON fields (Phase 16.4 bugfix)
+                parsed_params = json_lib.loads(parameters) if parameters else None
+                parsed_param_types = json_lib.loads(parameter_types) if parameter_types else None
 
                 symbols.append(
                     CodeSymbol(
@@ -216,7 +222,8 @@ class BlueprintGenerator:
                         end_line=end_line,
                         signature=signature,
                         return_type=return_type,
-                        parameters=parameters,
+                        parameters=parsed_params,
+                        parameter_types=parsed_param_types,
                         parent_class=parent_class
                     )
                 )

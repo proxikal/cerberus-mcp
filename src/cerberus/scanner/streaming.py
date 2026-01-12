@@ -17,6 +17,7 @@ from cerberus.parser import parse_file
 from cerberus.parser.dependencies import extract_imports, extract_calls, extract_import_links, extract_method_calls
 from cerberus.parser.type_resolver import extract_types_from_file
 from cerberus.schemas import CallReference, CodeSymbol, FileObject, ImportReference, TypeInfo, ImportLink, MethodCall
+from cerberus.limits import get_limits_config
 from .config import DEFAULT_IGNORE_PATTERNS
 
 
@@ -57,6 +58,11 @@ def scan_files_streaming(
     Yields:
         FileResult for each parsed file
     """
+    # Apply default max_bytes from limits config if not provided
+    if max_bytes is None:
+        max_bytes = get_limits_config().max_file_bytes
+        logger.debug(f"Using default max_bytes from limits config: {max_bytes}")
+
     logger.info(f"Starting streaming scan on directory: '{directory}'")
 
     # Load ignore patterns

@@ -2,10 +2,10 @@
 
 **Cerberus** is a high-precision "Context Management Layer" designed for autonomous AI agents working on massive, complex codebases. It solves the **"Context Wall"** problem by serving deterministic, AST-aware, and token-optimized context on-demand.
 
-[![Version: 0.14.0](https://img.shields.io/badge/version-0.14.0-blue.svg)](#)
+[![Version: 0.20.0](https://img.shields.io/badge/version-0.20.0-blue.svg)](#)
 [![Status: Production-Ready](https://img.shields.io/badge/status-production--ready-green.svg)](#)
-[![Tests: 289/304 Passing](https://img.shields.io/badge/tests-289%2F304%20passing-brightgreen.svg)](#)
-[![Phase: 14.3 Complete](https://img.shields.io/badge/phase-14.3%20complete-blue.svg)](#)
+[![Tests: 610/611 Passing](https://img.shields.io/badge/tests-610%2F611%20passing-brightgreen.svg)](#)
+[![Phase: 19.5 Complete](https://img.shields.io/badge/phase-19.5%20complete-blue.svg)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](#)
 
 ---

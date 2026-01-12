@@ -15,6 +15,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
+pytestmark = [pytest.mark.integration, pytest.mark.phase3]
 
 class TestPhase3Integration:
     """Integration tests for Phase 3 complete workflow."""
@@ -73,7 +76,6 @@ class DatabaseConnection:
         \"\"\"Disconnect from database.\"\"\"
         pass
 
-
 def get_user_data(user_id):
     \"\"\"Retrieve user data from database.\"\"\"
     conn = DatabaseConnection()
@@ -81,7 +83,6 @@ def get_user_data(user_id):
     # Fetch data
     conn.disconnect()
     return data
-
 
 class User:
     \"\"\"User model.\"\"\"
@@ -109,7 +110,6 @@ class DatabaseConnection:
         \"\"\"Get connection pool size.\"\"\"
         return 10
 
-
 def get_user_data(user_id):
     \"\"\"Retrieve user data from database.\"\"\"
     conn = DatabaseConnection()
@@ -118,12 +118,10 @@ def get_user_data(user_id):
     conn.disconnect()
     return data
 
-
 def authenticate_user(username, password):
     \"\"\"Authenticate user with credentials.\"\"\"
     # New function
     return True
-
 
 class User:
     \"\"\"User model with authentication.\"\"\"
@@ -137,12 +135,8 @@ class User:
 
     def test_full_phase3_workflow(self):
         """Test complete Phase 3 workflow."""
-        print("\n" + "=" * 60)
-        print("Phase 3 Integration Test: Full Workflow")
-        print("=" * 60)
 
         # Step 1: Build initial index
-        print("\n[1/6] Building initial index...")
         from cerberus.index import build_index
 
         scan_result = build_index(
@@ -153,15 +147,12 @@ class User:
         )
 
         initial_symbol_count = len(scan_result.symbols)
-        print(f"  ✓ Created index with {initial_symbol_count} symbols")
-        print(f"  ✓ Git commit stored: {scan_result.metadata.get('git_commit', 'N/A')[:8]}")
 
         assert initial_symbol_count > 0
         assert scan_result.metadata.get("git_commit") is not None
         assert scan_result.project_root == str(self.test_dir.resolve())
 
         # Step 2: Verify initial search works
-        print("\n[2/6] Testing initial hybrid search...")
         from cerberus.retrieval import hybrid_search
 
         results = hybrid_search(
@@ -171,12 +162,10 @@ class User:
             top_k=5,
         )
 
-        print(f"  ✓ Found {len(results)} results for 'DatabaseConnection'")
         assert len(results) > 0
         assert any(r.symbol.name == "DatabaseConnection" for r in results)
 
         # Step 3: Modify files
-        print("\n[3/6] Modifying files...")
         self._modify_files()
 
         # Commit changes
@@ -188,20 +177,15 @@ class User:
             capture_output=True,
         )
 
-        print("  ✓ Modified test.py and committed changes")
-
         # Step 4: Detect changes
-        print("\n[4/6] Detecting changes via git diff...")
         from cerberus.incremental import detect_changes
 
         changes = detect_changes(self.test_dir, self.index_path)
 
         assert changes is not None
-        print(f"  ✓ Detected {len(changes.modified)} modified files")
         assert len(changes.modified) > 0
 
         # Step 5: Incremental update
-        print("\n[5/6] Performing incremental update...")
         from cerberus.incremental import update_index_incrementally
         import time
 
@@ -213,15 +197,10 @@ class User:
         )
         elapsed = time.time() - start_time
 
-        print(f"  ✓ Updated {len(result.updated_symbols)} symbols in {elapsed:.3f}s")
-        print(f"  ✓ Strategy: {result.strategy}")
-        print(f"  ✓ Files re-parsed: {result.files_reparsed}")
-
         assert len(result.updated_symbols) > 0
         assert result.strategy in ["incremental", "surgical"]
 
         # Step 6: Verify search finds new function
-        print("\n[6/6] Testing search on updated index...")
         results = hybrid_search(
             query="authenticate_user",
             index_path=self.index_path,
@@ -229,7 +208,6 @@ class User:
             top_k=5,
         )
 
-        print(f"  ✓ Found {len(results)} results for 'authenticate_user'")
         assert len(results) > 0
         assert any(r.symbol.name == "authenticate_user" for r in results)
 
@@ -241,34 +219,23 @@ class User:
             top_k=5,
         )
 
-        print(f"  ✓ Semantic search found {len(results)} results")
         assert len(results) > 0
-
-        print("\n" + "=" * 60)
-        print("✓ Phase 3 Integration Test PASSED")
-        print("=" * 60)
 
     def test_incremental_vs_full_reparse(self):
         """Compare incremental update speed vs full reparse."""
-        print("\n" + "=" * 60)
-        print("Phase 3 Performance Test: Incremental vs Full")
-        print("=" * 60)
 
         # Build initial index
         from cerberus.index import build_index
         import time
 
-        print("\n[1/3] Building initial index...")
         scan_result = build_index(
             directory=self.test_dir,
             output_path=self.index_path,
             respect_gitignore=False,
             store_embeddings=False,
         )
-        print(f"  ✓ Indexed {len(scan_result.symbols)} symbols")
 
         # Modify files
-        print("\n[2/3] Modifying files...")
         self._modify_files()
         subprocess.run(["git", "add", "."], cwd=self.test_dir, check=True, capture_output=True)
         subprocess.run(
@@ -279,7 +246,6 @@ class User:
         )
 
         # Time incremental update
-        print("\n[3/3] Comparing update methods...")
         from cerberus.incremental import detect_changes, update_index_incrementally
 
         changes = detect_changes(self.test_dir, self.index_path)
@@ -292,8 +258,6 @@ class User:
         )
         incremental_time = time.time() - start
 
-        print(f"  Incremental update: {incremental_time:.3f}s")
-
         # Time full reparse (build new index)
         full_index_path = self.test_dir / "full_index.json"
         start = time.time()
@@ -305,68 +269,9 @@ class User:
         )
         full_time = time.time() - start
 
-        print(f"  Full reparse: {full_time:.3f}s")
-
         speedup = full_time / incremental_time if incremental_time > 0 else 0
-        print(f"  Speedup: {speedup:.1f}x faster")
 
         # Incremental should be reasonably fast
         # Note: On tiny codebases, incremental may have overhead that makes it slower
         # Allow 2x margin for small files where git diff overhead dominates
         assert incremental_time <= full_time * 2.0
-
-        print("\n" + "=" * 60)
-        print(f"✓ Incremental update is {speedup:.1f}x faster")
-        print("=" * 60)
-
-
-if __name__ == "__main__":
-    """Run integration tests manually."""
-    import sys
-
-    test = TestPhase3Integration()
-
-    total_tests = 0
-    passed_tests = 0
-
-    print("\n" + "=" * 70)
-    print(" " * 20 + "PHASE 3 INTEGRATION TESTS")
-    print("=" * 70)
-
-    # Test 1: Full workflow
-    total_tests += 1
-    try:
-        test.setup_method()
-        test.test_full_phase3_workflow()
-        test.teardown_method()
-        passed_tests += 1
-    except Exception as e:
-        print(f"\n✗ Full workflow test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        try:
-            test.teardown_method()
-        except:
-            pass
-
-    # Test 2: Performance comparison
-    total_tests += 1
-    try:
-        test.setup_method()
-        test.test_incremental_vs_full_reparse()
-        test.teardown_method()
-        passed_tests += 1
-    except Exception as e:
-        print(f"\n✗ Performance test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        try:
-            test.teardown_method()
-        except:
-            pass
-
-    print("\n" + "=" * 70)
-    print(f"RESULTS: {passed_tests}/{total_tests} integration tests passed")
-    print("=" * 70)
-
-    sys.exit(0 if passed_tests == total_tests else 1)

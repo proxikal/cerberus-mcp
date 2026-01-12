@@ -446,7 +446,7 @@ class CerberusDaemonServer:
             if self.watcher:
                 try:
                     self.watcher.stop()
-                except:
+                except Exception:
                     pass
             remove_pid_file(self.pid_file)
             raise RuntimeError(f"Failed to start server: {e}")

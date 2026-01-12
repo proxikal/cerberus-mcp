@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS symbols (
     signature TEXT,
     return_type TEXT,
     parameters TEXT,  -- JSON array serialized as TEXT
+    parameter_types TEXT,  -- Phase 16.4: JSON dict {param_name: type_name}
     parent_class TEXT,
 
     FOREIGN KEY (file_path) REFERENCES files(path) ON DELETE CASCADE

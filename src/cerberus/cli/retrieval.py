@@ -33,6 +33,13 @@ from .guidance import GuidanceProvider
 from .anchoring import ContextAnchor
 # Phase 14.2: Context Anchors V2
 from cerberus.anchoring import ContextAnchorV2, AnchorConfig
+# Phase 16.2: Token Tracking
+from cerberus.metrics import get_tracker
+# Phase 19.2: Efficiency Hints
+from .hints import EfficiencyHints, get_hint_collector
+# Phase 19.3: Efficiency tracking
+from cerberus.metrics.efficiency import get_efficiency_tracker
+import os
 
 app = typer.Typer()
 console = get_console()
@@ -48,11 +55,19 @@ def get_symbol(
         dir_okay=False,
         readable=True,
     ),
+    # Phase 17: Context control (reduced default from 3 to 5, aliased as --context)
     padding: int = typer.Option(
-        3, "--padding", "-p", help="Number of context lines to include before/after the symbol."
+        5, "--padding", "-p", help="Number of context lines to include before/after the symbol."
+    ),
+    context: Optional[int] = typer.Option(
+        None, "--context", help="[PHASE 17] Alias for --padding. Number of context lines."
     ),
     skeleton: bool = typer.Option(
         False, "--skeleton", help="Return a skeletonized view of the file instead of full context."
+    ),
+    # Phase 17: Callers now opt-in (was always included)
+    show_callers: bool = typer.Option(
+        False, "--show-callers", help="[PHASE 17] Include caller information (opt-in for efficiency)."
     ),
     show_imports: bool = typer.Option(
         False, "--show-imports", help="Display detailed import information for the symbol's file."
@@ -60,8 +75,12 @@ def get_symbol(
     json_output: bool = typer.Option(
         False, "--json", help="Output results as JSON for agents."
     ),
+    # Phase 17: Fuzzy is opt-in (default is exact match)
     fuzzy: bool = typer.Option(
         False, "--fuzzy", help="[PHASE 2.1] Enable fuzzy matching (substring search)."
+    ),
+    exact: bool = typer.Option(
+        True, "--exact/--no-exact", help="[PHASE 17] Exact match only (default: True)."
     ),
     file: Optional[str] = typer.Option(
         None, "--file", help="[PHASE 2.1] Show all symbols in a specific file."
@@ -72,17 +91,36 @@ def get_symbol(
     auto_hydrate: bool = typer.Option(
         False, "--auto-hydrate", help="[PHASE 8] Auto-fetch skeletons of referenced internal types."
     ),
+    # Phase 17: New efficiency flags
+    limit: Optional[int] = typer.Option(
+        10, "--limit", help="[PHASE 17] Maximum number of results to return (default: 10)."
+    ),
+    snippet: bool = typer.Option(
+        False, "--snippet", help="[PHASE 17] Output raw code only, no JSON wrapper."
+    ),
 ):
     """
-    [ENHANCED - PHASE 2.1] Retrieves code for a symbol from the index with minimal context.
+    [ENHANCED - PHASE 2.1 + PHASE 17] Retrieves code for a symbol from the index with minimal context.
 
-    Now supports fuzzy matching for exploration!
+    Phase 17 Changes (Context Optimization):
+    - Callers now opt-in via --show-callers (not included by default)
+    - Context reduced to 5 lines by default (was 3)
+    - --limit caps results at 10 by default
+    - --snippet mode returns raw code only (most efficient)
+    - --exact is now default (fuzzy is opt-in)
+
+    WARNING: For code retrieval, direct file read is more efficient than get-symbol.
+             Use: blueprint to find location → Read to get code
 
     Examples:
-      cerberus get-symbol MyClass                             # Exact match
-      cerberus get-symbol "skeleto" --fuzzy                   # Fuzzy search
-      cerberus get-symbol --file src/cerberus/main.py         # All symbols in file
+      cerberus get-symbol MyClass --snippet               # Raw code only (efficient)
+      cerberus get-symbol "skeleto" --fuzzy               # Fuzzy search
+      cerberus get-symbol --file src/cerberus/main.py     # All symbols in file
     """
+    # Phase 17: Handle context alias
+    if context is not None:
+        padding = context
+
     # Default to cerberus.db in CWD if not provided
     if index_path is None:
         index_path = Path("cerberus.db")
@@ -103,7 +141,7 @@ def get_symbol(
     # Even with daemon routing, we need scan_result for caller/import info
     scan_result = load_index(index_path)
 
-    # Phase 2.1: Enhanced symbol finding
+    # Phase 2.1 + Phase 17: Enhanced symbol finding with limit
     if file:
         # Show all symbols in a file
         matches = [sym for sym in scan_result.symbols
@@ -119,16 +157,23 @@ def get_symbol(
             matches = [sym for sym in matches if sym.type == symbol_type]
         # Sort by name length (shorter = better match)
         matches = sorted(matches, key=lambda s: len(s.name))
+    elif name and exact:
+        # Phase 17: Exact matching is now default
+        matches = get_symbol_with_routing(name, index_path, use_daemon=True)
     elif name:
-        # Exact matching with Phase 9.5 daemon routing
+        # Fallback to exact if not fuzzy
         matches = get_symbol_with_routing(name, index_path, use_daemon=True)
     else:
         console.print("[red]Error: Provide either a symbol name or use --file flag.[/red]")
         console.print("Examples:")
-        console.print("  cerberus get-symbol MyClass")
+        console.print("  cerberus get-symbol MyClass --snippet")
         console.print("  cerberus get-symbol \"skeleto\" --fuzzy")
         console.print("  cerberus get-symbol --file src/cerberus/main.py")
         raise typer.Exit(code=1)
+
+    # Phase 17: Apply limit
+    if limit and len(matches) > limit:
+        matches = matches[:limit]
 
     if not matches:
         if CLIConfig.is_machine_mode():
@@ -163,12 +208,14 @@ def get_symbol(
             padding=padding,
             skeleton=skeleton,
         )
-        # Collect callsites referencing this symbol
-        callers = [
-            c.model_dump()
-            for c in scan_result.calls
-            if c.callee == symbol.name
-        ]
+        # Phase 17: Collect callsites ONLY if requested
+        callers = []
+        if show_callers:
+            callers = [
+                c.model_dump()
+                for c in scan_result.calls
+                if c.callee == symbol.name
+            ]
 
         # Phase 1.3: Collect import links for this symbol's file
         import_info = []
@@ -251,10 +298,112 @@ def get_symbol(
         except Exception as e:
             logger.debug(f"Action tracking failed: {e}")
 
+    # Phase 17: Snippet mode - raw code output only (most efficient)
+    # Snippet mode activates when explicitly requested, UNLESS --json is also specified
+    if snippet and not json_output:
+        for item in enriched:
+            snippet_content = item["snippet"]["content"]
+            # Add separator if multiple results
+            if len(enriched) > 1:
+                symbol = item["symbol"]
+                typer.echo(f"# {symbol['name']} ({symbol['file_path']}:{symbol['start_line']}-{symbol['end_line']})")
+            typer.echo(snippet_content)
+            if len(enriched) > 1:
+                typer.echo("")  # Blank line between results
+        return
+
+    # Phase 16.2 + Phase 17: Token Tracking with efficiency warning
+    token_footer = ""
+    efficiency_warning = ""
+    if enriched and not os.getenv('CERBERUS_NO_TRACK'):
+        try:
+            tracker = get_tracker()
+            tracker.start_operation("get-symbol")
+
+            # Record baselines for files that would have been read
+            for item in enriched:
+                tracker.record_baseline(item["symbol"]["file_path"])
+
+            # Calculate actual output tokens
+            output_json = json.dumps(enriched, separators=(',', ':'))
+            tracker.record_output(output_json)
+
+            # Finalize and get footer
+            savings = tracker.finalize_operation()
+
+            # Phase 17: Efficiency warning when get-symbol costs more than direct read
+            if savings and savings.get('efficiency_percent', 0) < 0:
+                # Negative efficiency = overhead
+                overhead_pct = abs(savings.get('efficiency_percent', 0))
+                if overhead_pct > 50:  # More than 50% overhead
+                    efficiency_warning = (
+                        f"\n[yellow]⚠️  WARNING: get-symbol returned {overhead_pct:.0f}% more data than direct file read.[/yellow]\n"
+                        f"[dim]Recommended: Use 'cerberus blueprint' to find location, then Read file directly.[/dim]\n"
+                        f"[dim]Or use: cerberus get-symbol --snippet for raw code only.[/dim]"
+                    )
+
+            if not os.getenv('CERBERUS_SILENT_METRICS'):
+                token_footer = tracker.get_display_footer(savings)
+        except Exception as e:
+            logger.debug(f"Token tracking failed: {e}")
+
+    # Phase 19.2: Efficiency Hints
+    hint_collector = get_hint_collector()
+    if enriched:
+        # Calculate total lines returned
+        total_lines = 0
+        first_file = None
+        first_start = None
+        first_end = None
+        for item in enriched:
+            snippet = item["snippet"]
+            lines = snippet.get("end_line", 0) - snippet.get("start_line", 0) + 1
+            total_lines += lines
+            if first_file is None:
+                first_file = item["symbol"]["file_path"]
+                first_start = item["symbol"]["start_line"]
+                first_end = item["symbol"]["end_line"]
+
+        # Check for large response hint
+        large_hint = EfficiencyHints.check_large_response(
+            lines=total_lines,
+            file_path=first_file,
+            start_line=first_start,
+            end_line=first_end,
+            used_snippet=snippet,
+        )
+        hint_collector.add(large_hint)
+
+    # Phase 19.3: Track metrics
+    try:
+        eff_tracker = get_efficiency_tracker()
+        flags = []
+        if snippet:
+            flags.append("--snippet")
+        if show_callers:
+            flags.append("--show-callers")
+        if fuzzy:
+            flags.append("--fuzzy")
+        eff_tracker.record_command("get-symbol", flags, lines_returned=total_lines)
+        if hint_collector.has_hints():
+            for h in hint_collector.hints:
+                eff_tracker.record_hint_shown(h.type)
+    except Exception:
+        pass  # Don't fail command if metrics fail
+
     # Phase 10: Machine mode is DEFAULT - JSON output for AI agents
     if CLIConfig.is_machine_mode() or json_output:
+        # Phase 19.2: Inject hints into output
+        output = enriched
+        if hint_collector.has_hints():
+            # Wrap in object with hints if there are any
+            output = {"results": enriched, "hints": hint_collector.to_dict()}
         # Compact JSON for agents (no pretty printing)
-        typer.echo(json.dumps(enriched, separators=(',', ':')))
+        typer.echo(json.dumps(output, separators=(',', ':')))
+        # Phase 16.2: Token footer goes to stderr in machine mode to avoid breaking JSON
+        if token_footer:
+            import sys
+            print(token_footer, file=sys.stderr)
         return
 
     # Human mode: Rich tables and formatted output
@@ -319,6 +468,18 @@ def get_symbol(
         if tip:
             console.print(GuidanceProvider.format_tip(tip, style="footer"))
 
+    # Phase 17: Efficiency Warning
+    if efficiency_warning and not CLIConfig.is_machine_mode():
+        console.print(efficiency_warning)
+
+    # Phase 19.2: Display hints in human mode
+    if hint_collector.has_hints() and not CLIConfig.is_machine_mode():
+        console.print(f"\n[cyan]{hint_collector.format_human()}[/cyan]")
+
+    # Phase 16.2: Token Tracking Footer
+    if token_footer:
+        console.print(token_footer)
+
 
 
 @app.command()
@@ -376,13 +537,17 @@ def search(
     from cerberus.retrieval.utils import estimate_tokens
     from cerberus.retrieval.config import AUTO_SKELETONIZE_CONFIG
     from cerberus.synthesis import get_synthesis_facade
+    from cerberus.paths import find_index_path, get_paths
 
-    # Default to cerberus.db in CWD if not provided
+    # Use centralized path resolution
     if index_path is None:
-        index_path = Path("cerberus.db")
-        if not index_path.exists():
-            console.print(f"[red]Error: Index file 'cerberus.db' not found in current directory.[/red]")
-            console.print(f"[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
+        index_path = find_index_path()
+        if index_path is None:
+            paths = get_paths()
+            console.print("[red]Error: Index not found. Checked:[/red]")
+            console.print(f"[dim]  - {paths.index_db}[/dim]")
+            console.print(f"[dim]  - {paths.legacy_index_db}[/dim]")
+            console.print("[dim]Run 'cerberus index .' first or provide --index path.[/dim]")
             raise typer.Exit(code=1)
 
     try:
@@ -501,10 +666,39 @@ def search(
 
             response.append(result_dict)
 
+        # Phase 16.2: Token Tracking
+        token_footer = ""
+        if response and not os.getenv('CERBERUS_NO_TRACK'):
+            try:
+                tracker = get_tracker()
+                tracker.start_operation("search")
+
+                # Record baselines for files in search results
+                seen_files = set()
+                for res in results:
+                    if res.symbol.file_path not in seen_files:
+                        tracker.record_baseline(res.symbol.file_path)
+                        seen_files.add(res.symbol.file_path)
+
+                # Calculate actual output tokens
+                output_json = json.dumps(response, separators=(',', ':'))
+                tracker.record_output(output_json)
+
+                # Finalize and get footer
+                savings = tracker.finalize_operation()
+                if not os.getenv('CERBERUS_SILENT_METRICS'):
+                    token_footer = tracker.get_display_footer(savings)
+            except Exception as e:
+                logger.debug(f"Token tracking failed: {e}")
+
         # Phase 10: Machine mode is DEFAULT - JSON output for AI agents
         if CLIConfig.is_machine_mode() or json_output:
             # Compact JSON for agents (no pretty printing)
             typer.echo(json.dumps(response, separators=(',', ':')))
+            # Phase 16.2: Token footer goes to stderr in machine mode to avoid breaking JSON
+            if token_footer:
+                import sys
+                print(token_footer, file=sys.stderr)
             return
 
         # Human mode: Rich tables and formatted output
@@ -552,6 +746,10 @@ def search(
             tip = GuidanceProvider.get_tip("search")
             if tip:
                 console.print(GuidanceProvider.format_tip(tip, style="footer"))
+
+        # Phase 16.2: Token Tracking Footer
+        if token_footer:
+            console.print(token_footer)
 
     except Exception as e:
         logger.error(f"Search failed: {e}")
@@ -644,6 +842,9 @@ def blueprint_cmd(
     # Performance flags
     cached: bool = typer.Option(True, "--cached/--no-cache", help="Use cache (default: enabled)"),
     fast: bool = typer.Option(False, "--fast", help="Skip expensive analysis"),
+    # Phase 18: Session Memory integration
+    with_memory: bool = typer.Option(False, "--with-memory", help="[PHASE 18] Prepend Session Memory developer context"),
+    memory_project: Optional[str] = typer.Option(None, "--memory-project", help="[PHASE 18] Project name for Session Memory decisions"),
     # Common flags
     index_path: Optional[Path] = typer.Option(
         None,
@@ -706,6 +907,61 @@ def blueprint_cmd(
             console.print(f"[dim]Rebuild index with 'cerberus index .'[/dim]")
             raise typer.Exit(code=1)
 
+        # Phase 16.4: Pre-flight checks for optional features
+        # These features are functional but require prerequisites
+        import sys
+        prereq_warnings = []
+
+        if deps or hydrate or cycles:
+            # Check if symbol_references table has data
+            try:
+                cursor = conn.execute("SELECT COUNT(*) FROM symbol_references LIMIT 1")
+                ref_count = cursor.fetchone()[0]
+                if ref_count == 0:
+                    prereq_warnings.append(
+                        f"  --deps/--hydrate/--cycles: No symbol references indexed. "
+                        f"Re-index with 'cerberus index .' to populate."
+                    )
+            except Exception:
+                prereq_warnings.append(
+                    f"  --deps/--hydrate/--cycles: symbol_references table not found. "
+                    f"Re-index with 'cerberus index .'"
+                )
+
+        if coverage:
+            # Check if coverage.json exists
+            from cerberus.blueprint import CoverageAnalyzer
+            cov_analyzer = CoverageAnalyzer()
+            if not cov_analyzer.has_coverage_data():
+                prereq_warnings.append(
+                    f"  --coverage: No coverage.json found. Run 'pytest --cov=src --cov-report=json'"
+                )
+
+        if churn or diff_ref:
+            # Check if in git repo
+            import subprocess
+            try:
+                subprocess.run(
+                    ["git", "rev-parse", "--is-inside-work-tree"],
+                    capture_output=True, check=True
+                )
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                prereq_warnings.append(
+                    f"  --churn/--diff: Not in a git repository. Git history unavailable."
+                )
+
+        if stability and not (churn or coverage or meta):
+            prereq_warnings.append(
+                f"  --stability: Requires --churn, --coverage, or --meta to calculate. "
+                f"Add at least one other metric flag."
+            )
+
+        if prereq_warnings and not CLIConfig.is_machine_mode():
+            console.print("[yellow]ℹ️  Prerequisites for requested features:[/yellow]")
+            for warning in prereq_warnings:
+                console.print(f"[yellow]{warning}[/yellow]")
+            console.print("")  # Blank line before output
+
         # Normalize file path (resolve to absolute)
         file_path = Path(file).resolve()
 
@@ -731,10 +987,48 @@ def blueprint_cmd(
             output_format=format_type
         )
 
+        # Phase 16.2: Token Tracking - Start
+        token_footer = ""
+        if not os.getenv('CERBERUS_NO_TRACK'):
+            try:
+                tracker = get_tracker()
+                tracker.start_operation("blueprint")
+
+                # Record baseline (would have read full file)
+                tracker.record_baseline(str(file_path))
+            except Exception as e:
+                logger.debug(f"Token tracking initialization failed: {e}")
+
         # Generate blueprint (with repo path for diff support)
         repo_path = Path.cwd()  # Assume current directory is in git repo
         generator = BlueprintGenerator(conn, repo_path=repo_path)
         blueprint = generator.generate(request)
+
+        # Phase 18: Session Memory context injection
+        if with_memory:
+            try:
+                from cerberus.memory.context import ContextGenerator
+                from cerberus.memory.store import MemoryStore
+
+                store = MemoryStore()
+                ctx_generator = ContextGenerator(store)
+
+                # Auto-detect project if not provided
+                project = memory_project
+                if project is None:
+                    from cerberus.memory.decisions import DecisionManager
+                    dm = DecisionManager(store)
+                    project = dm.detect_project_name()
+
+                # Generate and output Session Memory context first
+                memory_context = ctx_generator.generate_context(project=project, compact=True)
+                if memory_context and "No preferences stored" not in memory_context:
+                    typer.echo("--- Session Memory Context ---")
+                    typer.echo(memory_context)
+                    typer.echo("--- Blueprint ---")
+            except Exception as e:
+                logger.debug(f"Session Memory injection failed: {e}")
+                # Continue with blueprint output even if memory fails
 
         # Format and output
         if format_type == "json":
@@ -752,6 +1046,50 @@ def blueprint_cmd(
             output = generator.format_output(blueprint, "tree", tree_options)
             # Use typer.echo for plain text output
             typer.echo(output)
+
+        # Phase 16.2: Token Tracking - Finalize
+        if not os.getenv('CERBERUS_NO_TRACK'):
+            try:
+                tracker.record_output(output)
+                savings = tracker.finalize_operation()
+                if not os.getenv('CERBERUS_SILENT_METRICS'):
+                    token_footer = tracker.get_display_footer(savings)
+                    typer.echo(token_footer)
+            except Exception as e:
+                logger.debug(f"Token tracking finalization failed: {e}")
+
+        # Phase 19.2: Memory hint when not using --with-memory
+        memory_hint_shown = False
+        if not with_memory and not CLIConfig.is_machine_mode():
+            memory_hint = EfficiencyHints.check_memory_available(
+                project=memory_project,
+                used_with_memory=with_memory,
+            )
+            if memory_hint:
+                console.print(f"\n[cyan]{memory_hint.to_human()}[/cyan]")
+                memory_hint_shown = True
+
+        # Phase 19.3: Track metrics
+        try:
+            eff_tracker = get_efficiency_tracker()
+            flags = []
+            if deps:
+                flags.append("--deps")
+            if meta:
+                flags.append("--meta")
+            if churn:
+                flags.append("--churn")
+            if coverage:
+                flags.append("--coverage")
+            if stability:
+                flags.append("--stability")
+            if with_memory:
+                flags.append("--with-memory")
+            eff_tracker.record_command("blueprint", flags)
+            if memory_hint_shown:
+                eff_tracker.record_hint_shown("memory")
+        except Exception:
+            pass  # Don't fail command if metrics fail
 
         # Record operation for dogfooding metrics
         record_operation('blueprint', tokens_read=0, tokens_saved=0, file_path=str(file_path))

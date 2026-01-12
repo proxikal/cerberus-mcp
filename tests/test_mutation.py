@@ -9,6 +9,8 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
+
+pytestmark = [pytest.mark.fast, pytest.mark.mutation]
 from cerberus.mutation import (
     SymbolLocator,
     CodeEditor,
@@ -303,4 +305,6 @@ class TestMutationConfig:
     def test_backup_dir_configured(self):
         """Test backup directory is configured."""
         assert "backup_dir" in MUTATION_CONFIG
-        assert MUTATION_CONFIG["backup_dir"] == ".cerberus_backups"
+        # Backup dir should be inside .cerberus/backups
+        assert MUTATION_CONFIG["backup_dir"].endswith(".cerberus/backups") or \
+               MUTATION_CONFIG["backup_dir"].endswith(".cerberus_backups")

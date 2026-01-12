@@ -52,6 +52,17 @@ def load_index(index_path: Path) -> Union[ScanResult, ScanResultAdapter]:
         # New SQLite format - streaming/lazy loading
         logger.info(f"Loading SQLite index from {index_path}")
         store = SQLiteIndexStore(index_path)
+
+        # Phase 16.3: Load FAISS store if it exists
+        faiss_path = store.index_dir / "vectors.faiss"
+        if faiss_path.exists():
+            try:
+                from cerberus.storage import FAISSVectorStore
+                store._faiss_store = FAISSVectorStore(store.index_dir, dimension=384)
+                logger.info(f"Loaded FAISS index with {len(store._faiss_store)} vectors")
+            except Exception as e:
+                logger.warning(f"Failed to load FAISS index: {e}")
+
         return ScanResultAdapter(store)
     else:
         # Legacy JSON format - full load

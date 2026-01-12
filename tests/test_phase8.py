@@ -8,6 +8,8 @@ import pytest
 import tempfile
 import subprocess
 from pathlib import Path
+
+pytestmark = pytest.mark.fast
 from cerberus.storage.sqlite_store import SQLiteIndexStore
 from cerberus.schemas import CodeSymbol, FileObject
 from cerberus.index import load_index
