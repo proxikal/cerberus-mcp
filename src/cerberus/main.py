@@ -20,7 +20,7 @@ from cerberus.index import (
     read_range,
     semantic_search,
 )
-from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality, memory, workflow, metrics_cmd, docs_validator, refresh
+from cerberus.cli import utils, retrieval, symbolic, dogfood, daemon, mutations, quality, memory, workflow, metrics_cmd, docs_validator, refresh, docs
 from cerberus.cli.config import CLIConfig
 from cerberus.cli.output import get_console
 from cerberus.cli.common import format_size
@@ -95,6 +95,7 @@ app.add_typer(dogfood.app, name="dogfood", help="Dogfooding commands (read, insp
 app.add_typer(mutations.app, name="mutations", help="Code mutation commands (edit, delete, insert, batch-edit)")
 app.add_typer(quality.app, name="quality", help="Quality commands (style-check, style-fix) - Phase 14.1")
 app.add_typer(memory.app, name="memory", help="Session Memory commands (learn, show, context) - Phase 18")
+app.add_typer(docs.app, name="docs", help="Documentation access commands (commands, architecture, quick, path)")
 app.add_typer(workflow.app, name="workflow", help="Streamlined workflow commands (start, go, orient) - Phase 19")
 app.add_typer(metrics_cmd.app, name="metrics", help="Efficiency metrics and reports - Phase 19.3")
 
