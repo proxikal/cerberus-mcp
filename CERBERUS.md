@@ -15,22 +15,28 @@
 
 ## QUICK START
 
-**For AI Agents using Cerberus in projects:**
+**MANDATORY STARTUP SEQUENCE (DO NOT SKIP):**
 
 ```bash
-# 1. Initialize Cerberus in your project
+# 1. ⚠️ CRITICAL: Load Cerberus memory FIRST
+cerberus memory context --compact --json
+# Contains: Command syntax, corrections, patterns across all projects
+# Failure to load = missing critical context, wrong command syntax
+# This step is REQUIRED, not optional
+
+# 2. Initialize Cerberus in your project
 cerberus start
 
-# 2. Understand the codebase
+# 3. Understand the codebase
 cerberus orient src/
 
-# 3. Explore specific files
+# 4. Explore specific files
 cerberus go src/main.py
 
-# 4. Find symbols
-cerberus search "MyClass"
+# 5. Find symbols (IMPORTANT: use 'cerberus retrieval search', not 'cerberus search')
+cerberus retrieval search "MyClass" --json
 
-# 5. Get code for editing (via Direct Read tool, NOT get-symbol)
+# 6. Get code for editing (via Direct Read tool, NOT get-symbol)
 Read src/main.py lines 45-60
 
 # 6. Make changes (via Direct Edit tool)
