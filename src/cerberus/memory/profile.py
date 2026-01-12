@@ -5,7 +5,7 @@ Handles developer profile schema, parsing, and operations.
 The profile stores global preferences that apply across all projects.
 
 Key constraints:
-- Max profile size: 1KB / 50 lines
+- Max profile size: 4KB / 50 lines
 - Store verbose, inject terse
 """
 
@@ -213,7 +213,7 @@ class ProfileManager:
                     return {
                         "success": False,
                         "category": PreferenceCategory.CODING_STYLE.value,
-                        "message": "Profile size limit exceeded (1KB max)",
+                        "message": "Profile size limit exceeded (4KB max)",
                     }
 
         # Check for anti-patterns
@@ -236,7 +236,7 @@ class ProfileManager:
                         return {
                             "success": False,
                             "category": PreferenceCategory.ANTI_PATTERNS.value,
-                            "message": "Profile size limit exceeded (1KB max)",
+                            "message": "Profile size limit exceeded (4KB max)",
                         }
 
         # Check for naming conventions
@@ -268,7 +268,7 @@ class ProfileManager:
                             return {
                                 "success": False,
                                 "category": PreferenceCategory.NAMING.value,
-                                "message": "Profile size limit exceeded (1KB max)",
+                                "message": "Profile size limit exceeded (4KB max)",
                             }
 
         # Fallback: add as general preference

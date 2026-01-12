@@ -34,8 +34,9 @@ class MemoryStore:
     """
 
     # Size limits (in bytes)
-    MAX_PROFILE_SIZE = 1024  # 1KB
+    MAX_PROFILE_SIZE = 4096  # 4KB (increased to allow useful pattern descriptions)
     MAX_CONTEXT_SIZE = 4096  # 4KB
+    MAX_TOTAL_MEMORY_SIZE = 50 * 1024  # 50KB total across all memory files
 
     def __init__(self, base_path: Optional[Path] = None):
         """

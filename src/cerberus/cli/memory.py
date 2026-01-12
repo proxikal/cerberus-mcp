@@ -772,8 +772,9 @@ def stats(
 
     # Limits
     typer.echo("Limits:")
-    typer.echo(f"  Max profile: {MemoryStore.MAX_PROFILE_SIZE} bytes (1KB)")
+    typer.echo(f"  Max profile: {MemoryStore.MAX_PROFILE_SIZE} bytes (4KB)")
     typer.echo(f"  Max context: {MemoryStore.MAX_CONTEXT_SIZE} bytes (4KB)")
+    typer.echo(f"  Max total: {MemoryStore.MAX_TOTAL_MEMORY_SIZE} bytes (50KB)")
 
 
 @app.command()
