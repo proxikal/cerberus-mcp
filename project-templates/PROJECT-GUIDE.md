@@ -401,6 +401,7 @@ Load when you need:
 1. Always load {{PROJECT_NAME}}.md (this file) at session start
 2. Load Cerberus memory: `cerberus memory context --compact --json`
 3. Load other docs ({{PROJECT_NAME}}-*.md) only when tasks require them
+4. Workflow markdown uses indexed headings; non-workflow .md stays Direct Read only
 
 ---
 

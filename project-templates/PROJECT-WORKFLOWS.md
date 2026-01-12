@@ -8,6 +8,11 @@
 
 ## DEVELOPMENT WORKFLOW
 
+### Workflow Docs (Markdown)
+
+- Use `cerberus retrieval search` or `cerberus search` against indexed headings in workflow .md files.
+- Non-workflow markdown stays Direct Read only (do not index).
+
 ### Feature Development
 
 ```bash

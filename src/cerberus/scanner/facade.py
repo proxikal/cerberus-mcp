@@ -11,7 +11,7 @@ from cerberus.parser import parse_file
 from cerberus.parser.dependencies import extract_imports, extract_calls, extract_import_links, extract_method_calls
 from cerberus.parser.type_resolver import extract_types_from_file
 from cerberus.schemas import CallReference, CodeSymbol, FileObject, ImportReference, ScanResult, TypeInfo, ImportLink
-from .config import DEFAULT_IGNORE_PATTERNS
+from .config import DEFAULT_IGNORE_PATTERNS, is_workflow_markdown
 
 @trace
 def scan(
@@ -28,7 +28,7 @@ def scan(
     Args:
         directory: The root directory to start the scan from.
         respect_gitignore: If True, files listed in .gitignore will be excluded.
-        extensions: A list of file extensions to include (e.g., ['.py', '.md']).
+        extensions: A list of file extensions to include (e.g., ['.py', '.md'] workflow only).
                     If None, all extensions are included.
 
     Returns:
@@ -102,6 +102,9 @@ def scan(
             # Check if the file extension is allowed
             if allowed_extensions and file_path.suffix not in allowed_extensions:
                 logger.debug(f"Ignoring '{relative_path}' due to extension filter")
+                continue
+            if file_path.suffix == ".md" and not is_workflow_markdown(file_path):
+                logger.debug(f"Ignoring '{relative_path}' (non-workflow markdown)")
                 continue
 
             try:

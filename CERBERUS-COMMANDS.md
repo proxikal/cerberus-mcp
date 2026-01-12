@@ -11,7 +11,7 @@
 ```bash
 cerberus start                              # Initialize session (index + daemon + watcher + memory)
 cerberus start --json                       # Machine-parsable status
-cerberus update                             # Reindex changed files
+cerberus update                             # Reindex changed files (git-aware incremental)
 cerberus clean --preserve-index             # Clean cache, keep index
 cerberus validate-docs                      # Validate CERBERUS.md sync
 cerberus validate-docs --json --strict      # Machine output, strict mode

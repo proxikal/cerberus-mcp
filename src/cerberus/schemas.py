@@ -15,7 +15,7 @@ class CodeSymbol(BaseModel):
     Represents a code symbol (function, class, etc.) extracted from a file.
     """
     name: str
-    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct"]
+    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct", "section"]
     file_path: str
     start_line: int
     end_line: int

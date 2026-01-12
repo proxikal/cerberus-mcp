@@ -18,7 +18,7 @@ from cerberus.parser.dependencies import extract_imports, extract_calls, extract
 from cerberus.parser.type_resolver import extract_types_from_file
 from cerberus.schemas import CallReference, CodeSymbol, FileObject, ImportReference, TypeInfo, ImportLink, MethodCall
 from cerberus.limits import get_limits_config
-from .config import DEFAULT_IGNORE_PATTERNS
+from .config import DEFAULT_IGNORE_PATTERNS, is_workflow_markdown
 
 
 @dataclass
@@ -50,7 +50,7 @@ def scan_files_streaming(
     Args:
         directory: Root directory to scan
         respect_gitignore: Honor .gitignore patterns
-        extensions: File extensions to include (None = all)
+        extensions: File extensions to include (None = all, workflow .md only)
         previous_files: Dict of {file_path: last_modified} for incremental
         incremental: Skip unchanged files
         max_bytes: Skip files larger than this
@@ -107,6 +107,8 @@ def scan_files_streaming(
 
             # Check extension filter
             if allowed_extensions and file_path.suffix not in allowed_extensions:
+                continue
+            if file_path.suffix == ".md" and not is_workflow_markdown(file_path):
                 continue
 
             # Check file size

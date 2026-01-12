@@ -4,7 +4,7 @@
 
 Cerberus is a command-line tool that helps developers and AI agents efficiently navigate and understand codebases through Abstract Syntax Tree (AST) parsing, symbol indexing, and cross-session memory.
 
-[![Version: 1.0.0](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/proxikal/Cerberus/releases/tag/v1.0.0)
+[![Version: 1.0.1](https://img.shields.io/badge/version-1.0.1-blue.svg)](https://github.com/proxikal/Cerberus/releases/tag/v1.0.1)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python: 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
@@ -316,12 +316,14 @@ Cerberus currently supports AST parsing for:
 - **JavaScript** (`.js`) - Functions, classes, methods
 - **TypeScript** (`.ts`) - Functions, classes, methods, interfaces, enums, variables
 - **Go** (`.go`) - Functions, structs
+- **Workflow Markdown** (`.md`) - Section headings in allowlisted workflow docs
 
 **Symbol Detection:**
 - Python: `class`, `def` (functions/methods)
 - JavaScript: `class`, `function`, async functions
 - TypeScript: `class`, `function`, `interface`, `enum`, `const` exports, methods
 - Go: `func`, `type ... struct`
+- Workflow Markdown: `#`/`##`/`###` heading sections (allowlisted)
 
 ---
 

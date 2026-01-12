@@ -49,7 +49,7 @@ def scan(
         False, "--no-gitignore", help="Do not respect .gitignore files."
     ),
     ext: Optional[List[str]] = typer.Option(
-        None, "--ext", help="File extensions to include (e.g., .py, .md). Can be used multiple times."
+        None, "--ext", help="File extensions to include (e.g., .py, workflow .md). Can be used multiple times."
     ),
     max_bytes: Optional[int] = typer.Option(
         None, "--max-bytes", help="Skip files larger than this size (in bytes)."
@@ -98,7 +98,7 @@ def index(
         False, "--no-gitignore", help="Do not respect .gitignore files."
     ),
     ext: Optional[List[str]] = typer.Option(
-        None, "--ext", help="File extensions to include (e.g., .py, .md). Can be used multiple times."
+        None, "--ext", help="File extensions to include (e.g., .py, workflow .md). Can be used multiple times."
     ),
     incremental: bool = typer.Option(
         False, "--incremental", help="Reuse existing index to skip unchanged files."

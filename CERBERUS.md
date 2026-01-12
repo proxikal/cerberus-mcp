@@ -1,5 +1,5 @@
-# CERBERUS v1.0.0 | Golden Egg Edition | Machine-First Protocol
-# Arch: AST/SQLite/FAISS | Tests: 606 pass | Updated: 2026-01-12
+# CERBERUS v1.0.1 | Golden Egg Edition | Machine-First Protocol
+# Arch: AST/SQLite/FAISS | Tests: 606 pass | Updated: 2026-01-13
 # Mission: 100% Signal, 0% Noise. Deterministic AST > LLM Guesswork.
 
 **📚 Documentation Suite:**
@@ -42,6 +42,9 @@ Read src/main.py lines 45-60
 # 6. Make changes (via Direct Edit tool)
 Edit src/main.py
 ```
+
+**Indexing Tip:** Use incremental updates to avoid full rescans:
+`cerberus update` (git-aware), or `cerberus index . --incremental` for mtime-only.
 
 **For AI Agents developing Cerberus itself:**
 
@@ -128,7 +131,8 @@ FIDELITY: For Cerberus tool usage, follow every rule without exception.
 ║ Track who calls what      ║ cerberus references (90% savings vs manual grep)  ║
 ║ Get code for editing      ║ Direct Read tool with line numbers                ║
 ║ Edit/write code           ║ Direct Edit/Write tool                            ║
-║ Read .md/.txt/.rst files  ║ Direct Read tool (not indexed)                    ║
+║ Read workflow .md files   ║ cerberus search (indexed headings) + Direct Read  ║
+║ Read other .md/.txt/.rst  ║ Direct Read tool (not indexed)                    ║
 ║ Git/Build/Test operations ║ Bash tool                                         ║
 ╚═══════════════════════════╩═══════════════════════════════════════════════════╝
 
@@ -147,6 +151,7 @@ PERMITTED: get-symbol --snippet --exact (sparingly, for AST context only)
 4. MAP_FIRST: Blueprint first, THEN direct Read for specific lines
 5. PARSE_PERFECT: All outputs LLM-parsable >98% accuracy
 6. DEPS_CHECK: Never delete/edit referenced symbols without checking deps
+7. WORKFLOW_MD: For workflow docs, use indexed headings (cerberus search) first; non-workflow .md stays Direct Read only
 ```
 
 ---

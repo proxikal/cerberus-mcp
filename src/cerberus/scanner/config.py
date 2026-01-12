@@ -1,4 +1,5 @@
 from typing import List
+from pathlib import Path
 from cerberus.exceptions import ConfigError
 
 # Default patterns to ignore, mimicking common global gitignore settings
@@ -16,6 +17,47 @@ DEFAULT_IGNORE_PATTERNS = [
     "*.pyc",
     "*.pyo",
 ]
+
+WORKFLOW_MD_FILENAMES = {
+    "AGENTS.md",
+    "CERBERUS.md",
+    "CERBERUS-COMMANDS.md",
+    "CERBERUS-ARCHITECTURE.md",
+    "CERBERUS-DEVELOPMENT.md",
+    "CERBERUS-LEADERSHIP.md",
+    "CLAUDE.md",
+    "CLAUDE-WORKFLOWS.md",
+    "HANDOFF.md",
+    "PROJECT-GUIDE.md",
+    "PROJECT-WORKFLOWS.md",
+    "PROJECT-HANDOFF.md",
+    "PROJECT-LEADERSHIP.md",
+    "PROJECT-VPS-OPS.md",
+}
+
+WORKFLOW_MD_SUFFIXES = (
+    "-GUIDE.md",
+    "-WORKFLOWS.md",
+    "-HANDOFF.md",
+    "-LEADERSHIP.md",
+    "-VPS-OPS.md",
+    "-ARCHITECTURE.md",
+    "-COMMANDS.md",
+    "-DEVELOPMENT.md",
+)
+
+
+def is_workflow_markdown(file_path: Path) -> bool:
+    """
+    Allowlist workflow markdown files for indexing.
+    """
+    name = file_path.name
+    if name in WORKFLOW_MD_FILENAMES:
+        return True
+    upper_name = name.upper()
+    if upper_name.startswith("PHASE-") or upper_name.startswith("PHASE_"):
+        return True
+    return any(name.endswith(suffix) for suffix in WORKFLOW_MD_SUFFIXES)
 
 
 def validate_ignore_patterns(patterns: List[str]) -> None:

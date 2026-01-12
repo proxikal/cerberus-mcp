@@ -275,6 +275,7 @@ mutations: <100ms for validation, depends on --verify command
    - CERBERUS-DEVELOPMENT.md (this file, when contributing)
 4. Update HANDOFF.md only when the orchestrator explicitly requests a handoff
 5. Rotate sessions when >3 exist in HANDOFF.md
+6. Workflow markdown: use cerberus search on indexed headings; non-workflow .md stays Direct Read only
 ```
 
 ---

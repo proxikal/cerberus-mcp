@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_files_last_modified ON files(last_modified);
 CREATE TABLE IF NOT EXISTS symbols (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    type TEXT NOT NULL CHECK(type IN ('function', 'class', 'method', 'variable', 'interface', 'enum', 'struct')),
+    type TEXT NOT NULL CHECK(type IN ('function', 'class', 'method', 'variable', 'interface', 'enum', 'struct', 'section')),
     file_path TEXT NOT NULL,
     start_line INTEGER NOT NULL,
     end_line INTEGER NOT NULL,
@@ -216,7 +216,7 @@ CREATE INDEX IF NOT EXISTS idx_blueprint_cache_file ON blueprint_cache(file_path
 CREATE INDEX IF NOT EXISTS idx_blueprint_cache_expires ON blueprint_cache(expires_at);
 
 -- Initialize schema version
-INSERT OR IGNORE INTO metadata (key, value) VALUES ('schema_version', '1.0.0');
+INSERT OR IGNORE INTO metadata (key, value) VALUES ('schema_version', '1.1.0');
 INSERT OR IGNORE INTO metadata (key, value) VALUES ('created_at', strftime('%s', 'now'));
 """
 

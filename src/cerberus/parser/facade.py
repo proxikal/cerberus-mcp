@@ -8,6 +8,7 @@ from .python_parser import parse_python_file
 from .javascript_parser import parse_javascript_file
 from .typescript_parser import parse_typescript_file
 from .go_parser import parse_go_file
+from .markdown_parser import parse_markdown_file
 # Import other specialist parsers here as they are created
 
 def parse_file(file_path: Path) -> List[CodeSymbol]:
@@ -39,6 +40,8 @@ def parse_file(file_path: Path) -> List[CodeSymbol]:
         return parse_typescript_file(file_path, content)
     elif language == "go":
         return parse_go_file(file_path, content)
+    elif language == "markdown":
+        return parse_markdown_file(file_path, content)
     
     logger.warning(f"No specialist parser implemented for language: '{language}'")
     return []

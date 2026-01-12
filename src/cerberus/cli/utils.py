@@ -103,7 +103,7 @@ def bench(
         help="Path to write/read the benchmark index.",
     ),
     ext: Optional[List[str]] = typer.Option(
-        None, "--ext", help="File extensions to include (e.g., .py, .md). Can be used multiple times."
+        None, "--ext", help="File extensions to include (e.g., .py, workflow .md). Can be used multiple times."
     ),
     json_output: bool = typer.Option(False, "--json", help="Output results as JSON for agents."),
 ):
