@@ -733,6 +733,9 @@ def stats(
             "limits": {
                 "max_profile_bytes": MemoryStore.MAX_PROFILE_SIZE,
                 "max_context_bytes": MemoryStore.MAX_CONTEXT_SIZE,
+                "max_project_decisions_bytes": MemoryStore.MAX_PROJECT_DECISIONS_SIZE,
+                "max_total_memory_bytes": MemoryStore.MAX_TOTAL_MEMORY_SIZE,
+                "max_project_age_days": MemoryStore.MAX_PROJECT_AGE_DAYS,
             }
         }
         typer.echo(json.dumps(output, indent=2))

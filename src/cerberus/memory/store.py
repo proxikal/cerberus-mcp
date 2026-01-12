@@ -34,9 +34,13 @@ class MemoryStore:
     """
 
     # Size limits (in bytes)
-    MAX_PROFILE_SIZE = 4096  # 4KB (increased to allow useful pattern descriptions)
-    MAX_CONTEXT_SIZE = 4096  # 4KB
-    MAX_TOTAL_MEMORY_SIZE = 50 * 1024  # 50KB total across all memory files
+    MAX_PROFILE_SIZE = 4 * 1024  # 4KB (global preferences)
+    MAX_CONTEXT_SIZE = 4 * 1024  # 4KB (context generation)
+    MAX_PROJECT_DECISIONS_SIZE = 10 * 1024  # 10KB per project (~20-25 decisions)
+    MAX_TOTAL_MEMORY_SIZE = 250 * 1024  # 250KB total (conservative but effective)
+
+    # Rotation policy
+    MAX_PROJECT_AGE_DAYS = 90  # Archive projects not accessed in 90 days
 
     def __init__(self, base_path: Optional[Path] = None):
         """
@@ -218,3 +222,85 @@ class MemoryStore:
     def timestamp() -> str:
         """Get current timestamp in ISO format."""
         return datetime.now(tz=None).astimezone().isoformat()
+
+    def check_project_size(self, project_name: str) -> tuple[bool, int]:
+        """
+        Check if a project's decision file is within size limits.
+
+        Args:
+            project_name: Name of the project
+
+        Returns:
+            Tuple of (is_within_limit, current_size_bytes)
+        """
+        project_file = self.project_path(project_name)
+        if not project_file.exists():
+            return (True, 0)
+
+        size = project_file.stat().st_size
+        return (size <= self.MAX_PROJECT_DECISIONS_SIZE, size)
+
+    def get_project_age_days(self, project_name: str) -> Optional[int]:
+        """
+        Get the age of a project in days since last access.
+
+        Args:
+            project_name: Name of the project
+
+        Returns:
+            Age in days, or None if project doesn't exist
+        """
+        project_file = self.project_path(project_name)
+        if not project_file.exists():
+            return None
+
+        # Use last access time (atime)
+        last_access = datetime.fromtimestamp(project_file.stat().st_atime)
+        age = (datetime.now() - last_access).days
+        return age
+
+    def archive_stale_projects(self, dry_run: bool = False) -> list[str]:
+        """
+        Archive projects that haven't been accessed in MAX_PROJECT_AGE_DAYS.
+
+        Args:
+            dry_run: If True, only return list of projects that would be archived
+
+        Returns:
+            List of project names that were (or would be) archived
+        """
+        archive_dir = self.base_path / 'archive'
+        projects_to_archive = []
+
+        for project_name in self.list_projects():
+            age = self.get_project_age_days(project_name)
+            if age is not None and age > self.MAX_PROJECT_AGE_DAYS:
+                projects_to_archive.append(project_name)
+
+        if not dry_run and projects_to_archive:
+            # Create archive directory
+            archive_dir.mkdir(exist_ok=True)
+
+            for project_name in projects_to_archive:
+                source = self.project_path(project_name)
+                dest = archive_dir / f'{project_name}_{datetime.now().strftime("%Y%m%d")}.json'
+
+                try:
+                    shutil.copy2(source, dest)  # Preserve metadata
+                    source.unlink()  # Delete original
+                    logger.info(f"Archived stale project: {project_name} (age: {self.get_project_age_days(project_name)} days)")
+                except Exception as e:
+                    logger.error(f"Error archiving {project_name}: {e}")
+
+        return projects_to_archive
+
+    def check_total_memory_size(self) -> tuple[bool, int]:
+        """
+        Check if total memory usage is within limits.
+
+        Returns:
+            Tuple of (is_within_limit, current_size_bytes)
+        """
+        stats = self.get_storage_stats()
+        total_size = stats['total_size_bytes']
+        return (total_size <= self.MAX_TOTAL_MEMORY_SIZE, total_size)

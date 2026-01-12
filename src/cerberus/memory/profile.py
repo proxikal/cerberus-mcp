@@ -286,7 +286,7 @@ class ProfileManager:
                 return {
                     "success": False,
                     "category": PreferenceCategory.GENERAL.value,
-                    "message": "Profile size limit exceeded (1KB max)",
+                    "message": "Profile size limit exceeded (4KB max)",
                 }
 
         return {
