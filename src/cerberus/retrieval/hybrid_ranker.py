@@ -63,10 +63,10 @@ def reciprocal_rank_fusion(
     Returns:
         List of HybridSearchResult sorted by fused score
     """
-    # Build RRF scores
+    # Build RRF scores with deduplication across both sources
     rrf_scores: Dict[str, Dict] = {}  # symbol_id -> {symbol, bm25_score, vector_score, rrf_score, ranks}
 
-    # Helper to create unique symbol ID
+    # Helper to create unique symbol ID (file+name+line is stable across sources)
     def symbol_id(symbol: CodeSymbol) -> str:
         return f"{symbol.file_path}:{symbol.name}:{symbol.start_line}"
 

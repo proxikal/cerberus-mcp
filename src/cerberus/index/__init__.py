@@ -7,7 +7,7 @@ from .json_store import JSONIndexStore
 from .index_builder import build_index
 from .index_loader import load_index, is_sqlite_index
 from .stats import compute_stats
-from cerberus.retrieval.utils import find_symbol, read_range
+from cerberus.retrieval.utils import find_symbol, find_symbol_fts, read_range
 from cerberus.semantic.search import semantic_search
 from cerberus.schemas import ScanResult
 from cerberus.storage import ScanResultAdapter
@@ -51,6 +51,7 @@ __all__ = [
     "save_index",
     "compute_stats",
     "find_symbol",
+    "find_symbol_fts",
     "read_range",
     "semantic_search",
 ]

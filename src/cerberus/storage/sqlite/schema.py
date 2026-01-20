@@ -234,6 +234,44 @@ def init_schema(conn: sqlite3.Connection, db_path: str) -> None:
     """
     try:
         conn.executescript(SCHEMA_SQL)
+        _run_migrations(conn)
         logger.debug(f"Initialized SQLite schema at {db_path}")
     except Exception as e:
         raise IndexCorruptionError(f"Failed to initialize database schema: {e}")
+
+
+def _run_migrations(conn: sqlite3.Connection) -> None:
+    """
+    Run forward-only schema/data migrations.
+
+    - 1.2.0: purge duplicate symbols and enforce uniqueness.
+    """
+    # Fetch current version (default to 1.1.0 if unset)
+    cur = conn.execute("SELECT value FROM metadata WHERE key = 'schema_version'")
+    row = cur.fetchone()
+    current_version = row[0] if row else "1.1.0"
+
+    # Migration to 1.2.0: remove duplicate symbols before UNIQUE index enforcement
+    if current_version < "1.2.0":
+        # Delete duplicate symbol rows, keeping the lowest id per unique span
+        conn.execute(
+            """
+            DELETE FROM symbols
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM symbols
+                GROUP BY file_path, name, start_line, end_line, type
+            )
+            """
+        )
+        # Enforce uniqueness going forward
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_symbols_unique
+                ON symbols(file_path, name, start_line, end_line, type)
+            """
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', '1.2.0')"
+        )
+        conn.commit()

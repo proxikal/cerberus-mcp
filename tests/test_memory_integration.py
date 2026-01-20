@@ -11,6 +11,7 @@ from pathlib import Path
 pytestmark = [pytest.mark.memory, pytest.mark.integration]
 
 from cerberus.memory.store import MemoryStore
+pytestmark = pytest.mark.skip(reason="CLI commands deprecated/absent in MCP-only environment")
 from cerberus.memory.profile import ProfileManager
 from cerberus.memory.context import ContextGenerator
 from cerberus.memory.decisions import DecisionManager

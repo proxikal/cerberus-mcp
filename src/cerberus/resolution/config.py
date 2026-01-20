@@ -48,7 +48,9 @@ INHERITANCE_CONFIG = {
 
 # Phase 6: Call Graph Configuration
 CALL_GRAPH_CONFIG = {
-    "max_depth": 10,             # Maximum recursion depth for call graphs
+    "max_depth": 10,              # Maximum recursion depth for call graphs
+    "max_nodes": 100,             # Maximum total nodes to prevent token explosion
+    "max_edges": 200,             # Maximum total edges to prevent token explosion
     "include_external": False,    # Include external library calls
     "track_dynamic_calls": True,  # Track dynamic method calls
 }

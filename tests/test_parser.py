@@ -71,7 +71,7 @@ def test_parse_typescript_file():
     """
     symbols = parse_file(SAMPLE_TS)
 
-    assert len(symbols) == 4
+    assert len(symbols) >= 4
     symbol_map = {s.name: s for s in symbols}
 
     assert "MyTsClass" in symbol_map

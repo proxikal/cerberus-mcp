@@ -7,7 +7,7 @@ from loguru import logger
 _logging_configured = False
 
 
-def setup_logging(level="INFO", suppress_console=None, enable_file_logging=None):
+def setup_logging(level="INFO", suppress_console=None, enable_file_logging=None, force=False):
     """
     Configures the global logger.
 
@@ -18,11 +18,12 @@ def setup_logging(level="INFO", suppress_console=None, enable_file_logging=None)
         level: Logging level (default: INFO)
         suppress_console: If True, suppress console logging. If None, check CERBERUS_MACHINE_MODE env var.
         enable_file_logging: If True, enable file logging. If None, check CERBERUS_FILE_LOGGING env var.
+        force: If True, re-configure logging even if already configured.
     """
     global _logging_configured
 
-    # Only configure once to avoid duplicate handlers
-    if _logging_configured:
+    # Only configure once to avoid duplicate handlers, unless forced
+    if _logging_configured and not force:
         return
     _logging_configured = True
 

@@ -330,7 +330,12 @@ def _finalize_results(
         List of HybridSearchResult objects
     """
     hybrid_results = []
+    seen = set()
     for idx, r in enumerate(results):
+        key = (r.symbol.file_path, r.symbol.name, r.symbol.start_line, r.symbol.end_line, r.symbol.type)
+        if key in seen:
+            continue
+        seen.add(key)
         # Ensure snippet is loaded
         if not r.snippet or not r.snippet.content:
             snippet_obj = read_range(

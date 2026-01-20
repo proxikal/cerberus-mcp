@@ -27,6 +27,7 @@ from .churn_analyzer import ChurnAnalyzer
 from .coverage_analyzer import CoverageAnalyzer
 from .stability_scorer import StabilityScorer
 from .formatter import BlueprintFormatter
+from .tree_builder import TreeBuilder
 # Phase 13.3 analyzers
 from .diff_analyzer import DiffAnalyzer
 from .aggregator import BlueprintAggregator, AggregatedBlueprint
@@ -75,7 +76,8 @@ class BlueprintGenerator:
             Blueprint or AggregatedBlueprint object with requested overlays applied
         """
         # Phase 13.3: Handle aggregation mode
-        if request.aggregate:
+        if request.aggregate or Path(request.file_path).is_dir():
+            request.aggregate = True
             return self._generate_aggregated(request)
 
         # Normalize file path
@@ -203,11 +205,17 @@ class BlueprintGenerator:
             )
 
             symbols = []
+            seen = set()
             for row in cursor.fetchall():
                 (
                     name, sym_type, fp, start_line, end_line,
                     signature, return_type, parameters, parameter_types, parent_class
                 ) = row
+
+                key = (fp, name, start_line, end_line, sym_type)
+                if key in seen:
+                    continue
+                seen.add(key)
 
                 # Parse JSON fields (Phase 16.4 bugfix)
                 parsed_params = json_lib.loads(parameters) if parameters else None
@@ -622,10 +630,14 @@ class BlueprintGenerator:
             if output_format == "json":
                 import json
                 return json.dumps(blueprint.to_dict(), indent=None)
+            elif output_format == "json-compact":
+                return BlueprintFormatter.format_as_json_compact(blueprint)
+            elif output_format == "flat":
+                return BlueprintFormatter.format_as_flat(blueprint)
             else:
-                # For tree format, convert to simple string representation
-                # TODO: Implement proper tree formatting for aggregated blueprints
-                return f"[Package: {blueprint.package_path}] ({blueprint.total_files} files, {blueprint.total_symbols} symbols)"
+                # Tree format for aggregated packages
+                builder = TreeBuilder(tree_options or TreeRenderOptions())
+                return builder.build_aggregated_tree(blueprint.package_path, blueprint.nodes)
 
         # Regular blueprint formatting
         if output_format == "tree":
@@ -633,5 +645,9 @@ class BlueprintGenerator:
         elif output_format == "json":
             # Machine mode: minified
             return BlueprintFormatter.format_as_json(blueprint, pretty=False)
+        elif output_format == "json-compact":
+            return BlueprintFormatter.format_as_json_compact(blueprint)
+        elif output_format == "flat":
+            return BlueprintFormatter.format_as_flat(blueprint)
         else:
             raise ValueError(f"Unknown output format: {output_format}")

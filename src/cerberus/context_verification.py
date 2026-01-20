@@ -163,28 +163,8 @@ def _get_package_structure() -> Dict[str, int]:
 
 
 def _get_command_count() -> int:
-    """Count CLI commands via typer introspection."""
-    try:
-        # Import the app and count registered commands
-        import sys
-        old_path = sys.path.copy()
-        sys.path.insert(0, "src")
-
-        try:
-            from cerberus.main import app
-            # Count all commands (some have explicit names, others use callback name)
-            # Filter out hidden commands
-            commands = [
-                cmd for cmd in app.registered_commands
-                if not getattr(cmd, 'hidden', False)
-            ]
-            return len(commands)
-        finally:
-            sys.path = old_path
-
-    except Exception as e:
-        # Fallback: return known count from CERBERUS.md
-        return 40
+    """CLI removed; no commands to count."""
+    return 0
 
 
 def _get_phase_status() -> Dict[str, str]:

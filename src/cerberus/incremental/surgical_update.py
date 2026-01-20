@@ -329,7 +329,7 @@ def _parse_single_file(file_path: str, project_path: Path) -> List[CodeSymbol]:
 
     try:
         # Parse just this file directly (avoid scanning parent directory)
-        symbols = parse_file(str(abs_path))
+        symbols = parse_file(abs_path)
 
         # Normalize file paths to relative (for SQLite consistency)
         for symbol in symbols:

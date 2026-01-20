@@ -32,6 +32,38 @@ def find_symbol(name: str, scan_result: ScanResult) -> List[CodeSymbol]:
     return matches
 
 
+def find_symbol_fts(
+    name: str,
+    scan_result: ScanResult,
+    exact: bool = True,
+    top_k: int = 100
+) -> List[CodeSymbol]:
+    """
+    Find symbols using FTS5 full-text search when available.
+    Falls back to linear scan for non-SQLite indices.
+    """
+    # Check if we have SQLite backend with FTS5
+    if hasattr(scan_result, '_store') and hasattr(scan_result._store, 'fts5_search'):
+        try:
+            store = scan_result._store
+            results = list(store.fts5_search(name, top_k=top_k))
+
+            if exact:
+                matches = [symbol for symbol, score in results if symbol.name == name]
+            else:
+                matches = [symbol for symbol, score in results]
+
+            if matches:
+                logger.info(f"Found {len(matches)} symbol(s) matching '{name}' via FTS5")
+            else:
+                logger.info(f"No symbols found matching '{name}' via FTS5")
+            return matches
+        except Exception as e:
+            logger.warning(f"FTS5 search failed, falling back: {e}")
+
+    return find_symbol(name, scan_result)
+
+
 def _skeletonize(content: str) -> str:
     """
     Produce a skeleton view of code: keep signatures and docstrings/comments.

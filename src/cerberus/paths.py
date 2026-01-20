@@ -32,6 +32,7 @@ class CerberusPaths:
 
     # Directory name for all Cerberus data
     CERBERUS_DIR = ".cerberus"
+    GLOBAL_DIR = Path.home() / ".cerberus"
 
     # File names (without paths)
     INDEX_DB_NAME = "cerberus.db"

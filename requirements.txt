@@ -1,11 +1,12 @@
-typer>=0.9.0
 pydantic>=2.0.0
 pytest>=7.0.0
+pytest-asyncio>=0.23.0
 loguru>=0.7.0
 pathspec>=0.12.0
 setuptools
 sentence-transformers>=2.6.0
 numpy>=1.26.0
+fastmcp>=0.1.0
 
 # Phase 2: Context Synthesis & Compaction
 tree-sitter>=0.25.0  # 0.25+ required for Python 3.14 (no distutils dependency)

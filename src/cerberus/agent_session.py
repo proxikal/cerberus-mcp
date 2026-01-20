@@ -236,13 +236,6 @@ class SessionTracker:
         if self.metrics.tokens_read == 0 and self.metrics.tokens_saved == 0:
             return
 
-        # Import config to check machine mode and metric settings
-        from cerberus.cli.config import CLIConfig
-
-        # Check if metrics should be suppressed
-        if CLIConfig.is_silent_metrics():
-            return
-
         # Calculate task metrics
         task_total = self.metrics.get_task_total_tokens()
         task_efficiency = self.metrics.get_task_efficiency_percent()
@@ -252,32 +245,6 @@ class SessionTracker:
         session_total = self.metrics.get_total_tokens()
         session_efficiency = self.metrics.get_efficiency_percent()
         session_dollars = SessionMetrics.tokens_to_dollars(self.metrics.tokens_saved, is_output=False)
-
-        # Machine mode: compact default output
-        if CLIConfig.is_machine_mode():
-            # Only display when showing task summary (at task completion)
-            # This prevents session summary from appearing after every single command
-            if not show_task_summary:
-                return
-
-            # Skip if no task data to show
-            if task_total == 0:
-                return
-
-            print()  # Newline for readability
-
-            # Show task summary
-            print(f"[Task] Saved: {self.metrics.task_tokens_saved:,} tokens (~${task_dollars:.4f}) | Efficiency: {task_efficiency:.1f}%")
-
-            # Show session summary (only at task completion)
-            print(f"[Session] Saved: {self.metrics.tokens_saved:,} tokens (~${session_dollars:.2f}) | Efficiency: {session_efficiency:.1f}%")
-            print()  # Newline for readability
-
-            # Reset task metrics after displaying
-            self.metrics.reset_task_metrics()
-            self._save_session()
-
-            return
 
         # Human mode: rich output
         # Only display when showing task summary (at task completion)

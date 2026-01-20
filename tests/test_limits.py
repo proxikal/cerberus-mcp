@@ -50,7 +50,7 @@ class TestIndexLimitsConfig:
         assert config.max_file_bytes == 1 * 1024 * 1024  # 1MB
         assert config.max_symbols_per_file == 500
         assert config.max_total_symbols == 100_000
-        assert config.max_index_size_mb == 100
+        assert config.max_index_size_mb == 150
         assert config.max_vectors == 100_000
 
     def test_env_var_override(self):

@@ -55,6 +55,22 @@ class TreeBuilder:
 
         return "\n".join(lines)
 
+    def build_aggregated_tree(self, package_path: str, nodes: List[BlueprintNode]) -> str:
+        """
+        Build a simple tree for aggregated (directory/package) blueprints.
+
+        Shows files and their top-level symbols.
+        """
+        lines = []
+        lines.append(f"[Package: {package_path}]")
+        lines.append("")  # Spacer
+
+        for i, file_node in enumerate(nodes):
+            is_last = i == len(nodes) - 1
+            lines.extend(self._render_node(file_node, depth=0, is_last=is_last, parent_prefixes=[]))
+
+        return "\n".join(lines)
+
     def _render_node(
         self,
         node: BlueprintNode,

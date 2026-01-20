@@ -393,8 +393,9 @@ def _write_batch_to_sqlite(
     This keeps transactions small and predictable (~100 files at a time).
     """
     with sqlite_store.transaction() as conn:
-        # Write files
+        # Clear any previous data for these files to avoid duplicate rows from re-indexing
         for file_obj in file_batch:
+            sqlite_store.delete_file(file_obj.path, conn=conn)
             sqlite_store.write_file(file_obj, conn=conn)
 
         # Write symbols with chunked batching (handles large symbol counts)

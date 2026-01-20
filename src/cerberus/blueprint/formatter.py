@@ -4,8 +4,9 @@ Phase 13.1: Support both human-readable tree and machine-readable JSON outputs.
 """
 
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from .schemas import Blueprint, TreeRenderOptions
+from .aggregator import AggregatedBlueprint
 from .tree_builder import TreeBuilder
 
 
@@ -53,6 +54,79 @@ class BlueprintFormatter:
         else:
             # Machine mode: minified JSON
             return json.dumps(data, separators=(',', ':'), ensure_ascii=False)
+
+    @staticmethod
+    def format_as_json_compact(blueprint: Union[Blueprint, AggregatedBlueprint]) -> str:
+        """
+        Format blueprint as compact JSON (minimal tokens).
+
+        Differences from full JSON:
+        - No indentation/whitespace.
+        - Omits null/empty fields where safe.
+        - Uses short field names (sig, parent).
+        """
+        def _strip_node(node):
+            data = {
+                "name": node.name,
+                "type": node.type,
+                "line": node.start_line,
+            }
+            if node.signature:
+                data["sig"] = node.signature
+            if node.parent_class:
+                data["parent"] = node.parent_class
+            if node.children:
+                # Only include methods for classes; flatten to minimal info
+                data["methods"] = [
+                    {"name": c.name, "line": c.start_line}
+                    for c in node.children
+                ]
+            return data
+
+        if isinstance(blueprint, AggregatedBlueprint):
+            payload = {
+                "package": blueprint.package_path,
+                "files": [
+                    {
+                        "file": node.file_path,
+                        "symbols": [_strip_node(child) for child in node.children],
+                    }
+                    for node in blueprint.nodes
+                ],
+            }
+        else:
+            payload = {
+                "file": blueprint.file_path,
+                "symbols": [_strip_node(n) for n in blueprint.nodes],
+            }
+
+        return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+
+    @staticmethod
+    def format_as_flat(blueprint: Union[Blueprint, AggregatedBlueprint]) -> str:
+        """
+        Format blueprint as flat symbol list (minimal tokens).
+
+        Returns one symbol per line: "type:name (line X)"
+        Ideal for quick overview with ~200 tokens.
+        """
+        lines = []
+
+        if isinstance(blueprint, AggregatedBlueprint):
+            for node in blueprint.nodes:
+                lines.append(f"# {node.file_path}")
+                for child in node.children:
+                    lines.append(f"  {child.type}:{child.name} (L{child.start_line})")
+                    for method in child.children:
+                        lines.append(f"    {method.type}:{method.name} (L{method.start_line})")
+        else:
+            lines.append(f"# {blueprint.file_path}")
+            for node in blueprint.nodes:
+                lines.append(f"{node.type}:{node.name} (L{node.start_line})")
+                for child in node.children:
+                    lines.append(f"  {child.type}:{child.name} (L{child.start_line})")
+
+        return "\n".join(lines)
 
     @staticmethod
     def _to_dict(blueprint: Blueprint, include_metadata: bool) -> Dict[str, Any]:

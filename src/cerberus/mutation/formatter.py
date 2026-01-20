@@ -177,7 +177,7 @@ class CodeFormatter:
 
         # Check if formatter is available
         if not shutil.which(command):
-            logger.warning(f"Formatter '{command}' not found in PATH")
+            logger.debug(f"Formatter '{command}' not found in PATH, skipping auto-format")
             return True, None  # Not an error, just unavailable
 
         # Build command

@@ -16,6 +16,12 @@ from pathlib import Path
 
 import pytest
 
+# Ensure local src is importable before importing cerberus modules
+repo_root = Path(__file__).resolve().parents[1]
+src_path = repo_root / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
 from cerberus.logging_config import setup_logging
 
 
@@ -29,6 +35,11 @@ def pytest_configure(config):
     os.environ.setdefault("CERBERUS_MACHINE_MODE", "1")
     os.environ.setdefault("CERBERUS_SILENT_METRICS", "1")
     os.environ.setdefault("CERBERUS_NO_TRACK", "true")
+    # Register asyncio marker if not present
+    config.addinivalue_line("markers", "asyncio: mark test as asyncio-based")
+    # Ensure repo src is importable
+    repo_root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(repo_root / "src"))
 
 
 # ============================================================================

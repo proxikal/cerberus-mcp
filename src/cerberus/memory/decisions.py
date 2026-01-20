@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from datetime import date
 
 from cerberus.memory.store import MemoryStore
+from cerberus.memory import config
 from cerberus.logging_config import logger
 
 
@@ -77,8 +78,7 @@ class ProjectDecisions:
     project: str = ""
     decisions: List[Decision] = field(default_factory=list)
 
-    # Maximum decisions to keep per project
-    MAX_DECISIONS = 10
+    # Maximum decisions configured in config.py
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -100,9 +100,10 @@ class ProjectDecisions:
 
     def add_decision(self, decision: Decision) -> None:
         """Add a decision, maintaining the max limit."""
+        max_decisions = config.max_decisions_per_project()
         self.decisions.insert(0, decision)  # Most recent first
-        if len(self.decisions) > self.MAX_DECISIONS:
-            self.decisions = self.decisions[:self.MAX_DECISIONS]
+        if len(self.decisions) > max_decisions:
+            self.decisions = self.decisions[:max_decisions]
 
     def get_recent(self, count: int = 5) -> List[Decision]:
         """Get the most recent decisions."""

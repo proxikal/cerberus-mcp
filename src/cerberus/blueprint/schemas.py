@@ -220,7 +220,10 @@ class BlueprintRequest(BaseModel):
     show_meta: bool = Field(False, description="Include complexity metrics")
     use_cache: bool = Field(True, description="Allow cache usage")
     fast_mode: bool = Field(False, description="Skip expensive analysis")
-    output_format: Literal["tree", "json"] = Field("json", description="Output format")
+    output_format: Literal["tree", "json", "json-compact", "flat"] = Field(
+        "json",
+        description="Output format: tree (ASCII), json (structured), json-compact (minified), or flat (list)"
+    )
 
     # Phase 13.2 flags:
     show_churn: bool = Field(False, description="Include git churn analysis")

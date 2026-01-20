@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from datetime import date
 
 from cerberus.memory.store import MemoryStore
+from cerberus.memory import config
 from cerberus.logging_config import logger
 
 
@@ -113,8 +114,7 @@ class PromptLibrary:
     task_type: str = ""
     prompts: List[Prompt] = field(default_factory=list)
 
-    # Maximum prompts per task type
-    MAX_PROMPTS = 5
+    # Maximum prompts per task type configured in config.py
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -145,13 +145,14 @@ class PromptLibrary:
 
         self.prompts.insert(0, prompt)  # Most recent first
 
-        if len(self.prompts) > self.MAX_PROMPTS:
+        max_prompts = config.max_prompts_per_project()
+        if len(self.prompts) > max_prompts:
             # Remove lowest effectiveness prompts
             self.prompts = sorted(
                 self.prompts,
                 key=lambda p: (p.effectiveness, p.use_count),
                 reverse=True
-            )[:self.MAX_PROMPTS]
+            )[:max_prompts]
 
     def get_by_effectiveness(self, count: int = 5) -> List[Prompt]:
         """Get prompts sorted by effectiveness."""

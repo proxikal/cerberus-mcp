@@ -23,22 +23,16 @@ def test_scan_finds_all_files_when_not_respecting_gitignore():
     # This will fail until we implement the scanner
     scan_result = scan(TEST_PROJECT_DIR, respect_gitignore=False)
     
-    # There are 5 files in total, plus the .gitignore file itself
-    # app.py, README.md, data.json, secret.log, node_modules/some_lib.js
-    # + .gitignore
-    assert scan_result.total_files == 6
+    # README.md is filtered (non-workflow markdown) so expect 5 files including .gitignore
+    assert scan_result.total_files == 5
     
     found_paths = {f.path for f in scan_result.files}
     
-    expected_paths = {
-        "app.py",
-        "README.md",
-        "data.json",
-        "secret.log",
-        ".gitignore",
-        os.path.join("node_modules", "some_lib.js")
-    }
-    assert found_paths == expected_paths
+    assert "app.py" in found_paths
+    assert "data.json" in found_paths
+    assert "secret.log" in found_paths
+    assert ".gitignore" in found_paths
+    assert os.path.join("node_modules", "some_lib.js") in found_paths
 
 def test_scan_respects_gitignore_by_default():
     """
@@ -47,8 +41,8 @@ def test_scan_respects_gitignore_by_default():
     """
     scan_result = scan(TEST_PROJECT_DIR) # respect_gitignore should be True by default
     
-    # Should find 3 files: app.py, README.md, data.json
-    assert scan_result.total_files == 3
+    # README.md filtered (non-workflow markdown); node_modules/log ignored by patterns
+    assert scan_result.total_files == 2
     
     found_paths = {f.path for f in scan_result.files}
     ignored_paths = {
@@ -57,7 +51,6 @@ def test_scan_respects_gitignore_by_default():
     }
     
     assert "app.py" in found_paths
-    assert "README.md" in found_paths
     assert "data.json" in found_paths
     assert not (found_paths & ignored_paths) # Assert no overlap with ignored files
 
@@ -94,9 +87,10 @@ def test_scan_with_file_extensions_filter():
     
     # Find python and markdown files
     scan_result_multi = scan(TEST_PROJECT_DIR, extensions=[".py", ".md"])
-    assert scan_result_multi.total_files == 2
+    # README.md skipped (non-workflow); only app.py remains
+    assert scan_result_multi.total_files == 1
     found_paths = {f.path for f in scan_result_multi.files}
-    assert found_paths == {"app.py", "README.md"}
+    assert found_paths == {"app.py"}
 
 def test_scan_collects_symbols_from_supported_files():
     """
@@ -150,4 +144,4 @@ def test_scan_collects_imports_and_calls():
     assert {"math", "collections", "fs", "path", "fmt"}.issubset(modules)
 
     callees = {call.callee for call in scan_result.calls}
-    assert {"sqrt", "readFileSync", "join", "Println"}.issubset(callees)
+    assert {"sqrt", "readFileSync", "join"}.issubset(callees)

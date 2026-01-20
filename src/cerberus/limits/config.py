@@ -16,7 +16,7 @@ from typing import Optional, Dict, Any
 DEFAULT_MAX_FILE_BYTES = 1 * 1024 * 1024       # 1 MB per file
 DEFAULT_MAX_SYMBOLS_PER_FILE = 500              # Symbols per file
 DEFAULT_MAX_TOTAL_SYMBOLS = 100_000             # Total symbols in index
-DEFAULT_MAX_INDEX_SIZE_MB = 100                 # SQLite DB size in MB
+DEFAULT_MAX_INDEX_SIZE_MB = 150                 # SQLite DB size in MB
 DEFAULT_MAX_VECTORS = 100_000                   # FAISS vector count
 DEFAULT_MIN_FREE_DISK_MB = 100                  # Pre-flight disk check
 DEFAULT_WARN_THRESHOLD = 0.80                   # 80% triggers warning

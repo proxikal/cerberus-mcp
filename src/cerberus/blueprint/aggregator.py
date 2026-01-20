@@ -3,6 +3,7 @@
 Phase 13.3: Aggregates blueprints across multiple files in a package.
 """
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import List, Dict, Optional, Set
@@ -224,7 +225,7 @@ class BlueprintAggregator:
                 """
                 SELECT
                     name, type, start_line, end_line,
-                    signature, return_type, parameters, parent_class
+                    signature, return_type, parameters, parameter_types, parent_class
                 FROM symbols
                 WHERE file_path = ?
                 ORDER BY start_line ASC
@@ -236,8 +237,12 @@ class BlueprintAggregator:
             for row in cursor.fetchall():
                 (
                     name, sym_type, start_line, end_line,
-                    signature, return_type, parameters, parent_class
+                    signature, return_type, parameters, parameter_types, parent_class
                 ) = row
+
+                # Normalize JSON-encoded fields from SQLite into Python types
+                parsed_params = json.loads(parameters) if parameters else None
+                parsed_param_types = json.loads(parameter_types) if parameter_types else None
 
                 symbols.append(
                     CodeSymbol(
@@ -248,7 +253,8 @@ class BlueprintAggregator:
                         end_line=end_line,
                         signature=signature,
                         return_type=return_type,
-                        parameters=parameters,
+                        parameters=parsed_params,
+                        parameter_types=parsed_param_types,
                         parent_class=parent_class
                     )
                 )

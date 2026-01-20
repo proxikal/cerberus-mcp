@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 from datetime import date
 
 from cerberus.memory.store import MemoryStore
+from cerberus.memory import config
 from cerberus.logging_config import logger
 
 
@@ -75,8 +76,7 @@ class CorrectionStore:
     updated_at: str = ""
     corrections: List[Correction] = field(default_factory=list)
 
-    # Maximum corrections to keep
-    MAX_CORRECTIONS = 20  # Store more, show top 10 in context
+    # Maximum corrections to keep (see config.py for configurable limit)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -202,13 +202,13 @@ class CorrectionManager:
 
         # Add and maintain max limit
         corrections.corrections.append(correction)
-        if len(corrections.corrections) > CorrectionStore.MAX_CORRECTIONS:
+        if len(corrections.corrections) > config.max_corrections():
             # Remove lowest frequency corrections
             corrections.corrections = sorted(
                 corrections.corrections,
                 key=lambda c: c.frequency,
                 reverse=True
-            )[:CorrectionStore.MAX_CORRECTIONS]
+            )[:config.max_corrections()]
 
         if self.save_corrections(corrections):
             return {

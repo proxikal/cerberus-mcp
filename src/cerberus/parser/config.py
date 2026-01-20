@@ -34,6 +34,7 @@ LANGUAGE_QUERIES = {
     "go": {
         "function": re.compile(r"^\s*func\s+(?:\([^)]+\)\s*)?([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE),
         "struct": re.compile(r"^\s*type\s+([A-Za-z_][A-Za-z0-9_]*)\s+struct", re.MULTILINE),
+        "interface": re.compile(r"^\s*type\s+([A-Za-z_][A-Za-z0-9_]*)\s+interface", re.MULTILINE),
     },
     "markdown": {
         "section": re.compile(r"^#{1,6}\s+(.+)", re.MULTILINE),

@@ -1,18 +1,18 @@
-// Sample Go file for parser tests
-
+// Sample Go file for parser testing.
 package main
 
 import "fmt"
 
+// Widget is a sample struct.
 type Widget struct {
-    Name string
+	Name  string
+	Value int
 }
 
-func (w *Widget) Greet() string {
-    fmt.Println("hi")
-    return "hello"
+func Greet(name string) string {
+	return fmt.Sprintf("Hello, %s!", name)
 }
 
-func add(a int, b int) int {
-    return a + b
+func add(a, b int) int {
+	return a + b
 }

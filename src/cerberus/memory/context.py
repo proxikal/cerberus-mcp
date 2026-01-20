@@ -20,6 +20,9 @@ from cerberus.memory.corrections import CorrectionManager
 from cerberus.memory.prompts import PromptManager
 
 
+from cerberus.memory import config as memory_config
+
+
 class ContextGenerator:
     """
     Generates compressed context for AI session injection.
@@ -30,14 +33,12 @@ class ContextGenerator:
     - Human readability (markdown format)
     """
 
-    # Maximum lines for context output
-    MAX_PROFILE_LINES = 50
-    MAX_FULL_CONTEXT_LINES = 150
-
-    # Limits for each section
-    MAX_DECISIONS_IN_CONTEXT = 5
-    MAX_CORRECTIONS_IN_CONTEXT = 5
-    MAX_PROMPTS_IN_CONTEXT = 3
+    # Maximum lines for context output - loaded from config (static ints for comparisons)
+    MAX_PROFILE_LINES: int = int(memory_config.max_profile_lines())
+    MAX_FULL_CONTEXT_LINES: int = int(memory_config.max_context_lines())
+    MAX_DECISIONS_IN_CONTEXT: int = int(memory_config.max_decisions_in_context())
+    MAX_CORRECTIONS_IN_CONTEXT: int = int(memory_config.max_corrections_in_context())
+    MAX_PROMPTS_IN_CONTEXT: int = int(memory_config.max_prompts_in_context())
 
     # Style key to human-readable descriptions
     STYLE_DESCRIPTIONS = {

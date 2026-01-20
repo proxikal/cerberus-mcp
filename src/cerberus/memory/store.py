@@ -19,6 +19,7 @@ import tempfile
 import shutil
 
 from cerberus.logging_config import logger
+from cerberus.memory import config as memory_config
 
 
 class MemoryStore:
@@ -33,14 +34,12 @@ class MemoryStore:
     └── projects/                 # Per-project decisions
     """
 
-    # Size limits (in bytes)
-    MAX_PROFILE_SIZE = 4 * 1024  # 4KB (global preferences)
-    MAX_CONTEXT_SIZE = 4 * 1024  # 4KB (context generation)
-    MAX_PROJECT_DECISIONS_SIZE = 10 * 1024  # 10KB per project (~20-25 decisions)
-    MAX_TOTAL_MEMORY_SIZE = 250 * 1024  # 250KB total (conservative but effective)
-
-    # Rotation policy
-    MAX_PROJECT_AGE_DAYS = 90  # Archive projects not accessed in 90 days
+    # Size limits - eager load as class attributes for safe comparisons
+    MAX_PROFILE_SIZE: int = int(memory_config.max_profile_size())
+    MAX_CONTEXT_SIZE: int = int(memory_config.max_context_size())
+    MAX_PROJECT_DECISIONS_SIZE: int = int(memory_config.max_project_decisions_size())
+    MAX_TOTAL_MEMORY_SIZE: int = int(memory_config.max_total_memory_size())
+    MAX_PROJECT_AGE_DAYS: int = int(memory_config.max_project_age_days())
 
     def __init__(self, base_path: Optional[Path] = None):
         """
@@ -50,34 +49,53 @@ class MemoryStore:
             base_path: Override the default storage location (for testing)
         """
         if base_path is None:
-            # Default: ~/.config/cerberus/memory/
-            config_home = os.environ.get('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
-            self.base_path = Path(config_home) / 'cerberus' / 'memory'
+            # Default Global: ~/.cerberus/memory/
+            self.base_path = Path.home() / '.cerberus' / 'memory'
         else:
             self.base_path = base_path
+
+        # Local Project: .cerberus/memory/ (relative to CWD)
+        self.local_path = Path.cwd() / '.cerberus' / 'memory'
 
         # Ensure directories exist
         self._ensure_directories()
 
     def _ensure_directories(self) -> None:
         """Create the directory structure if it doesn't exist."""
+        # Global dirs
         self.base_path.mkdir(parents=True, exist_ok=True)
         (self.base_path / 'prompts').mkdir(exist_ok=True)
-        (self.base_path / 'projects').mkdir(exist_ok=True)
+        (self.base_path / 'projects').mkdir(exist_ok=True) # Keep for legacy/fallback
+
+        # Local dirs (only if .cerberus exists or we are initializing)
+        if (Path.cwd() / '.cerberus').exists():
+            self.local_path.mkdir(parents=True, exist_ok=True)
 
     @property
     def profile_path(self) -> Path:
-        """Path to the profile.json file."""
+        """Path to the profile.json file (Global)."""
         return self.base_path / 'profile.json'
 
     @property
     def corrections_path(self) -> Path:
-        """Path to the corrections.json file."""
+        """Path to the corrections.json file (Global)."""
         return self.base_path / 'corrections.json'
 
     def project_path(self, project_name: str) -> Path:
-        """Path to a project-specific decisions file."""
-        # Sanitize project name for filesystem
+        """
+        Path to a project-specific decisions file.
+        
+        Priority:
+        1. Local: .cerberus/memory/decisions.json (if in project root)
+        2. Global: ~/.cerberus/memory/projects/<name>.json (fallback)
+        """
+        # Check if we are in a project with .cerberus initialized
+        if (Path.cwd() / '.cerberus').exists():
+            # Ensure local memory dir exists
+            self.local_path.mkdir(exist_ok=True)
+            return self.local_path / 'decisions.json'
+
+        # Fallback to global storage
         safe_name = "".join(c if c.isalnum() or c in '-_' else '_' for c in project_name)
         return self.base_path / 'projects' / f'{safe_name}.json'
 

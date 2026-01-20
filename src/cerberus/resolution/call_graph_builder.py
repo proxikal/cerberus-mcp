@@ -13,6 +13,33 @@ from cerberus.logging_config import logger
 from cerberus.storage.sqlite_store import SQLiteIndexStore
 from .config import CALL_GRAPH_CONFIG
 
+# Built-in functions and common stdlib to filter out
+BUILTIN_FILTER = {
+    # Python builtins
+    'print', 'len', 'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
+    'range', 'enumerate', 'zip', 'map', 'filter', 'sum', 'min', 'max', 'abs',
+    'isinstance', 'issubclass', 'type', 'getattr', 'setattr', 'hasattr', 'delattr',
+    'open', 'input', 'sorted', 'reversed', 'all', 'any', 'next', 'iter',
+    # Common stdlib methods
+    'append', 'extend', 'insert', 'remove', 'pop', 'clear', 'index', 'count',
+    'keys', 'values', 'items', 'get', 'update', 'join', 'split', 'strip',
+    'upper', 'lower', 'replace', 'format', 'startswith', 'endswith',
+    'read', 'write', 'close', 'seek', 'tell',
+    # Date/time
+    'now', 'strftime', 'strptime', 'time', 'sleep',
+    # JSON/serialization
+    'json', 'loads', 'dumps',
+    # JavaScript/TypeScript builtins
+    'console', 'log', 'error', 'warn', 'info', 'debug',
+    'parseInt', 'parseFloat', 'isNaN', 'isFinite',
+    'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval',
+    'push', 'shift', 'unshift', 'slice', 'splice', 'forEach', 'includes',
+    # Go builtins
+    'make', 'new', 'len', 'cap', 'append', 'copy', 'delete',
+    'panic', 'recover', 'close',
+    'Println', 'Printf', 'Sprintf', 'Fprintf',
+}
+
 
 @dataclass
 class CallNode:
@@ -71,7 +98,9 @@ class CallGraphBuilder:
             CallGraph object
         """
         max_depth = max_depth or self.config["max_depth"]
-        logger.debug(f"Building forward call graph for {symbol_name} (max depth: {max_depth})")
+        max_nodes = self.config.get("max_nodes", 100)
+        max_edges = self.config.get("max_edges", 200)
+        logger.debug(f"Building forward call graph for {symbol_name} (max depth: {max_depth}, max nodes: {max_nodes})")
 
         nodes: List[CallNode] = []
         edges: List[Tuple[str, str]] = []
@@ -88,6 +117,12 @@ class CallGraphBuilder:
             if depth > max_depth:
                 truncated = True
                 continue
+
+            # Check node limit
+            if len(nodes) >= max_nodes:
+                truncated = True
+                logger.debug(f"Call graph truncated at {max_nodes} nodes")
+                break
 
             max_depth_reached = max(max_depth_reached, depth)
 
@@ -113,11 +148,21 @@ class CallGraphBuilder:
                 callees = self._get_callees(current_symbol, file)
 
                 for callee_name, callee_file, callee_line in callees:
+                    # Check edge limit
+                    if len(edges) >= max_edges:
+                        truncated = True
+                        logger.debug(f"Call graph truncated at {max_edges} edges")
+                        break
+
                     edges.append((current_symbol, callee_name))
 
                     # Add to queue for traversal
                     if depth + 1 <= max_depth:
                         queue.append((callee_name, callee_file, depth + 1))
+
+                # If edge limit hit, stop processing
+                if truncated:
+                    break
 
         logger.debug(f"Forward graph: {len(nodes)} nodes, {len(edges)} edges, max depth: {max_depth_reached}")
 
@@ -148,7 +193,9 @@ class CallGraphBuilder:
             CallGraph object
         """
         max_depth = max_depth or self.config["max_depth"]
-        logger.debug(f"Building reverse call graph for {symbol_name} (max depth: {max_depth})")
+        max_nodes = self.config.get("max_nodes", 100)
+        max_edges = self.config.get("max_edges", 200)
+        logger.debug(f"Building reverse call graph for {symbol_name} (max depth: {max_depth}, max nodes: {max_nodes})")
 
         nodes: List[CallNode] = []
         edges: List[Tuple[str, str]] = []
@@ -165,6 +212,12 @@ class CallGraphBuilder:
             if depth > max_depth:
                 truncated = True
                 continue
+
+            # Check node limit
+            if len(nodes) >= max_nodes:
+                truncated = True
+                logger.debug(f"Call graph truncated at {max_nodes} nodes")
+                break
 
             max_depth_reached = max(max_depth_reached, depth)
 
@@ -189,11 +242,21 @@ class CallGraphBuilder:
                 callers = self._get_callers(current_symbol, file)
 
                 for caller_name, caller_file, caller_line in callers:
+                    # Check edge limit
+                    if len(edges) >= max_edges:
+                        truncated = True
+                        logger.debug(f"Call graph truncated at {max_edges} edges")
+                        break
+
                     edges.append((caller_name, current_symbol))
 
                     # Add to queue for traversal
                     if depth + 1 <= max_depth:
                         queue.append((caller_name, caller_file, depth + 1))
+
+                # If edge limit hit, stop processing
+                if truncated:
+                    break
 
         logger.debug(f"Reverse graph: {len(nodes)} nodes, {len(edges)} edges, max depth: {max_depth_reached}")
 
@@ -254,32 +317,53 @@ class CallGraphBuilder:
         """
         conn = self.store._get_connection()
         try:
-            # Get regular function calls
+            # First, get the symbol's line range
             cursor = conn.execute("""
-                SELECT callee, caller_file, line
+                SELECT start_line, end_line
+                FROM symbols
+                WHERE name = ? AND file_path = ?
+                LIMIT 1
+            """, (symbol_name, file_path))
+
+            result = cursor.fetchone()
+            if not result:
+                return []
+
+            start_line, end_line = result
+
+            # Get regular function calls within this symbol's line range
+            cursor = conn.execute("""
+                SELECT DISTINCT callee, line
                 FROM calls
                 WHERE caller_file = ?
-            """, (file_path,))
+                AND line >= ?
+                AND line <= ?
+            """, (file_path, start_line, end_line))
 
             calls = cursor.fetchall()
 
-            # Also check method calls
+            # Also check method calls within the line range
             cursor = conn.execute("""
-                SELECT method, caller_file, line
+                SELECT DISTINCT method, line
                 FROM method_calls
                 WHERE caller_file = ?
-            """, (file_path,))
+                AND line >= ?
+                AND line <= ?
+            """, (file_path, start_line, end_line))
 
             method_calls = cursor.fetchall()
 
-            # Combine and deduplicate
-            all_calls = calls + method_calls
+            # Combine and filter built-ins
             unique_calls = {}
-            for callee, cfile, line in all_calls:
+            for callee, line in calls + method_calls:
+                # Filter out built-ins and stdlib noise
+                if callee in BUILTIN_FILTER:
+                    continue
+
                 if callee not in unique_calls:
                     # Try to resolve callee to its file
                     callee_info = self._get_symbol_location(callee, None)
-                    callee_file = callee_info[0] if callee_info else cfile
+                    callee_file = callee_info[0] if callee_info else file_path
                     unique_calls[callee] = (callee, callee_file, line)
 
             return list(unique_calls.values())
@@ -320,7 +404,7 @@ class CallGraphBuilder:
             all_locations = call_locations + method_call_locations
 
             # For each location, find the enclosing function/method
-            callers = []
+            unique_callers = {}
             for caller_file, line in all_locations:
                 # Find symbol that contains this line
                 cursor = conn.execute("""
@@ -336,8 +420,12 @@ class CallGraphBuilder:
 
                 result = cursor.fetchone()
                 if result:
-                    callers.append((result[0], result[1], result[2]))
+                    caller_name, caller_file_path, caller_line = result
+                    # Deduplicate by caller name and file
+                    key = f"{caller_name}:{caller_file_path}"
+                    if key not in unique_callers:
+                        unique_callers[key] = (caller_name, caller_file_path, caller_line)
 
-            return callers
+            return list(unique_callers.values())
         finally:
             conn.close()

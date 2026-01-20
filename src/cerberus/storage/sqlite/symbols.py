@@ -5,12 +5,46 @@ Handles CRUD operations for files, symbols, and embeddings metadata.
 """
 
 import json
+import re
 import sqlite3
 from typing import Any, Dict, Iterator, List, Optional
 
 from cerberus.logging_config import logger
 from cerberus.schemas import CodeSymbol, FileObject
 from cerberus.storage.sqlite.config import DEFAULT_CHUNK_SIZE, DEFAULT_BATCH_SIZE
+
+
+def escape_fts5_query(query: str) -> str:
+    """
+    Escape special characters in FTS5 queries to prevent syntax errors.
+
+    FTS5 special characters: " * ( ) AND OR NOT : ^ + - @
+
+    For simple queries with special chars, we wrap the entire query in double quotes
+    to treat it as a phrase search, and escape any internal double quotes.
+
+    Args:
+        query: Raw search query
+
+    Returns:
+        Sanitized query safe for FTS5
+    """
+    # Check if query contains FTS5 special characters (excluding spaces and alphanumerics)
+    # Special chars: " * ( ) @ : ^ + -
+    # Boolean operators are handled separately
+    has_special_chars = bool(re.search(r'[@"*():\^+\-]', query))
+
+    # Check if query looks like an intentional FTS5 query (uses AND, OR, NOT)
+    # We allow these through if the user is doing advanced searching
+    is_advanced_query = bool(re.search(r'\b(AND|OR|NOT)\b', query, re.IGNORECASE))
+
+    if has_special_chars and not is_advanced_query:
+        # Escape internal double quotes and wrap in quotes for phrase search
+        escaped = query.replace('"', '""')
+        return f'"{escaped}"'
+
+    # If it's an advanced query or has no special chars, return as-is
+    return query
 
 
 class SQLiteSymbolsOperations:
@@ -94,9 +128,15 @@ class SQLiteSymbolsOperations:
 
                 # Insert chunk
                 chunk_ids = []
+                seen = set()
                 for s in chunk:
+                    key = (s.file_path, s.name, s.start_line, s.end_line, s.type)
+                    if key in seen:
+                        continue  # skip duplicate within batch
+                    seen.add(key)
+
                     cursor = _conn.execute("""
-                        INSERT INTO symbols (name, type, file_path, start_line, end_line,
+                        INSERT OR IGNORE INTO symbols (name, type, file_path, start_line, end_line,
                                            signature, return_type, parameters, parameter_types, parent_class)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (s.name, s.type, s.file_path, s.start_line, s.end_line,
@@ -104,7 +144,8 @@ class SQLiteSymbolsOperations:
                          json.dumps(s.parameters) if s.parameters else None,
                          json.dumps(s.parameter_types) if s.parameter_types else None,
                          s.parent_class))
-                    chunk_ids.append(cursor.lastrowid)
+                    if cursor.rowcount:
+                        chunk_ids.append(cursor.lastrowid)
 
                 all_symbol_ids.extend(chunk_ids)
 
@@ -245,12 +286,18 @@ class SQLiteSymbolsOperations:
             cursor = conn.execute(query, params)
 
             # Yield in batches
+            seen = set()
             while True:
                 rows = cursor.fetchmany(batch_size)
                 if not rows:
                     break
 
                 for row in rows:
+                    key = (row['file_path'], row['name'], row['start_line'], row['end_line'], row['type'])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+
                     yield CodeSymbol(
                         name=row['name'],
                         type=row['type'],
@@ -289,6 +336,10 @@ class SQLiteSymbolsOperations:
         """
         conn = self._get_connection()
         try:
+            seen = set()
+            # Escape FTS5 special characters to prevent syntax errors
+            safe_query = escape_fts5_query(query)
+
             # FTS5 query with BM25 ranking
             # The bm25() function returns negative scores (more negative = better match)
             # We negate it to get positive scores (higher = better)
@@ -304,7 +355,7 @@ class SQLiteSymbolsOperations:
                 LIMIT ?
             """
 
-            cursor = conn.execute(fts_query, (query, top_k))
+            cursor = conn.execute(fts_query, (safe_query, top_k))
 
             # Yield in batches
             while True:
@@ -313,6 +364,11 @@ class SQLiteSymbolsOperations:
                     break
 
                 for row in rows:
+                    key = (row['file_path'], row['name'], row['start_line'], row['end_line'], row['type'])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+
                     symbol = CodeSymbol(
                         name=row['name'],
                         type=row['type'],
