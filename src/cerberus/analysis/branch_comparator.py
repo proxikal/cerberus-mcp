@@ -354,7 +354,10 @@ class BranchComparator:
                 logger.warning(f"Failed to diff file {path}")
                 continue
 
-            binary = "Binary files" in diff_out
+            binary = any(
+                line.startswith("Binary files") or line.startswith("GIT binary patch")
+                for line in diff_out.splitlines()
+            )
             ranges = parse_line_ranges(diff_out) if not binary else []
             additions, deletions = self._count_line_changes(diff_out)
 
@@ -529,11 +532,14 @@ class BranchComparator:
                     old_path=old_path,
                 )
 
+            # Deduplicate identical symbol entries (index may contain duplicates)
+            deduped_symbols = self._dedupe_symbol_changes(symbol_changes)
+
             results.append(
                 FileChange(
                     file=relative_path,
                     change_type=change_type,
-                    symbols_changed=symbol_changes,
+                    symbols_changed=deduped_symbols,
                     old_path=self._relativize(old_path) if old_path else None,
                     binary=binary,
                 )
@@ -818,6 +824,18 @@ class BranchComparator:
         elif hasattr(node, "body") and isinstance(getattr(node, "body"), list):
             for child in getattr(node, "body"):
                 self._strip_docstrings(child)
+
+    def _dedupe_symbol_changes(self, symbols: List[SymbolChange]) -> List[SymbolChange]:
+        """Remove duplicate SymbolChange entries by (name, line_number, change_type)."""
+        seen = set()
+        deduped: List[SymbolChange] = []
+        for sym in symbols:
+            key = (sym.name, sym.line_number, sym.change_type, sym.parent_class)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(sym)
+        return deduped
 
     @staticmethod
     def _count_line_changes(diff_output: str) -> Tuple[int, int]:
