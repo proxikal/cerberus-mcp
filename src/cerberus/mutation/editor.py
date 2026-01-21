@@ -9,7 +9,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 from cerberus.logging_config import logger
 from cerberus.schemas import SymbolLocation

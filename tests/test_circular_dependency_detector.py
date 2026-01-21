@@ -6,7 +6,7 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
-from src.cerberus.analysis.circular_dependency_detector import (
+from cerberus.analysis.circular_dependency_detector import (
     CircularDependencyDetector,
     find_circular_dependencies,
     CircularChain

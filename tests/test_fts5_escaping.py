@@ -6,7 +6,7 @@ to prevent FTS5 syntax errors.
 """
 
 import pytest
-from src.cerberus.storage.sqlite.symbols import escape_fts5_query
+from cerberus.storage.sqlite.symbols import escape_fts5_query
 
 
 class TestFTS5QueryEscaping:
