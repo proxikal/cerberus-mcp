@@ -122,6 +122,36 @@ class BranchComparisonResult:
         return data
 
 
+@dataclass
+class MultiBranchComparisonResult:
+    """Aggregated result for comparing multiple branches to a base branch."""
+
+    status: str
+    base_branch: str
+    branches: List[str]
+    results: List[BranchComparisonResult]
+    aggregate_files_changed: int
+    aggregate_symbols_changed: int
+    branches_with_conflicts: List[str] = field(default_factory=list)
+    truncated: bool = False
+    token_cost: int = 0
+    errors: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "status": self.status,
+            "base_branch": self.base_branch,
+            "branches": self.branches,
+            "aggregate_files_changed": self.aggregate_files_changed,
+            "aggregate_symbols_changed": self.aggregate_symbols_changed,
+            "branches_with_conflicts": self.branches_with_conflicts,
+            "truncated": self.truncated,
+            "token_cost": self.token_cost,
+            "errors": self.errors,
+            "results": [r.to_dict() for r in self.results],
+        }
+
+
 class BranchComparator:
     """
     Compare two git branches and map diff ranges to symbols.
@@ -135,6 +165,7 @@ class BranchComparator:
         self.index = index
         self.git_root = get_git_root(project_root) or project_root
         self._symbol_cache = self._build_symbol_cache()
+        self._last_compare_branches: Tuple[Optional[str], Optional[str]] = (None, None)
 
     def compare(
         self,
@@ -222,6 +253,8 @@ class BranchComparator:
                 token_cost=0,
                 warnings=warnings,
             )
+
+        self._last_compare_branches = (branch_a, branch_b)
 
         mapped_changes = self._map_changes_to_symbols(changed_files, branch_a, branch_b)
 
@@ -836,6 +869,124 @@ class BranchComparator:
             seen.add(key)
             deduped.append(sym)
         return deduped
+
+    @staticmethod
+    def _count_line_changes(diff_output: str) -> Tuple[int, int]:
+        """Count added/removed lines from diff output (excluding headers)."""
+        added = 0
+        removed = 0
+        for line in diff_output.splitlines():
+            if line.startswith("+++ ") or line.startswith("--- "):
+                continue
+            if line.startswith("+"):
+                added += 1
+            elif line.startswith("-"):
+                removed += 1
+        return added, removed
+
+    @staticmethod
+    def _assess_risk(changes: List[FileChange]) -> str:
+        """Risk assessment based on symbol counts and critical paths."""
+        # Flatten symbol changes
+        all_symbols = [s for change in changes for s in change.symbols_changed]
+        total_symbols = len(all_symbols)
+
+        critical_patterns = ["__init__", "main", "app", "server", "core"]
+        has_critical = any(
+            any(pattern in change.file for pattern in critical_patterns)
+            for change in changes
+        )
+
+        if total_symbols > 50 or (has_critical and total_symbols > 20):
+            return "critical"
+        if total_symbols > 20 or has_critical:
+            return "high"
+        if total_symbols > 5:
+            return "medium"
+        return "low"
+
+    @staticmethod
+    def _estimate_token_cost(data: Any) -> int:
+        """Approximate token cost for JSON payload."""
+        try:
+            payload = json.dumps(data)
+        except Exception:
+            return 0
+        return len(payload) // 4  # ~4 chars per token heuristic
+
+    def _check_index_sync(self, branch_b: str, warnings: List[str]) -> None:
+        """Warn if index git commit differs from branch_b tip."""
+        index_commit = None
+        try:
+            if isinstance(self.index, ScanResultAdapter):
+                index_commit = self.index._store.get_metadata("git_commit")
+            else:
+                index_commit = getattr(self.index, "metadata", {}).get("git_commit")
+        except Exception:
+            index_commit = None
+
+        code, commit, _ = self._run_git(["rev-parse", branch_b])
+        branch_commit = commit if code == 0 else None
+
+        if index_commit and branch_commit and index_commit != branch_commit:
+            warnings.append(
+                f"Index git commit {index_commit[:7]} differs from {branch_b} ({branch_commit[:7]})."
+            )
+
+
+class MultiBranchComparator:
+    """
+    Compare a base branch against multiple target branches.
+
+    Uses BranchComparator for per-branch analysis and aggregates results.
+    """
+
+    def __init__(self, project_root: Path, index: Any):
+        self.project_root = project_root
+        self.index = index
+        self.single = BranchComparator(project_root, index)
+
+    def compare_many(
+        self,
+        base_branch: str,
+        branches: List[str],
+        focus: Optional[str] = None,
+        include_conflicts: bool = True,
+    ) -> MultiBranchComparisonResult:
+        results: List[BranchComparisonResult] = []
+        errors: List[str] = []
+        conflicts_branches: List[str] = []
+        aggregate_files: set = set()
+        aggregate_symbols: int = 0
+        total_tokens = 0
+        truncated_any = False
+
+        for branch in branches:
+            result = self.single.compare(base_branch, branch, focus, include_conflicts)
+            results.append(result)
+            if result.status != "success":
+                errors.append(f"{branch}: {result.error or 'unknown error'}")
+            if result.conflicts:
+                conflicts_branches.append(branch)
+            aggregate_files.update(change["file"] for change in result.changes)
+            aggregate_symbols += result.symbols_changed
+            total_tokens += result.token_cost
+            truncated_any = truncated_any or result.truncated
+
+        status = "success" if not errors else "partial"
+
+        return MultiBranchComparisonResult(
+            status=status,
+            base_branch=base_branch,
+            branches=branches,
+            results=results,
+            aggregate_files_changed=len(aggregate_files),
+            aggregate_symbols_changed=aggregate_symbols,
+            branches_with_conflicts=conflicts_branches,
+            truncated=truncated_any,
+            token_cost=total_tokens,
+            errors=errors,
+        )
 
     @staticmethod
     def _count_line_changes(diff_output: str) -> Tuple[int, int]:

@@ -360,3 +360,73 @@ def calc():
     change = result.changes[0]["symbols_changed"][0]
     assert change["name"] == "calc"
     assert change.get("semantically_equivalent") is True
+
+
+def test_multi_branch_comparison(temp_dir):
+    """Aggregates per-branch results and totals."""
+    repo = temp_dir / "branch_compare_multi"
+    repo.mkdir()
+    _init_repo(repo)
+
+    _write(
+        repo,
+        "app.py",
+        """
+def foo():
+    return "foo"
+
+def bar():
+    return "bar"
+        """,
+    )
+    _run_git(repo, "add", ".")
+    _run_git(repo, "commit", "-m", "base")
+
+    # Branch A modifies foo
+    _run_git(repo, "checkout", "-b", "feature/a")
+    _write(
+        repo,
+        "app.py",
+        """
+def foo():
+    return "foo v2"
+
+def bar():
+    return "bar"
+        """,
+    )
+    _run_git(repo, "add", ".")
+    _run_git(repo, "commit", "-m", "change foo")
+
+    # Branch B modifies bar
+    _run_git(repo, "checkout", "main")
+    _run_git(repo, "checkout", "-b", "feature/b")
+    _write(
+        repo,
+        "app.py",
+        """
+def foo():
+    return "foo"
+
+def bar():
+    return "bar v2"
+        """,
+    )
+    _run_git(repo, "add", ".")
+    _run_git(repo, "commit", "-m", "change bar")
+
+    # Build index on base (has both symbols)
+    index = _build_index(repo)
+    from cerberus.analysis.branch_comparator import MultiBranchComparator
+
+    comparator = MultiBranchComparator(repo, index)
+    result = comparator.compare_many("main", ["feature/a", "feature/b"])
+    data = result.to_dict()
+
+    assert data["status"] == "success"
+    assert data["aggregate_files_changed"] == 1
+    assert data["aggregate_symbols_changed"] >= 2
+    assert len(data["results"]) == 2
+    per_branch = {r["branch_b"]: r for r in data["results"]}
+    assert per_branch["feature/a"]["symbols_changed"] >= 1
+    assert per_branch["feature/b"]["symbols_changed"] >= 1

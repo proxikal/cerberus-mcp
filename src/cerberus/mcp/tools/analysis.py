@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Optional
 
-from cerberus.analysis.branch_comparator import BranchComparator
+from cerberus.analysis.branch_comparator import BranchComparator, MultiBranchComparator
 from cerberus.resolution.call_graph_builder import CallGraphBuilder, CallGraph
 
 from ..index_manager import get_index_manager
@@ -182,6 +182,40 @@ def register(mcp):
             index = get_index_manager().get_index()
             comparator = BranchComparator(Path.cwd(), index)
             result = comparator.compare(branch_a, branch_b, focus, include_conflicts)
+            return result.to_dict()
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+
+
+    @mcp.tool()
+    def diff_branches_multi(
+        base_branch: str,
+        branches: list[str],
+        focus: str | None = None,
+        include_conflicts: bool = True
+    ) -> dict:
+        """
+        Compare multiple branches to a base branch at symbol level.
+
+        Aggregates symbol-level diffs across all target branches and reports
+        conflicts per branch when requested.
+
+        Args:
+            base_branch: Branch used as baseline (e.g., main)
+            branches: List of target branches to compare
+            focus: Optional substring filter across paths/symbols
+            include_conflicts: Whether to detect potential conflicts
+
+        Returns:
+            Dict with aggregated stats and per-branch results.
+        """
+        try:
+            index = get_index_manager().get_index()
+            comparator = MultiBranchComparator(Path.cwd(), index)
+            result = comparator.compare_many(base_branch, branches, focus, include_conflicts)
             return result.to_dict()
         except Exception as e:
             return {
