@@ -4,28 +4,6 @@
 
 Cerberus combines intelligent code exploration with persistent session memory, designed exclusively for AI agents to maximize efficiency and maintain context across sessions.
 
-## 🚀 Quick Links
-
-### Getting Started
-- **[Installation](Installation)** - Complete setup guide for all components
-- **[Quick Start](Quick-Start)** - Get up and running in 5 minutes
-- **[Context-Aware Operation](Context-Aware-Operation)** - How Cerberus adapts to your workspace
-
-### Core Features
-- **[MCP Tools Reference](MCP-Tools-Reference)** - All 51 tools explained with examples
-- **[Session Memory](Session-Memory)** - Dual-layer memory system deep dive
-- **[Advanced Analysis](Advanced-Analysis)** - Impact analysis, test coverage, branch comparison
-- **[Token Efficiency](Token-Efficiency)** - Why Cerberus saves 70-95% tokens
-
-### Configuration
-- **[Agent Skill Guide](Agent-Skill-Guide)** - Using and customizing the Cerberus skill
-- **[Session Hooks](Session-Hooks)** - Auto-invocation and startup configuration
-
-### Reference
-- **[Architecture](Architecture)** - System design for contributors
-- **[Troubleshooting](Troubleshooting)** - Common issues and solutions
-- **[FAQ](FAQ)** - Frequently asked questions
-
 ## What is Cerberus?
 
 Cerberus is an MCP (Model Context Protocol) server that provides AI agents with two powerful capabilities:
@@ -105,11 +83,12 @@ More languages coming soon.
 - **Issues**: [Report bugs or request features](https://github.com/proxikal/cerberus-mcp/issues)
 - **License**: MIT
 
-## Next Steps
+## Getting Started
 
-1. **[Install Cerberus](Installation)** - Set up MCP server, skill, and hook
-2. **[Quick Start](Quick-Start)** - Your first session with Cerberus
-3. **[MCP Tools Reference](MCP-Tools-Reference)** - Explore all 51 tools
+Use the **sidebar** to navigate through the documentation:
+- Start with **Installation** to set up Cerberus
+- Follow **Quick Start** for your first session
+- Explore **MCP Tools Reference** for all 51 tools
 
 ---
 
