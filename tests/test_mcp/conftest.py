@@ -22,7 +22,8 @@ def unwrap_result(result):
     """
     structured = getattr(result, "structured_content", None)
     if structured is not None:
-        if isinstance(structured, dict) and set(structured.keys()) == {"result"}:
+        # Unwrap 'result' key if present (ignoring metadata like _token_info)
+        if isinstance(structured, dict) and "result" in structured:
             return structured["result"]
         return structured
 
