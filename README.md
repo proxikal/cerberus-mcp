@@ -1,8 +1,12 @@
 # Cerberus MCP
 
-**Model Context Protocol (MCP) server for intelligent code exploration and analysis**
+**Model Context Protocol (MCP) server for AI-powered code exploration and persistent session memory**
 
-Cerberus is an MCP server that enables AI agents to efficiently navigate and understand codebases through AST-based parsing, symbol indexing, and advanced analysis tools.
+Cerberus is an MCP server designed exclusively for AI agents. It combines two powerful capabilities:
+
+1. **Intelligent Code Exploration** - Navigate codebases through AST-based symbol search, architectural blueprints, call graph analysis, and token-efficient skeletonization (90%+ token reduction vs reading full files)
+
+2. **Persistent Session Memory** - Learn and remember across sessions with dual-layer memory: global preferences/corrections that apply everywhere, and project-specific architectural decisions that persist per-codebase
 
 [![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/proxikal/cerberus-mcp)
 [![Python: 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -76,18 +80,18 @@ Add to your `claude_desktop_config.json`:
 
 The MCP server will start automatically when Claude Desktop launches.
 
-### CLI Usage (Optional)
+### Development Installation
 
-While Cerberus is primarily an MCP server, you can also run it as a CLI tool for testing:
+For contributors and developers working on Cerberus itself:
 
 ```bash
-# Install in development mode
+# Clone and install in development mode
 git clone https://github.com/proxikal/cerberus-mcp.git
 cd cerberus-mcp
-pip install -e .
+pip install -e ".[dev]"
 
-# Run the MCP server directly
-cerberus-mcp
+# Run tests
+pytest tests/ -v
 ```
 
 ---
@@ -139,7 +143,7 @@ cerberus-mcp
 
 ## Available MCP Tools
 
-Cerberus provides **44 MCP tools** organized into these categories:
+Cerberus provides **51 MCP tools** organized into these categories:
 
 ### Search & Discovery
 - `search` - Search for symbols across codebase (keyword + semantic)
@@ -285,9 +289,9 @@ context(symbol_name="UserService", include_bases=True, include_deps=True)
 
 ## Example Workflows
 
-### For AI Agents
+All workflows are designed for AI agents using Cerberus through Claude Desktop or other MCP-enabled AI systems.
 
-**Exploring a New Codebase:**
+### Exploring a New Codebase
 ```python
 # 1. Load session memory (patterns from previous sessions)
 memory_context(compact=True)
@@ -335,21 +339,7 @@ validate_architecture(rules=["layer_separation", "type_coverage"])
 memory_learn(category="decision", content="Uses JWT with 1hr expiry for auth")
 ```
 
-### For Developers
-
-**Quick Navigation:**
-```python
-# See what's in a file without opening it
-blueprint(path="src/components/Button.tsx")
-
-# Get just the function signatures
-skeletonize(path="src/lib/api.ts")
-
-# Find where a function is defined
-search(query="handleSubmit")
-```
-
-**Code Quality:**
+**Maintaining Code Quality:**
 ```python
 # Check for circular dependencies
 find_circular_deps(scope="src/", min_severity="medium")
@@ -359,6 +349,9 @@ style_check(path="src/", fix_preview=True)
 
 # Auto-fix issues
 style_fix(path="src/", dry_run=False)
+
+# Compare branches at symbol level
+diff_branches(branch_a="main", branch_b="feature/auth")
 ```
 
 ---
@@ -658,9 +651,9 @@ Cerberus is designed for minimal token usage:
    - Combines into single payload
 
 4. **Memory System**
-   - Stores patterns per-project in `~/.config/cerberus/memory/<project>/`
-   - JSON files for decisions, preferences, corrections
-   - Context generation formats for AI consumption
+   - Global memory in `~/.cerberus/memory/` (preferences, corrections)
+   - Project memory in `<project>/.cerberus/memory/` (architectural decisions)
+   - Context generation formats optimized for AI consumption
 
 ### Project Structure
 
@@ -669,7 +662,7 @@ cerberus-mcp/
 ├── src/cerberus/
 │   ├── mcp/              # MCP server and tools
 │   │   ├── server.py     # FastMCP server setup
-│   │   └── tools/        # 47 MCP tools
+│   │   └── tools/        # 51 MCP tools
 │   ├── analysis/         # Advanced analysis (impact, circular deps, etc.)
 │   ├── blueprint/        # Architectural blueprints
 │   ├── index/            # Symbol indexing
@@ -760,7 +753,7 @@ pytest tests/test_mcp/ -v
 
 ### Phase 4 (In Progress)
 - ✅ Circular dependency detection
-- ⏳ Cross-branch comparison
+- ✅ Cross-branch comparison (symbol-level diffs, multi-branch support, semantic equivalence)
 - ⏳ Incremental context tracking
 
 ### Future Enhancements
