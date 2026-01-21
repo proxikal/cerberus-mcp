@@ -74,3 +74,19 @@ cerberus_agent.log
 *_ops.json
 .cerberus_protocol.json
 formula
+
+# Development/Internal files (not for public repo)
+docs/
+demo/
+benchmarks/
+.handoff-archive/
+project-templates/
+skill/
+hooks/
+tools/
+wiki-content/
+cerberus-mcp.wiki/
+WIKI-PUBLISH.md
+DESIGN-CONFIG-DRIVEN-ARCHITECTURE.md
+README.full.md.backup
+*.backup
