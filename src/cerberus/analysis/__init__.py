@@ -18,6 +18,7 @@ from cerberus.analysis.pattern_checker import PatternChecker
 from cerberus.analysis.architecture_validator import ArchitectureValidator
 from cerberus.analysis.semantic_search import SemanticSearchEngine
 from cerberus.analysis.circular_dependency_detector import CircularDependencyDetector
+from cerberus.analysis.branch_comparator import BranchComparator
 
 __all__ = [
     "ProjectSummaryAnalyzer",
@@ -27,4 +28,5 @@ __all__ = [
     "ArchitectureValidator",
     "SemanticSearchEngine",
     "CircularDependencyDetector",
+    "BranchComparator",
 ]

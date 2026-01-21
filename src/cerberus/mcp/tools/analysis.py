@@ -1,6 +1,8 @@
 """Code analysis tools - dependencies, call graphs."""
+from pathlib import Path
 from typing import Optional
 
+from cerberus.analysis.branch_comparator import BranchComparator
 from cerberus.resolution.call_graph_builder import CallGraphBuilder, CallGraph
 
 from ..index_manager import get_index_manager
@@ -143,6 +145,49 @@ def register(mcp):
         }
 
         return response
+
+
+    @mcp.tool()
+    def diff_branches(
+        branch_a: str,
+        branch_b: str,
+        focus: str | None = None,
+        include_conflicts: bool = True
+    ) -> dict:
+        """
+        Compare code changes between two git branches at symbol level.
+
+        Returns symbol-level changes (which functions/classes modified) rather
+        than raw line diffs. Useful for reviewing feature branches before merge.
+
+        Args:
+            branch_a: Base branch (e.g., "main")
+            branch_b: Compare branch (e.g., "feature/auth")
+            focus: Optional filter - matches paths and symbol names (e.g., "auth")
+            include_conflicts: Whether to detect potential conflicts
+
+        Returns:
+            Dict with changes, risk assessment, and token cost
+
+        Example:
+            >>> diff_branches("main", "feature/auth", focus="authentication")
+            {
+                "status": "success",
+                "symbols_changed": 12,
+                "changes": [...],
+                "risk_assessment": "medium"
+            }
+        """
+        try:
+            index = get_index_manager().get_index()
+            comparator = BranchComparator(Path.cwd(), index)
+            result = comparator.compare(branch_a, branch_b, focus, include_conflicts)
+            return result.to_dict()
+        except Exception as e:
+            return {
+                "status": "error",
+                "error": str(e)
+            }
 
 
 def _serialize_graph(graph: CallGraph) -> dict:

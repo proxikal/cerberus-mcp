@@ -109,6 +109,7 @@ cerberus-mcp
 - **Circular dependency detection** - Identify problematic import cycles
 - **Pattern consistency checking** - Verify code follows project conventions
 - **Architecture validation** - Enforce structural rules and boundaries
+- **Cross-branch comparison** - Summarize branch diffs at symbol level
 - **Related changes** - Suggest other files that might need updating
 
 ### 📊 Project Intelligence
@@ -136,7 +137,7 @@ cerberus-mcp
 
 ## Available MCP Tools
 
-Cerberus provides **42 MCP tools** organized into these categories:
+Cerberus provides **43 MCP tools** organized into these categories:
 
 ### Search & Discovery
 - `search` - Search for symbols across codebase (keyword + semantic)
@@ -156,6 +157,7 @@ Cerberus provides **42 MCP tools** organized into these categories:
 - `deps` - Get callers and callees for a symbol
 - `call_graph` - Build recursive call graph
 - `analyze_impact` - Analyze impact of changing a symbol
+- `diff_branches` - Symbol-level diff between two git branches
 - `test_coverage` - Map test coverage for code
 - `find_circular_deps` - Detect circular dependency chains
 - `related_changes` - Suggest related files to update
