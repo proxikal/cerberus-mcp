@@ -41,7 +41,7 @@ class CodeEditor:
         """Ensure backup directory exists."""
         if self.config["backup_enabled"]:
             backup_dir = Path(self.config["backup_dir"])
-            backup_dir.mkdir(exist_ok=True)
+            backup_dir.mkdir(parents=True, exist_ok=True)
 
     def replace_symbol(
         self,
