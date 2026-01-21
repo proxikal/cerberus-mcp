@@ -319,3 +319,44 @@ def handler():
     assert "service.py" in conflict_files
     reasons = {c["reason"] for c in result.conflicts}
     assert "overlapping_changes" in reasons
+
+
+def test_semantic_equivalence_for_docstring_only_changes(temp_dir):
+    """Docstring-only edits are marked semantically equivalent."""
+    repo = temp_dir / "branch_compare_semantic"
+    repo.mkdir()
+    _init_repo(repo)
+
+    _write(
+        repo,
+        "utils.py",
+        """
+def calc():
+    return 1 + 1
+        """,
+    )
+    _run_git(repo, "add", ".")
+    _run_git(repo, "commit", "-m", "base calc")
+
+    _run_git(repo, "checkout", "-b", "feature/docs")
+    _write(
+        repo,
+        "utils.py",
+        """
+def calc():
+    \"\"\"Calculate value.\"\"\"
+    return 1 + 1
+        """,
+    )
+    _run_git(repo, "add", ".")
+    _run_git(repo, "commit", "-m", "docstring change")
+
+    index = _build_index(repo)
+    comparator = BranchComparator(repo, index)
+
+    result = comparator.compare("main", "feature/docs")
+    assert result.status == "success"
+    assert result.symbols_changed == 1
+    change = result.changes[0]["symbols_changed"][0]
+    assert change["name"] == "calc"
+    assert change.get("semantically_equivalent") is True

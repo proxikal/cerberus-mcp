@@ -7,6 +7,8 @@ classes, and methods changed between two branches.
 
 from __future__ import annotations
 
+import ast
+import copy
 import json
 import subprocess
 from dataclasses import dataclass, field
@@ -31,9 +33,11 @@ class SymbolChange:
     lines_removed: int
     file: str
     line_number: int
+    parent_class: Optional[str] = None
+    semantically_equivalent: Optional[bool] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        data = {
             "name": self.name,
             "type": self.type,
             "change_type": self.change_type,
@@ -42,6 +46,11 @@ class SymbolChange:
             "file": self.file,
             "line_number": self.line_number,
         }
+        if self.parent_class is not None:
+            data["parent_class"] = self.parent_class
+        if self.semantically_equivalent is not None:
+            data["semantically_equivalent"] = self.semantically_equivalent
+        return data
 
 
 @dataclass
@@ -214,7 +223,7 @@ class BranchComparator:
                 warnings=warnings,
             )
 
-        mapped_changes = self._map_changes_to_symbols(changed_files)
+        mapped_changes = self._map_changes_to_symbols(changed_files, branch_a, branch_b)
 
         available_symbols = sum(len(fc.symbols_changed) for fc in mapped_changes)
         available_files = len(mapped_changes)
@@ -449,7 +458,12 @@ class BranchComparator:
     # ------------------------------------------------------------------
     # Mapping helpers
     # ------------------------------------------------------------------
-    def _map_changes_to_symbols(self, changed_files: List[Dict[str, Any]]) -> List[FileChange]:
+    def _map_changes_to_symbols(
+        self,
+        changed_files: List[Dict[str, Any]],
+        branch_a: str,
+        branch_b: str,
+    ) -> List[FileChange]:
         """Map line ranges to symbols using the index."""
         results: List[FileChange] = []
 
@@ -481,6 +495,7 @@ class BranchComparator:
                             lines_removed=0,
                             file=relative_path,
                             line_number=symbol.start_line,
+                            parent_class=symbol.parent_class,
                         )
                     )
             else:
@@ -501,8 +516,18 @@ class BranchComparator:
                             lines_removed=0,
                             file=relative_path,
                             line_number=symbol.start_line,
+                            parent_class=symbol.parent_class,
                         )
                     )
+
+            if change_type in {"modified", "renamed"} and symbol_changes and ranges:
+                self._annotate_semantic_equivalence(
+                    symbol_changes,
+                    branch_a=branch_a,
+                    branch_b=branch_b,
+                    path=path,
+                    old_path=old_path,
+                )
 
             results.append(
                 FileChange(
@@ -664,6 +689,7 @@ class BranchComparator:
             lines_removed=lines_removed,
             file=relative_path,
             line_number=symbol.start_line,
+            parent_class=symbol.parent_class,
         )
 
     @staticmethod
@@ -675,6 +701,123 @@ class BranchComparator:
     def _ranges_overlap_generic(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
         """Check overlap between two integer ranges."""
         return a_start <= b_end and b_start <= a_end
+
+    # ------------------------------------------------------------------
+    # Semantic equivalence (best-effort AST comparison)
+    # ------------------------------------------------------------------
+    def _annotate_semantic_equivalence(
+        self,
+        symbol_changes: List[SymbolChange],
+        branch_a: str,
+        branch_b: str,
+        path: str,
+        old_path: Optional[str],
+    ) -> None:
+        """Set semantically_equivalent flag for overlapping modified symbols."""
+        for change in symbol_changes:
+            change.semantically_equivalent = self._is_semantically_equivalent(
+                change, branch_a, branch_b, path, old_path
+            )
+
+    def _is_semantically_equivalent(
+        self,
+        change: SymbolChange,
+        branch_a: str,
+        branch_b: str,
+        path: str,
+        old_path: Optional[str],
+    ) -> Optional[bool]:
+        """
+        Compare symbol ASTs between branches to see if logic is equivalent.
+
+        Returns:
+            True if ASTs match (ignoring docstrings), False if they differ,
+            None if comparison not possible.
+        """
+        path_a = old_path or path
+        code_a = self._get_file_content(branch_a, path_a)
+        code_b = self._get_file_content(branch_b, path)
+        if code_a is None or code_b is None:
+            return None
+
+        node_a = self._extract_symbol_node(code_a, change.name, change.type, change.parent_class)
+        node_b = self._extract_symbol_node(code_b, change.name, change.type, change.parent_class)
+        if node_a is None or node_b is None:
+            return None
+
+        norm_a = self._normalize_node(node_a)
+        norm_b = self._normalize_node(node_b)
+        return norm_a == norm_b
+
+    def _get_file_content(self, branch: str, path: str) -> Optional[str]:
+        """Return file content from a branch via git show."""
+        code, out, err = self._run_git(["show", f"{branch}:{path}"])
+        if code != 0:
+            logger.debug(f"git show failed for {branch}:{path}: {err}")
+            return None
+        return out
+
+    def _extract_symbol_node(
+        self,
+        code: str,
+        name: str,
+        symbol_type: str,
+        parent_class: Optional[str],
+    ) -> Optional[ast.AST]:
+        """Extract AST node for a symbol by name (and parent_class for methods)."""
+        try:
+            module = ast.parse(code)
+        except SyntaxError:
+            return None
+
+        if symbol_type == "class":
+            for node in module.body:
+                if isinstance(node, ast.ClassDef) and node.name == name:
+                    return node
+            return None
+
+        if symbol_type == "function":
+            for node in module.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+                    return node
+            return None
+
+        if symbol_type == "method":
+            for node in module.body:
+                if isinstance(node, ast.ClassDef) and (
+                    parent_class is None or node.name == parent_class
+                ):
+                    for child in node.body:
+                        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name == name:
+                            return child
+            return None
+
+        # Fallback: search by name anywhere
+        for node in ast.walk(module):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == name:
+                return node
+        return None
+
+    def _normalize_node(self, node: ast.AST) -> str:
+        """Normalize node by stripping docstrings and attributes."""
+        clone = copy.deepcopy(node)
+        self._strip_docstrings(clone)
+        return ast.dump(clone, include_attributes=False)
+
+    def _strip_docstrings(self, node: ast.AST) -> None:
+        """Remove leading docstring expressions from function/class nodes recursively."""
+        def strip_in_body(body: List[ast.stmt]) -> List[ast.stmt]:
+            if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
+                return body[1:]
+            return body
+
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            node.body = strip_in_body(node.body)
+            for child in node.body:
+                self._strip_docstrings(child)
+        elif hasattr(node, "body") and isinstance(getattr(node, "body"), list):
+            for child in getattr(node, "body"):
+                self._strip_docstrings(child)
 
     @staticmethod
     def _count_line_changes(diff_output: str) -> Tuple[int, int]:
