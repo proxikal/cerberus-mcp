@@ -145,3 +145,4 @@ async def mcp_client(mcp_server):
     client = Client(mcp_server)
     async with client:
         yield client
+# CI test trigger
