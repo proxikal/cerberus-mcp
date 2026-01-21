@@ -157,12 +157,14 @@ def _hybrid_search_streaming(
         logger.debug(f"FTS5 search returned {len(bm25_results)} results")
 
     # Vector semantic search (query FAISS directly)
+    has_embeddings = False
     if mode in ["semantic", "balanced"]:
         logger.info(f"Performing streaming vector search for '{query}'")
 
         # Check if FAISS store is available
         if store._faiss_store and len(store._faiss_store) > 0:
             logger.debug("Using FAISS direct query (streaming)")
+            has_embeddings = True
             vector_results = vector_search_faiss(
                 query=query,
                 sqlite_store=store,
@@ -172,7 +174,7 @@ def _hybrid_search_streaming(
                 padding=padding,
             )
         else:
-            logger.warning("No FAISS store available, skipping vector search")
+            logger.warning("No FAISS store available, falling back to keyword search")
 
     # Handle single-method modes
     if mode == "keyword":
@@ -180,9 +182,36 @@ def _hybrid_search_streaming(
         return _finalize_results(bm25_results[:top_k], "keyword", padding)
 
     if mode == "semantic":
+        # FALLBACK: If no embeddings, use keyword search instead
+        if not has_embeddings or not vector_results:
+            logger.warning("Semantic search requested but no embeddings available - falling back to keyword search")
+            if not bm25_results:
+                # Need to run keyword search since it wasn't done
+                logger.info(f"Performing FTS5 keyword search for fallback")
+                fts5_results = []
+                for symbol, score in store.fts5_search(query, top_k=top_k_per_method):
+                    snippet = CodeSnippet(
+                        file_path=symbol.file_path,
+                        start_line=symbol.start_line,
+                        end_line=symbol.end_line,
+                        content="",  # Loaded lazily later
+                    )
+                    fts5_results.append(SearchResult(
+                        symbol=symbol,
+                        score=score,
+                        snippet=snippet,
+                    ))
+                bm25_results = fts5_results
+            return _finalize_results(bm25_results[:top_k], "keyword_fallback", padding)
+
         return _finalize_results(vector_results[:top_k], "semantic", padding)
 
     # Balanced mode - fuse results
+    # FALLBACK: If no embeddings, use keyword search only
+    if not has_embeddings or not vector_results:
+        logger.warning("Balanced mode requested but no embeddings available - falling back to keyword search")
+        return _finalize_results(bm25_results[:top_k], "keyword_fallback", padding)
+
     logger.info(f"Fusing results using {fusion_method} method")
 
     if fusion_method == "rrf":
@@ -257,15 +286,21 @@ def _hybrid_search_legacy(
         )
         bm25_results = bm25_index.search(query, top_k=top_k_per_method)
 
+    has_embeddings = False
     if mode in ["semantic", "balanced"]:
         logger.info(f"Performing vector semantic search for '{query}'")
-        vector_results = vector_search(
-            query=query,
-            scan_result=scan_result,
-            snippets=snippets,
-            top_k=top_k_per_method,
-            model_name=VECTOR_CONFIG["model"],
-        )
+        # Check if embeddings are available
+        if scan_result.embeddings:
+            has_embeddings = True
+            vector_results = vector_search(
+                query=query,
+                scan_result=scan_result,
+                snippets=snippets,
+                top_k=top_k_per_method,
+                model_name=VECTOR_CONFIG["model"],
+            )
+        else:
+            logger.warning("No embeddings available in legacy index, skipping vector search")
 
     # Handle single-method modes
     if mode == "keyword":
@@ -283,6 +318,31 @@ def _hybrid_search_legacy(
         ]
 
     if mode == "semantic":
+        # FALLBACK: If no embeddings, use keyword search instead
+        if not has_embeddings or not vector_results:
+            logger.warning("Semantic search requested but no embeddings available - falling back to keyword search")
+            if not bm25_results:
+                # Need to run keyword search since it wasn't done
+                logger.info(f"Performing BM25 keyword search for fallback")
+                bm25_index = BM25Index(
+                    documents=snippets,
+                    k1=BM25_CONFIG["k1"],
+                    b=BM25_CONFIG["b"],
+                )
+                bm25_results = bm25_index.search(query, top_k=top_k_per_method)
+
+            return [
+                HybridSearchResult(
+                    symbol=r.symbol,
+                    bm25_score=r.score,
+                    vector_score=0.0,
+                    hybrid_score=r.score,
+                    rank=idx + 1,
+                    match_type="keyword_fallback",
+                )
+                for idx, r in enumerate(bm25_results[:top_k])
+            ]
+
         # Convert vector results to HybridSearchResult
         return [
             HybridSearchResult(
@@ -294,6 +354,22 @@ def _hybrid_search_legacy(
                 match_type="semantic",
             )
             for idx, r in enumerate(vector_results[:top_k])
+        ]
+
+    # Balanced mode - fuse results
+    # FALLBACK: If no embeddings, use keyword search only
+    if not has_embeddings or not vector_results:
+        logger.warning("Balanced mode requested but no embeddings available - falling back to keyword search")
+        return [
+            HybridSearchResult(
+                symbol=r.symbol,
+                bm25_score=r.score,
+                vector_score=0.0,
+                hybrid_score=r.score,
+                rank=idx + 1,
+                match_type="keyword_fallback",
+            )
+            for idx, r in enumerate(bm25_results[:top_k])
         ]
 
     # Balanced mode - fuse results
@@ -346,16 +422,18 @@ def _finalize_results(
             )
             r.snippet.content = snippet_obj.content
 
-        if match_type == "keyword":
+        # Handle keyword and keyword_fallback modes (both use BM25 scores)
+        if match_type in ["keyword", "keyword_fallback"]:
             hybrid_result = HybridSearchResult(
                 symbol=r.symbol,
                 bm25_score=r.score,
                 vector_score=0.0,
                 hybrid_score=r.score,
                 rank=idx + 1,
-                match_type="keyword",
+                match_type=match_type,  # Preserve the actual match_type
             )
         else:
+            # Semantic mode (uses vector scores)
             hybrid_result = HybridSearchResult(
                 symbol=r.symbol,
                 bm25_score=0.0,

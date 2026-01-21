@@ -57,9 +57,12 @@ class TreeBuilder:
 
     def build_aggregated_tree(self, package_path: str, nodes: List[BlueprintNode]) -> str:
         """
-        Build a simple tree for aggregated (directory/package) blueprints.
+        Build a compact summary tree for aggregated (directory/package) blueprints.
 
-        Shows files and their top-level symbols.
+        Shows files with symbol counts only - NO detailed symbol trees.
+        This prevents token explosion for large directories.
+
+        Target: ~300-500 tokens for any directory size.
         """
         lines = []
         lines.append(f"[Package: {package_path}]")
@@ -67,9 +70,63 @@ class TreeBuilder:
 
         for i, file_node in enumerate(nodes):
             is_last = i == len(nodes) - 1
-            lines.extend(self._render_node(file_node, depth=0, is_last=is_last, parent_prefixes=[]))
+
+            # Show file with summary counts only
+            prefix = self.LAST_BRANCH if is_last else self.BRANCH
+            summary = self._build_file_summary(file_node)
+            lines.append(f"{prefix}{summary}")
 
         return "\n".join(lines)
+
+    def _build_file_summary(self, file_node: BlueprintNode) -> str:
+        """
+        Build a compact summary line for a file showing symbol counts.
+
+        Args:
+            file_node: BlueprintNode representing a file
+
+        Returns:
+            Summary string like "file.py (3 classes, 5 functions, 125 lines)"
+        """
+        # Count symbols by type
+        counts = {}
+        total_symbols = 0
+        max_line = 0
+
+        def count_node(node: BlueprintNode):
+            nonlocal total_symbols, max_line
+            total_symbols += 1
+            max_line = max(max_line, node.end_line)
+
+            # Count top-level symbols only (classes and functions)
+            if node.type in ["class", "function"]:
+                counts[node.type] = counts.get(node.type, 0) + 1
+
+            # Don't recurse into children for directory summaries
+
+        # Count direct children only (top-level symbols in file)
+        for child in file_node.children:
+            count_node(child)
+
+        # Build summary string
+        parts = [file_node.name]
+
+        if counts:
+            count_strs = []
+            for sym_type in ["class", "function"]:
+                if sym_type in counts:
+                    count = counts[sym_type]
+                    plural = "es" if sym_type == "class" else "s"
+                    count_strs.append(f"{count} {sym_type}{plural if count != 1 else ''}")
+
+            if count_strs:
+                parts.append(f"({', '.join(count_strs)})")
+
+        # Add line count if available
+        if max_line > 0:
+            parts.append(f"[{max_line} lines]")
+
+        return " ".join(parts)
 
     def _render_node(
         self,

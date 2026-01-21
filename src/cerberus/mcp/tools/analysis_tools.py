@@ -55,7 +55,8 @@ def register(mcp):
         try:
             # Get project root (where .cerberus/ index is)
             manager = get_index_manager()
-            project_root = manager._project_root or Path.cwd()
+            index = manager.get_index()
+            project_root = Path(getattr(index, "project_root", None) or Path.cwd())
 
             # Generate summary
             summary = generate_project_summary(project_root)
@@ -136,7 +137,7 @@ def register(mcp):
                 }
 
             store = index._store
-            project_root = manager._project_root or Path.cwd()
+            project_root = Path(getattr(index, "project_root", None) or Path.cwd())
 
             # Perform analysis
             analysis = analyze_change_impact(store, symbol_name, file_path, project_root)
@@ -222,7 +223,7 @@ def register(mcp):
                 }
 
             store = index._store
-            project_root = manager._project_root or Path.cwd()
+            project_root = Path(getattr(index, "project_root", None) or Path.cwd())
 
             # Perform coverage mapping
             coverage = map_test_coverage(store, symbol_name, file_path, project_root)
@@ -314,7 +315,8 @@ def register(mcp):
         """
         try:
             manager = get_index_manager()
-            project_root = manager._project_root or Path.cwd()
+            index = manager.get_index()
+            project_root = Path(getattr(index, "project_root", None) or Path.cwd())
 
             # Perform pattern check
             result = check_pattern_consistency(
@@ -426,7 +428,8 @@ def register(mcp):
         """
         try:
             manager = get_index_manager()
-            project_root = manager._project_root or Path.cwd()
+            index = manager.get_index()
+            project_root = Path(getattr(index, "project_root", None) or Path.cwd())
 
             # Perform validation
             result = validate_architecture(
@@ -537,7 +540,8 @@ def register(mcp):
         """
         try:
             manager = get_index_manager()
-            project_root = manager._project_root or Path.cwd()
+            index = manager.get_index()
+            project_root = Path(getattr(index, "project_root", None) or Path.cwd())
 
             # Perform semantic search
             result = search_by_behavior(
@@ -633,7 +637,8 @@ def register(mcp):
         """
         try:
             manager = get_index_manager()
-            project_root = manager._project_root or Path.cwd()
+            index = manager.get_index()
+            project_root = Path(getattr(index, "project_root", None) or Path.cwd())
 
             # Detect circular dependencies
             result = find_circular_dependencies(

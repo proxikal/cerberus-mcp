@@ -52,6 +52,7 @@ def register(mcp):
 
         callers = builder._get_callers(symbol_name, file_resolved)
         callees = builder._get_callees(symbol_name, file_resolved)
+        imports = builder._get_imports(file_resolved)
 
         return {
             "status": "ok",
@@ -63,7 +64,9 @@ def register(mcp):
             "callees": [
                 {"name": name, "file": fpath, "line": line} for name, fpath, line in callees
             ],
-            "imports": [],
+            "imports": [
+                {"module": module, "line": line} for module, line in imports
+            ],
         }
 
     @mcp.tool()

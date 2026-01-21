@@ -26,7 +26,7 @@ def register(mcp):
         TOKEN EFFICIENCY:
 
         Format costs (approx):
-        - tree: ~350 tokens (recommended for LLM consumption)
+        - tree: ~350 tokens (recommended for LLM consumption; names only, no signatures)
         - json: ~1,800 tokens (≈5x more expensive; use only for programmatic parsing)
         - flat: ~200 tokens (symbol list)
 
@@ -35,13 +35,14 @@ def register(mcp):
         - With deps/meta: up to ~1,500 tokens (≈4x increase)
 
         Best practices:
-        - Prefer format="tree" for exploration.
+        - Prefer format="tree" for exploration (compact, names-only view).
+        - Use format="json" or "json-compact" if you need full signatures.
         - Enable show_deps/show_meta only when necessary.
-        - Use json only when you truly need machine-parseable output.
 
         Defaults that protect tokens:
         - max_depth=10 prevents deep trees
         - max_width=120 truncates long lines
+        - show_signatures=False keeps tree format compact
 
         Args:
             path: File or directory path to analyze
@@ -76,8 +77,9 @@ def register(mcp):
 
             # Token-safe defaults: prevent unbounded tree output
             tree_options = TreeRenderOptions(
-                max_depth=10,      # Captures most code, prevents pathological nesting
-                max_width=120,     # Reasonable terminal width, truncates long lines
+                max_depth=10,          # Captures most code, prevents pathological nesting
+                max_width=120,         # Reasonable terminal width, truncates long lines
+                show_signatures=False, # Show names only for compact output (~350 tokens)
             )
 
             output = generator.format_output(blueprint_obj, format, tree_options)
@@ -127,6 +129,15 @@ def register(mcp):
                 "show_deps": show_deps,
                 "show_meta": show_meta
             }
+
+            # Warn if tree format exceeds expected token budget
+            if format == "tree" and tokens > 2000 and not (show_deps or show_meta):
+                add_warning(
+                    response,
+                    f"Blueprint output is larger than expected ({tokens} tokens). "
+                    f"This usually happens with very large directories. "
+                    f"Consider using a more specific path to reduce output size."
+                )
 
             return response
         finally:

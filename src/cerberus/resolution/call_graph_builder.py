@@ -315,6 +315,8 @@ class CallGraphBuilder:
         Returns:
             List of (callee_name, callee_file, line) tuples
         """
+        from pathlib import Path as PathLib
+
         conn = self.store._get_connection()
         try:
             # First, get the symbol's line range
@@ -331,6 +333,13 @@ class CallGraphBuilder:
 
             start_line, end_line = result
 
+            # Normalize file_path to absolute for calls table query
+            # (symbols table uses relative paths, calls table uses absolute paths)
+            if not PathLib(file_path).is_absolute():
+                abs_file_path = str(PathLib.cwd() / file_path)
+            else:
+                abs_file_path = file_path
+
             # Get regular function calls within this symbol's line range
             cursor = conn.execute("""
                 SELECT DISTINCT callee, line
@@ -338,7 +347,7 @@ class CallGraphBuilder:
                 WHERE caller_file = ?
                 AND line >= ?
                 AND line <= ?
-            """, (file_path, start_line, end_line))
+            """, (abs_file_path, start_line, end_line))
 
             calls = cursor.fetchall()
 
@@ -349,7 +358,7 @@ class CallGraphBuilder:
                 WHERE caller_file = ?
                 AND line >= ?
                 AND line <= ?
-            """, (file_path, start_line, end_line))
+            """, (abs_file_path, start_line, end_line))
 
             method_calls = cursor.fetchall()
 
@@ -427,5 +436,39 @@ class CallGraphBuilder:
                         unique_callers[key] = (caller_name, caller_file_path, caller_line)
 
             return list(unique_callers.values())
+        finally:
+            conn.close()
+
+    def _get_imports(
+        self,
+        file_path: str
+    ) -> List[Tuple[str, int]]:
+        """
+        Get all imports for a file.
+
+        Returns:
+            List of (module, line) tuples
+        """
+        from pathlib import Path as PathLib
+
+        conn = self.store._get_connection()
+        try:
+            # Normalize file_path to absolute for imports table query
+            # (symbols table uses relative paths, imports table uses absolute paths)
+            if not PathLib(file_path).is_absolute():
+                abs_file_path = str(PathLib.cwd() / file_path)
+            else:
+                abs_file_path = file_path
+
+            # Get imports for this file
+            cursor = conn.execute("""
+                SELECT DISTINCT module, line
+                FROM imports
+                WHERE file_path = ?
+                ORDER BY line
+            """, (abs_file_path,))
+
+            imports = cursor.fetchall()
+            return imports
         finally:
             conn.close()
