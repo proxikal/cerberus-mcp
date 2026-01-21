@@ -366,7 +366,7 @@ class BranchComparator:
     def _detect_conflicts(self, branch_a: str, branch_b: str) -> List[Dict[str, Any]]:
         """
         Detect potential conflicts by checking files changed on both branches
-        since their merge base.
+        since their merge base. Includes overlap detection on changed ranges.
         """
         base = self._get_merge_base(branch_a, branch_b)
         if not base:
@@ -375,8 +375,32 @@ class BranchComparator:
         files_a = self._files_changed_since(base, branch_a)
         files_b = self._files_changed_since(base, branch_b)
 
-        conflicts = []
-        for path in sorted(files_a.intersection(files_b)):
+        conflicts: List[Dict[str, Any]] = []
+        overlapping_files = sorted(files_a.intersection(files_b))
+
+        for path in overlapping_files:
+            ranges_a = self._file_ranges_since(base, branch_a, path)
+            ranges_b = self._file_ranges_since(base, branch_b, path)
+
+            overlap_pairs = self._find_overlaps(ranges_a, ranges_b)
+            if overlap_pairs:
+                conflicts.append(
+                    {
+                        "file": path,
+                        "reason": "overlapping_changes",
+                        "branch_a_ranges": [self._serialize_range(r) for r in ranges_a],
+                        "branch_b_ranges": [self._serialize_range(r) for r in ranges_b],
+                        "overlaps": [
+                            {
+                                "branch_a": self._serialize_range(a),
+                                "branch_b": self._serialize_range(b),
+                            }
+                            for a, b in overlap_pairs
+                        ],
+                    }
+                )
+                continue
+
             conflicts.append(
                 {
                     "file": path,
@@ -391,6 +415,36 @@ class BranchComparator:
         if code != 0:
             return set()
         return {line for line in out.splitlines() if line.strip()}
+
+    def _file_ranges_since(self, base: str, branch: str, path: str) -> List[LineRange]:
+        """
+        Get line ranges changed in a file since base..branch.
+        """
+        code, diff_out, _ = self._run_git(
+            ["diff", "--unified=0", "--find-renames=20%", f"{base}..{branch}", "--", path]
+        )
+        if code != 0 or "Binary files" in diff_out:
+            return []
+        return parse_line_ranges(diff_out)
+
+    @staticmethod
+    def _find_overlaps(ranges_a: List[LineRange], ranges_b: List[LineRange]) -> List[Tuple[LineRange, LineRange]]:
+        """Find overlapping line ranges between two sets."""
+        overlaps: List[Tuple[LineRange, LineRange]] = []
+        for ra in ranges_a:
+            for rb in ranges_b:
+                if BranchComparator._ranges_overlap_generic(ra.start, ra.end, rb.start, rb.end):
+                    overlaps.append((ra, rb))
+        return overlaps
+
+    @staticmethod
+    def _serialize_range(range_: LineRange) -> Dict[str, Any]:
+        """Serialize LineRange for conflict output."""
+        return {
+            "start": range_.start,
+            "end": range_.end,
+            "change_type": range_.change_type,
+        }
 
     # ------------------------------------------------------------------
     # Mapping helpers
@@ -616,6 +670,11 @@ class BranchComparator:
     def _ranges_overlap(symbol_start: int, symbol_end: int, changed_range: LineRange) -> bool:
         """Check if symbol range overlaps with changed range."""
         return symbol_start <= changed_range.end and changed_range.start <= symbol_end
+
+    @staticmethod
+    def _ranges_overlap_generic(a_start: int, a_end: int, b_start: int, b_end: int) -> bool:
+        """Check overlap between two integer ranges."""
+        return a_start <= b_end and b_start <= a_end
 
     @staticmethod
     def _count_line_changes(diff_output: str) -> Tuple[int, int]:

@@ -259,3 +259,63 @@ def do_work():
     assert change.get("old_path") == "legacy.py"
     assert change["change_type"] == "renamed"
     assert change["symbols_changed"][0]["change_type"] == "renamed"
+
+
+def test_conflict_detection_overlapping_changes(temp_dir):
+    """Overlapping edits across branches surface as conflicts."""
+    repo = temp_dir / "branch_compare_conflicts"
+    repo.mkdir()
+    _init_repo(repo)
+
+    _write(
+        repo,
+        "service.py",
+        """
+def handler():
+    return "v1"
+        """,
+    )
+    _run_git(repo, "add", ".")
+    _run_git(repo, "commit", "-m", "initial")
+
+    # Branch A modifies handler body
+    _run_git(repo, "checkout", "-b", "feature/a")
+    _write(
+        repo,
+        "service.py",
+        """
+def handler():
+    value = "branch_a"
+    return value
+        """,
+    )
+    _run_git(repo, "add", ".")
+    _run_git(repo, "commit", "-m", "branch a changes")
+
+    # Branch B modifies same region differently
+    _run_git(repo, "checkout", "main")
+    _run_git(repo, "checkout", "-b", "feature/b")
+    _write(
+        repo,
+        "service.py",
+        """
+def handler():
+    value = "branch_b"
+    return value
+        """,
+    )
+    _run_git(repo, "add", ".")
+    _run_git(repo, "commit", "-m", "branch b changes")
+
+    # Build index on branch B (feature/b)
+    index = _build_index(repo)
+    comparator = BranchComparator(repo, index)
+
+    result = comparator.compare("feature/a", "feature/b", include_conflicts=True)
+
+    assert result.status == "success"
+    assert result.conflicts, "Expected conflicts for overlapping edits"
+    conflict_files = {c["file"] for c in result.conflicts}
+    assert "service.py" in conflict_files
+    reasons = {c["reason"] for c in result.conflicts}
+    assert "overlapping_changes" in reasons
