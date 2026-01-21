@@ -5,6 +5,8 @@ Phase 12.5: Automatically resolves non-overlapping AST conflicts when
 optimistic locks fail, enabling collaboration without manual intervention.
 """
 
+from __future__ import annotations
+
 from typing import Tuple, Optional, List, Dict, Any, TYPE_CHECKING
 from pathlib import Path
 
