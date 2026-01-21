@@ -73,3 +73,4 @@ cerberus_agent.log
 # Misc
 *_ops.json
 .cerberus_protocol.json
+formula
