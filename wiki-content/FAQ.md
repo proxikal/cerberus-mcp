@@ -211,16 +211,17 @@ The skill loads once (~2,500 tokens one-time). Over a session with 20 messages, 
 ### What's the difference between `search` and `Grep`?
 
 **`search` (Cerberus):**
-- AST-based symbol search
+- Finds files, symbols, markdown headings
+- `search("README")` → finds README.md
+- `search("auth")` → finds auth functions/classes
 - 95% fewer false matches
-- Returns structured data (name, file, line)
-- Understands code structure
+- Returns structured data (type, name, file, line)
 
 **`Grep` (native):**
-- Text pattern matching
+- Text pattern matching only
 - Matches in code, comments, strings
 - Must filter manually
-- No code understanding
+- Use for: literal strings in code bodies, comments, SQL
 
 ### Should I use `index_build` or `smart_update`?
 
@@ -269,11 +270,14 @@ cp -r skill/* ~/.claude/skills/Cerberus/
 
 ### Search returns no results
 
+**Search finds:** filenames, code symbols, markdown headings
+**Search doesn't find:** text inside code bodies, comments, strings (use Grep)
+
 ```bash
 # Check index exists
 ls .cerberus/cerberus.db
 
-# Build index
+# Rebuild index (includes .md files by default)
 index_build(path=".")
 ```
 

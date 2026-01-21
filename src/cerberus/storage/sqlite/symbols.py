@@ -18,21 +18,25 @@ def escape_fts5_query(query: str) -> str:
     """
     Escape special characters in FTS5 queries to prevent syntax errors.
 
-    FTS5 special characters: " * ( ) AND OR NOT : ^ + - @
+    FTS5 special characters: " * ( ) AND OR NOT : ^ + - @ .
 
-    For simple queries with special chars, we wrap the entire query in double quotes
-    to treat it as a phrase search, and escape any internal double quotes.
+    For natural queries with special chars (like "main.go" or "user_service.ts"),
+    we wrap the entire query in double quotes to treat it as a phrase search,
+    and escape any internal double quotes.
+
+    This allows AI agents to type queries naturally without worrying about syntax.
 
     Args:
-        query: Raw search query
+        query: Raw search query (e.g., "main.go", "Config", "TODO:")
 
     Returns:
         Sanitized query safe for FTS5
     """
-    # Check if query contains FTS5 special characters (excluding spaces and alphanumerics)
-    # Special chars: " * ( ) @ : ^ + -
-    # Boolean operators are handled separately
-    has_special_chars = bool(re.search(r'[@"*():\^+\-]', query))
+    # Check if query contains FTS5 special characters (excluding spaces, underscores, alphanumerics)
+    # Special chars that need escaping: @ " * ( ) : . ^ + -
+    # Underscores are safe (valid in identifiers)
+    # Boolean operators (AND, OR, NOT) are handled separately
+    has_special_chars = bool(re.search(r'[@"*():.\^+\-]', query))
 
     # Check if query looks like an intentional FTS5 query (uses AND, OR, NOT)
     # We allow these through if the user is doing advanced searching
@@ -40,6 +44,7 @@ def escape_fts5_query(query: str) -> str:
 
     if has_special_chars and not is_advanced_query:
         # Escape internal double quotes and wrap in quotes for phrase search
+        # This makes "main.go" → "\"main.go\"" which FTS5 treats as literal text
         escaped = query.replace('"', '""')
         return f'"{escaped}"'
 

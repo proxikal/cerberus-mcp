@@ -93,35 +93,34 @@ Total over 20 messages: 500 tokens
 
 **Savings:** 95% (10,100 tokens saved)
 
-### 4. Symbol Search vs Text Search (95% fewer false matches)
+### 4. Unified Search vs Text Search (95% fewer false matches)
 
-**Traditional (grep/text search):**
+**Traditional (grep/find for files + text):**
 ```
-grep -r "authenticate" .
+find . -name "README*"           # Find files
+grep -r "authenticate" .         # Find text
 
-Results:
+Results from grep:
 - "authenticate" in comments                      ❌ False match
-- "authenticate_user"                             ✓ Partial match
-- "authentication_required"                       ✓ Partial match
-- "is_authenticated"                              ✓ Partial match
 - "# TODO: authenticate this request"             ❌ False match
 - String: "Please authenticate"                   ❌ False match
 
-95% false positive rate common
-Agent must read context to filter
+95% false positive rate, must filter manually
 ```
 
-**Cerberus (AST-based symbol search):**
+**Cerberus (unified search for files + symbols + headings):**
 ```
+search(query="README", limit=5)
+→ README (file) - README.md:1                         ✓ File by name
+
 search(query="authenticate", limit=5)
+→ authenticate (function) - src/auth/service.py:45    ✓ Symbol
+→ AuthenticateRequest (class) - src/auth/models.py    ✓ Symbol
 
-Results:
-- authenticate (function) - src/auth/service.py:45    ✓ Exact symbol
-- authenticate_user (function) - src/auth/handlers.py ✓ Related symbol
-- AuthenticateRequest (class) - src/auth/models.py    ✓ Related type
+search(query="Installation", limit=5)
+→ Installation (section) - docs/SETUP.md:15           ✓ Markdown heading
 
-0% false positives - all results are actual code symbols
-No reading required to filter
+0% false positives - files, symbols, and headings only
 ```
 
 **Savings:** 95% fewer false matches, 80% less context reading

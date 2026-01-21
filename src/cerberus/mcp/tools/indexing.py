@@ -15,12 +15,30 @@ def register(mcp):
         Args:
             path: Directory to index (default: current directory)
             extensions: File extensions to include (default: common code files)
+                       IMPORTANT: Extensions must include the dot prefix (e.g., ".py", ".go", ".ts")
 
         Returns:
             Index statistics (file count, symbol count, path)
         """
         if extensions is None:
+            # Code files
             extensions = [".py", ".ts", ".js", ".go", ".tsx", ".jsx"]
+            # Documentation
+            extensions.extend([".md", ".txt", ".rst"])
+            # Configs
+            extensions.extend([".json", ".yaml", ".yml", ".toml", ".ini"])
+            # Scripts
+            extensions.extend([".sh", ".bash"])
+        else:
+            # Validate and auto-correct extension format
+            corrected_extensions = []
+            for ext in extensions:
+                if not ext.startswith("."):
+                    # Auto-correct by adding dot prefix
+                    corrected_extensions.append(f".{ext}")
+                else:
+                    corrected_extensions.append(ext)
+            extensions = corrected_extensions
 
         manager = get_index_manager()
         return manager.rebuild(Path(path), extensions)

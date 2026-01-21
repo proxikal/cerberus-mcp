@@ -5,11 +5,27 @@ from cerberus.exceptions import ConfigError
 
 # Mapping of file extensions to language names used in this module
 SUPPORTED_LANGUAGES = {
+    # Code
     ".py": "python",
     ".js": "javascript",
     ".ts": "typescript",
+    ".tsx": "typescript",
+    ".jsx": "javascript",
     ".go": "go",
+    ".rs": "rust",
+    # Documentation
     ".md": "markdown",
+    ".txt": "plaintext",
+    ".rst": "restructuredtext",
+    # Config files
+    ".json": "json",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".toml": "toml",
+    ".ini": "ini",
+    # Scripts
+    ".sh": "shell",
+    ".bash": "shell",
 }
 
 # Regex patterns for finding symbols.
@@ -36,8 +52,45 @@ LANGUAGE_QUERIES = {
         "struct": re.compile(r"^\s*type\s+([A-Za-z_][A-Za-z0-9_]*)\s+struct", re.MULTILINE),
         "interface": re.compile(r"^\s*type\s+([A-Za-z_][A-Za-z0-9_]*)\s+interface", re.MULTILINE),
     },
+    "rust": {
+        "function": re.compile(r"^\s*(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?fn\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE),
+        "struct": re.compile(r"^\s*(?:pub\s+)?struct\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE),
+        "enum": re.compile(r"^\s*(?:pub\s+)?enum\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE),
+        "trait": re.compile(r"^\s*(?:pub\s+)?trait\s+([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE),
+        "impl": re.compile(r"^\s*impl(?:<[^>]+>)?\s+(?:<[^>]+>\s+)?([A-Za-z_][A-Za-z0-9_]*)", re.MULTILINE),
+    },
     "markdown": {
         "section": re.compile(r"^#{1,6}\s+(.+)", re.MULTILINE),
+    },
+    "restructuredtext": {
+        "section": re.compile(r"^([^\n]+)\n([=\-~^\"#*+`':.<>_]{3,})", re.MULTILINE),
+    },
+    "plaintext": {
+        # For .txt files (phase files, notes), extract lines that look like headers
+        # Lines in ALL CAPS, or lines followed by === or ---
+        "section": re.compile(r"^([A-Z][A-Z\s]{3,}[A-Z])$|^(.+)\n([=\-]{3,})", re.MULTILINE),
+    },
+    "json": {
+        # Extract top-level keys as symbols
+        "key": re.compile(r'^\s*"([^"]+)"\s*:', re.MULTILINE),
+    },
+    "yaml": {
+        # Extract top-level keys (not indented)
+        "key": re.compile(r'^([a-zA-Z_][a-zA-Z0-9_-]*)\s*:', re.MULTILINE),
+    },
+    "toml": {
+        # Extract sections [section] and top-level keys
+        "section": re.compile(r'^\[([^\]]+)\]', re.MULTILINE),
+        "key": re.compile(r'^([a-zA-Z_][a-zA-Z0-9_-]*)\s*=', re.MULTILINE),
+    },
+    "ini": {
+        # Extract sections [section] and keys
+        "section": re.compile(r'^\[([^\]]+)\]', re.MULTILINE),
+        "key": re.compile(r'^([a-zA-Z_][a-zA-Z0-9_-]*)\s*=', re.MULTILINE),
+    },
+    "shell": {
+        # Extract function definitions
+        "function": re.compile(r'^(?:function\s+)?([a-zA-Z_][a-zA-Z0-9_-]*)\s*\(\s*\)\s*\{', re.MULTILINE),
     },
 }
 

@@ -15,7 +15,7 @@ class CodeSymbol(BaseModel):
     Represents a code symbol (function, class, etc.) extracted from a file.
     """
     name: str
-    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct", "section"]
+    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct", "section", "file"]
     file_path: str
     start_line: int
     end_line: int
@@ -261,7 +261,7 @@ class HybridSearchResult(BaseModel):
     vector_score: float  # Semantic similarity (0-1)
     hybrid_score: float  # Combined score (0-1)
     rank: int  # Final ranking position
-    match_type: Literal["keyword", "semantic", "both"]
+    match_type: Literal["keyword", "semantic", "both", "keyword_fallback"]
 
 
 # Phase 5: Symbolic Intelligence Schemas

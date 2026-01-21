@@ -125,10 +125,19 @@ class ContextAssembler:
         symbol_name: str,
         file_path: Optional[str]
     ) -> Optional[CodeSymbol]:
-        """Get symbol from database."""
+        """
+        Get symbol from database with smart ranking.
+
+        When multiple symbols share the same name, ranks them by:
+        1. Current working directory (highest priority)
+        2. Shallower path depth (likely main implementation)
+        3. File name matches symbol name (e.g., Config.ts for Config class)
+        4. Root-level directories (src/, lib/, pkg/, internal/)
+        """
         conn = self.store._get_connection()
         try:
             if file_path:
+                # Exact match requested - no ambiguity
                 cursor = conn.execute("""
                     SELECT name, type, file_path, start_line, end_line,
                            signature, return_type, parameters, parent_class
@@ -136,16 +145,35 @@ class ContextAssembler:
                     WHERE name = ? AND file_path = ?
                     LIMIT 1
                 """, (symbol_name, file_path))
+                result = cursor.fetchone()
             else:
+                # Fetch ALL matches and rank them
                 cursor = conn.execute("""
                     SELECT name, type, file_path, start_line, end_line,
                            signature, return_type, parameters, parent_class
                     FROM symbols
                     WHERE name = ?
-                    LIMIT 1
                 """, (symbol_name,))
 
-            result = cursor.fetchone()
+                all_results = cursor.fetchall()
+                if not all_results:
+                    return None
+
+                # If only one match, return it immediately
+                if len(all_results) == 1:
+                    result = all_results[0]
+                else:
+                    # Multiple matches - rank them
+                    ranked = self._rank_symbols(symbol_name, all_results)
+                    result = ranked[0]  # Best match
+
+                    # Log disambiguation for transparency
+                    other_locations = [r[2] for r in ranked[1:4]]  # Show up to 3 alternatives
+                    logger.info(
+                        f"Multiple matches for '{symbol_name}' - selected {result[2]}. "
+                        f"Alternatives: {', '.join(other_locations)}"
+                    )
+
             if result:
                 return CodeSymbol(
                     name=result[0],
@@ -161,6 +189,53 @@ class ContextAssembler:
             return None
         finally:
             conn.close()
+
+    def _rank_symbols(self, symbol_name: str, results: list) -> list:
+        """
+        Rank symbol matches by relevance.
+
+        Scoring criteria (higher = better):
+        - In current working directory: +100
+        - Shallower path: +(50 - path_depth)
+        - File name contains symbol name: +30
+        - Root-level files (src/, lib/, pkg/, internal/): +20
+        """
+        from pathlib import Path
+
+        cwd = Path.cwd()
+        ranked = []
+
+        for result in results:
+            file_path = result[2]
+            score = 0
+            path = Path(file_path)
+
+            # 1. Prioritize files in current working directory
+            try:
+                path.relative_to(cwd)
+                score += 100
+            except ValueError:
+                pass  # Not in cwd
+
+            # 2. Prefer shallower paths (likely main implementation)
+            depth = len(Path(file_path).parts)
+            score += max(0, 50 - depth)
+
+            # 3. File name matches symbol name
+            file_stem = path.stem.lower()
+            if symbol_name.lower() in file_stem or file_stem in symbol_name.lower():
+                score += 30
+
+            # 4. Prefer root-level directories (src, lib, pkg, internal)
+            parts = Path(file_path).parts
+            if len(parts) > 0 and parts[0] in ('src', 'lib', 'pkg', 'internal'):
+                score += 20
+
+            ranked.append((result, score))
+
+        # Sort by score descending
+        ranked.sort(key=lambda x: x[1], reverse=True)
+        return [r[0] for r in ranked]  # Return just the results, sorted
 
     def _get_symbol_code(self, symbol: CodeSymbol) -> str:
         """Extract the code for a symbol from its file."""

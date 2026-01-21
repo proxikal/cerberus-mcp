@@ -5,12 +5,46 @@ Generates comprehensive project overviews for AI agents starting new sessions.
 Aims for 80/20 value in ~800 tokens instead of 5,000+ token exploration.
 """
 
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 import json
 import re
 import subprocess
+
+PROJECT_MARKERS = {
+    "go": ["go.mod", "go.sum"],
+    "javascript": ["package.json", "node_modules"],
+    "typescript": ["tsconfig.json", "package.json"],
+    "rust": ["Cargo.toml", "Cargo.lock"],
+    "python": ["pyproject.toml", "setup.py", "requirements.txt"],
+    "java": ["pom.xml", "build.gradle", "build.gradle.kts"],
+    "csharp": [".csproj", ".sln"],
+    "php": ["composer.json"],
+    "ruby": ["Gemfile", "Gemfile.lock"],
+}
+
+EXTENSION_TO_LANGUAGE = {
+    ".go": "go",
+    ".py": "python",
+    ".js": "javascript",
+    ".ts": "typescript",
+    ".rs": "rust",
+    ".java": "java",
+    ".cs": "csharp",
+    ".php": "php",
+    ".rb": "ruby",
+}
+
+ENTRY_POINT_PATTERNS = {
+    "go": ["main.go", "cmd/*/main.go", "*/main.go"],
+    "python": ["main.py", "__main__.py", "cli.py", "app.py"],
+    "javascript": ["index.js", "main.js", "app.js", "server.js"],
+    "typescript": ["index.ts", "main.ts", "app.ts", "server.ts"],
+    "rust": ["main.rs", "lib.rs"],
+    "java": ["Main.java", "Application.java"],
+}
 
 
 @dataclass
@@ -95,24 +129,90 @@ class ProjectSummaryAnalyzer:
 
         return summary
 
+    def _detect_languages(self) -> List[str]:
+        """Detect languages present using markers and file extensions."""
+        counts = Counter()
+        counts.update(self._detect_languages_by_markers())
+        counts.update(self._detect_languages_by_files())
+
+        if not counts:
+            return []
+
+        languages = [lang for lang, _ in counts.most_common()]
+
+        if "typescript" in languages and "javascript" in languages:
+            languages = [lang for lang in languages if lang != "javascript"]
+
+        return languages
+
+    def _detect_languages_by_markers(self) -> Dict[str, int]:
+        """Detect languages based on project marker files."""
+        markers: Dict[str, int] = {}
+
+        for language, files in PROJECT_MARKERS.items():
+            for marker in files:
+                if (self.project_root / marker).exists():
+                    markers[language] = markers.get(language, 0) + 1
+
+        return markers
+
+    def _detect_languages_by_files(self) -> Dict[str, int]:
+        """Count files by extension to infer languages."""
+        counts: Dict[str, int] = {}
+
+        for ext, language in EXTENSION_TO_LANGUAGE.items():
+            matches = list(self.project_root.rglob(f"*{ext}"))
+            if matches:
+                counts[language] = counts.get(language, 0) + len(matches)
+
+        return counts
+
     def _detect_tech_stack(self) -> List[str]:
         """Detect technologies used in project."""
         stack = []
 
-        # Check for Python version
+        languages = self._detect_languages()
+        if not languages:
+            return stack
+
+        for language in languages:
+            if language == "python":
+                stack.extend(self._detect_python_stack())
+            elif language == "go":
+                stack.extend(self._detect_go_stack())
+            elif language in ("javascript", "typescript"):
+                stack.extend(self._detect_js_stack())
+            elif language == "rust":
+                stack.extend(self._detect_rust_stack())
+            elif language == "java":
+                stack.extend(self._detect_java_stack())
+
+        seen = set()
+        deduped = []
+        for item in stack:
+            if item not in seen:
+                deduped.append(item)
+                seen.add(item)
+
+        return deduped
+
+    def _detect_python_stack(self) -> List[str]:
+        """Detect Python-specific technologies."""
+        stack = []
         pyproject = self.project_root / "pyproject.toml"
+
         if pyproject.exists():
             content = pyproject.read_text()
-            # Extract Python version
             if match := re.search(r'python\s*=\s*["\']([^"\']+)["\']', content):
                 stack.append(f"Python {match.group(1)}")
-            elif match := re.search(r'requires-python\s*=\s*["\']([^"\']+)["\']', content):
+            elif match := re.search(
+                r'requires-python\s*=\s*["\']([^"\']+)["\']', content
+            ):
                 stack.append(f"Python {match.group(1)}")
 
-        # Check for common frameworks/libraries
         requirements_files = [
             self.project_root / "requirements.txt",
-            self.project_root / "pyproject.toml",
+            pyproject,
         ]
 
         key_packages = {
@@ -134,51 +234,214 @@ class ProjectSummaryAnalyzer:
                     if pkg in content and name not in stack:
                         stack.append(name)
 
-        # Check for databases
-        if (self.project_root / "*.db").exists() or "sqlite" in str(self.project_root):
-            if "SQLite" not in stack:
-                stack.append("SQLite")
+        db_files = list(self.project_root.glob("*.db"))
+        if db_files and "SQLite" not in stack:
+            stack.append("SQLite")
+
+        return stack
+
+    def _detect_go_stack(self) -> List[str]:
+        """Detect Go-specific technologies."""
+        stack = []
+        go_mod = self.project_root / "go.mod"
+
+        if not go_mod.exists():
+            return stack
+
+        content = go_mod.read_text()
+        if match := re.search(r"go (\d+\.\d+)", content):
+            stack.append(f"Go {match.group(1)}")
+
+        go_packages = {
+            "chi": "Chi (HTTP router)",
+            "gin": "Gin (Web framework)",
+            "echo": "Echo (Web framework)",
+            "fiber": "Fiber (Web framework)",
+            "templ": "Templ (Templating)",
+            "htmx": "htmx",
+            "pgx": "PostgreSQL",
+            "sqlc": "sqlc (SQL generator)",
+            "gorm": "GORM (ORM)",
+            "cobra": "Cobra (CLI framework)",
+        }
+
+        lower_content = content.lower()
+        for pkg, name in go_packages.items():
+            if pkg in lower_content and name not in stack:
+                stack.append(name)
+
+        return stack
+
+    def _detect_js_stack(self) -> List[str]:
+        """Detect JavaScript/TypeScript technologies."""
+        stack = []
+        package_json = self.project_root / "package.json"
+
+        if not package_json.exists():
+            return stack
+
+        try:
+            data = json.loads(package_json.read_text())
+            deps = {
+                **data.get("dependencies", {}),
+                **data.get("devDependencies", {}),
+            }
+        except Exception:
+            deps = {}
+            content = package_json.read_text().lower()
+            for key in ("next", "react", "express", "vue", "svelte"):
+                if key in content:
+                    deps[key] = "unknown"
+
+        framework_map = {
+            "next": "Next.js",
+            "react": "React",
+            "express": "Express.js",
+            "vue": "Vue",
+            "svelte": "Svelte",
+            "vite": "Vite",
+            "typescript": "TypeScript",
+        }
+
+        for pkg, name in framework_map.items():
+            if pkg in deps and name not in stack:
+                stack.append(name)
+
+        return stack
+
+    def _detect_rust_stack(self) -> List[str]:
+        """Detect Rust technologies."""
+        stack = []
+        cargo = self.project_root / "Cargo.toml"
+        if not cargo.exists():
+            return stack
+
+        content = cargo.read_text().lower()
+        if "edition" in content:
+            stack.append("Rust")
+
+        frameworks = {
+            "tokio": "Tokio",
+            "axum": "Axum",
+            "rocket": "Rocket",
+            "serde": "Serde",
+        }
+        for pkg, name in frameworks.items():
+            if pkg in content and name not in stack:
+                stack.append(name)
+
+        return stack
+
+    def _detect_java_stack(self) -> List[str]:
+        """Detect Java technologies."""
+        stack = []
+        pom = self.project_root / "pom.xml"
+        gradle = self.project_root / "build.gradle"
+        gradle_kts = self.project_root / "build.gradle.kts"
+
+        for file in (pom, gradle, gradle_kts):
+            if not file.exists():
+                continue
+            content = file.read_text().lower()
+            if "spring" in content and "Spring" not in stack:
+                stack.append("Spring")
+            if "quarkus" in content and "Quarkus" not in stack:
+                stack.append("Quarkus")
+
+        if stack:
+            stack.insert(0, "Java")
 
         return stack
 
     def _detect_project_type(self) -> str:
         """Detect the type of project."""
-        # Check for common project indicators
-        if (self.project_root / "pyproject.toml").exists():
-            content = (self.project_root / "pyproject.toml").read_text()
-            if "fastmcp" in content.lower():
-                return "MCP Server"
-            elif "fastapi" in content.lower():
-                return "FastAPI Application"
-            elif "django" in content.lower():
-                return "Django Application"
-            elif "flask" in content.lower():
-                return "Flask Application"
-            elif "[tool.poetry]" in content:
-                return "Python Library"
+        languages = self._detect_languages()
+        if not languages:
+            return "Unknown Project"
 
-        if (self.project_root / "setup.py").exists():
-            return "Python Package"
+        primary = languages[0]
+        project_type = f"{primary.title()} Project"
 
-        return "Python Project"
+        if primary == "go":
+            go_mod = self.project_root / "go.mod"
+            if go_mod.exists():
+                content = go_mod.read_text().lower()
+                if "cobra" in content:
+                    project_type = "Go CLI Application"
+                if any(web in content for web in ("chi", "gin", "echo", "fiber")):
+                    project_type = "Go Web Application"
+                elif project_type == f"{primary.title()} Project":
+                    project_type = "Go Project"
+            else:
+                project_type = "Go Project"
+
+        elif primary in ("javascript", "typescript"):
+            package_json = self.project_root / "package.json"
+            if package_json.exists():
+                content = package_json.read_text().lower()
+                if "next" in content:
+                    project_type = "Next.js Application"
+                elif "express" in content:
+                    project_type = "Express.js Application"
+                elif "react" in content:
+                    project_type = "React Application"
+                else:
+                    project_type = f"{primary.title()} Project"
+            else:
+                project_type = f"{primary.title()} Project"
+
+        elif primary == "python":
+            if (self.project_root / "pyproject.toml").exists():
+                content = (self.project_root / "pyproject.toml").read_text()
+                lower_content = content.lower()
+                if "fastmcp" in lower_content:
+                    project_type = "MCP Server"
+                elif "fastapi" in lower_content:
+                    project_type = "FastAPI Application"
+                elif "django" in lower_content:
+                    project_type = "Django Application"
+                elif "flask" in lower_content:
+                    project_type = "Flask Application"
+                elif "[tool.poetry]" in content:
+                    project_type = "Python Library"
+                else:
+                    project_type = "Python Project"
+
+            if (self.project_root / "setup.py").exists():
+                project_type = "Python Package"
+
+        if len(languages) > 1:
+            lang_str = " + ".join(lang.title() for lang in languages[:3])
+            return f"Multi-Language Project ({lang_str})"
+
+        return project_type
 
     def _infer_architecture(self) -> str:
         """Infer project architecture from structure."""
-        # Check common architecture patterns
         directories = [d.name for d in self.project_root.glob("*") if d.is_dir()]
+        languages = self._detect_languages()
+        primary_lang = languages[0] if languages else "Unknown"
 
         if "mcp" in directories or "server" in directories:
-            return "MCP server with pluggable tools"
-        elif "api" in directories and "models" in directories:
-            return "REST API with models and routes"
-        elif "app" in directories and "templates" in directories:
-            return "Web application with template rendering"
-        elif "cli" in directories:
-            return "Command-line interface application"
-        elif "lib" in directories or "src" in directories:
-            return "Library with modular components"
+            return f"MCP server ({primary_lang.title()})"
+        if "api" in directories and "models" in directories:
+            return f"REST API ({primary_lang.title()})"
+        if "app" in directories and "templates" in directories:
+            return f"Web application ({primary_lang.title()})"
+        if "cli" in directories or "cmd" in directories:
+            return f"CLI application ({primary_lang.title()})"
+        if "web" in directories or "static" in directories:
+            return f"Web application ({primary_lang.title()})"
+        if "lib" in directories or "src" in directories:
+            return (
+                f"Library with modular components ({primary_lang.title()})"
+            )
 
-        return "Modular Python application"
+        if len(languages) > 1:
+            joined = " + ".join(lang.title() for lang in languages)
+            return f"Multi-language application ({joined})"
+
+        return f"Modular {primary_lang.title()} application"
 
     def _map_key_modules(self) -> Dict[str, str]:
         """Map key modules to their purposes."""
@@ -264,30 +527,25 @@ class ProjectSummaryAnalyzer:
 
     def _find_entry_points(self) -> List[str]:
         """Find main entry points of the application."""
-        entry_points = []
+        entry_points: List[str] = []
+        languages = self._detect_languages() or ["python"]
 
-        # Common entry point patterns
-        entry_patterns = [
-            ("**/main.py", "main"),
-            ("**/server.py", "create_server"),
-            ("**/server.py", "start_server"),
-            ("**/app.py", "create_app"),
-            ("**/__main__.py", "main"),
-            ("**/cli.py", "cli"),
-            ("**/cli.py", "main"),
-        ]
+        for language in languages:
+            patterns = ENTRY_POINT_PATTERNS.get(language, [])
+            for pattern in patterns:
+                for match in self.project_root.rglob(pattern):
+                    if match.is_file():
+                        rel_path = match.relative_to(self.project_root)
+                        entry_points.append(str(rel_path))
 
-        for pattern, func_name in entry_patterns:
-            for file_path in self.project_root.glob(pattern):
-                if file_path.is_file():
-                    # Check if function exists
-                    content = file_path.read_text()
-                    if f"def {func_name}" in content or f"async def {func_name}" in content:
-                        # Make path relative
-                        rel_path = file_path.relative_to(self.project_root)
-                        entry_points.append(f"{rel_path}::{func_name}")
+        seen = set()
+        deduped = []
+        for entry in entry_points:
+            if entry not in seen:
+                deduped.append(entry)
+                seen.add(entry)
 
-        return entry_points[:5]  # Limit to top 5
+        return deduped[:5]
 
     def _extract_coding_patterns(self) -> List[str]:
         """Extract common coding patterns from the codebase."""

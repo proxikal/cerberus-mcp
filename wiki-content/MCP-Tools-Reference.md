@@ -59,29 +59,36 @@ context(symbol_name="processPayment", include_bases=true, include_deps=true)
 
 ### `search`
 
-Hybrid keyword + semantic search for symbols.
+Hybrid keyword + semantic search for files, symbols, and markdown headings.
+
+**Finds:**
+- **Files** by name: `search("README")` → finds README.md, README.txt
+- **Symbols**: functions, classes, methods, variables
+- **Markdown headings**: `search("Installation")` → finds `## Installation` sections
 
 **Parameters:**
 - `query` (required): Search term (keyword or natural language)
-- `limit` (default: 10): Maximum results
+- `limit` (default: 5): Maximum results
 - `mode` (default: "auto"): "keyword", "semantic", or "balanced"
 
 **Returns:**
-- List of matching symbols with file paths and line numbers
+- List of matches with type (`file`, `function`, `class`, `section`, etc.), file path, line numbers
 
 **Token cost:** ~400-500 tokens for limit=5, ~800-1,000 for limit=10
 
 **Examples:**
 ```
-search(query="authentication", limit=5)
-search(query="function that validates email", mode="semantic", limit=10)
-search(query="UserModel", mode="keyword", limit=3)
+search(query="README", limit=5)              # Find README.md by filename
+search(query="authentication", limit=5)      # Find auth-related symbols
+search(query="Installation", limit=5)        # Find markdown sections
+search(query="UserModel", mode="keyword")    # Exact symbol match
 ```
 
 **Tips:**
 - Start with `limit=5` to minimize tokens
 - Use `mode="keyword"` for exact name matches
 - Use `mode="semantic"` for "find code that does X"
+- File symbols use filename stem (no extension)
 
 ### `get_symbol`
 
