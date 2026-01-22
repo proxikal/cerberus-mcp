@@ -599,42 +599,142 @@ class AgentLearningEngine:
 
 ---
 
-## LLM Refinement
+## Proposal Refinement
 
 ```python
 class ProposalRefiner:
     """
-    Use LLM to refine agent proposals into canonical form.
+    Refine agent proposals into canonical form.
+
+    PRIMARY: Rule-based refinement (no dependencies, instant)
+    OPTIONAL: LLM enhancement (if Ollama available AND enabled)
     """
 
-    def __init__(self, llm_provider: str = "ollama"):
-        self.llm = LLMClient(llm_provider)
+    def __init__(self, use_llm: bool = False):
+        """
+        Args:
+            use_llm: If True AND Ollama is available, use LLM for refinement.
+                     Default is False - rule-based works well.
+        """
+        self.use_llm = use_llm
 
     def refine(self, proposal: AgentProposal) -> AgentProposal:
         """
         Refine proposal content to terse, imperative form.
         """
-        prompt = f"""Refine this agent-learned rule to terse imperative form (max 10 words):
+        # PRIMARY: Rule-based refinement
+        refined = self._refine_with_rules(proposal.content, proposal.evidence)
 
-Action: {proposal.content}
-Evidence: {chr(10).join(proposal.evidence)}
+        # OPTIONAL: LLM enhancement
+        if self.use_llm:
+            llm_refined = self._try_llm_refinement(refined, proposal)
+            if llm_refined:
+                refined = llm_refined
 
-Output format: "Verb object (constraint)"
-Examples:
-- "Plan file splits before writing (200-line limit)"
-- "Write tests before implementation"
-- "Log errors before returning"
-
-Terse rule:"""
-
-        try:
-            refined = self.llm.generate(prompt).strip()
-            proposal.content = refined
-        except:
-            # Fallback: Keep original
-            pass
-
+        proposal.content = refined
         return proposal
+
+    def _refine_with_rules(self, content: str, evidence: List[str]) -> str:
+        """
+        Refine content using rule-based transformations.
+        """
+        content_lower = content.lower()
+
+        # Template mappings for common patterns
+        REFINEMENT_TEMPLATES = {
+            # File operations
+            "split": "Plan file splits before writing (200-line limit)",
+            "separate": "Plan file splits before writing (200-line limit)",
+
+            # Testing
+            "test first": "Write tests before implementation (TDD)",
+            "tdd": "Write tests before implementation (TDD)",
+            "test before": "Write tests before implementation (TDD)",
+
+            # Output style
+            "summary": "Keep summaries 2-3 sentences max",
+            "terse": "Keep output terse and actionable",
+            "concise": "Keep output concise",
+            "short": "Keep explanations short",
+            "verbose": "Avoid verbose explanations",
+
+            # Planning
+            "plan first": "Create plan before implementation",
+            "design first": "Create design docs before coding",
+            "plan before": "Create plan before implementation",
+
+            # Error handling
+            "log error": "Log errors before returning",
+            "error handling": "Handle errors explicitly with logging",
+        }
+
+        # Check for template matches
+        for keyword, template in REFINEMENT_TEMPLATES.items():
+            if keyword in content_lower:
+                return template
+
+        # Fallback: Clean up the content
+        return self._clean_content(content)
+
+    def _clean_content(self, content: str) -> str:
+        """
+        Clean content into imperative form.
+        """
+        import re
+
+        # Remove common filler phrases
+        FILLER_PATTERNS = [
+            r"^continue:?\s*",
+            r"^always\s+",
+            r"^you\s+should\s+",
+            r"^make\s+sure\s+to\s+",
+        ]
+
+        result = content
+        for pattern in FILLER_PATTERNS:
+            result = re.sub(pattern, "", result, flags=re.IGNORECASE)
+
+        # Capitalize first letter
+        if result:
+            result = result[0].upper() + result[1:]
+
+        # Ensure max length
+        words = result.split()
+        if len(words) > 12:
+            result = ' '.join(words[:12])
+
+        return result
+
+    def _try_llm_refinement(self, content: str, proposal: AgentProposal) -> Optional[str]:
+        """
+        OPTIONAL: Use Ollama for refinement if available.
+        Returns None if LLM unavailable or fails.
+        """
+        try:
+            import requests
+
+            prompt = f"""Refine this rule to terse imperative form (max 10 words):
+
+Rule: {content}
+Evidence: {proposal.evidence[0] if proposal.evidence else ""}
+
+Output ONLY the refined rule:"""
+
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={"model": "llama3.2:3b", "prompt": prompt, "stream": False},
+                timeout=5
+            )
+
+            if response.status_code == 200:
+                refined = response.json().get("response", "").strip()
+                if 3 <= len(refined.split()) <= 12:
+                    return refined
+
+        except Exception:
+            pass  # LLM unavailable - that's fine
+
+        return None
 ```
 
 ---
@@ -644,16 +744,21 @@ Terse rule:"""
 ```python
 # At session end (combined with user corrections)
 
-def on_session_end():
+def on_session_end(use_llm: bool = False):
+    """
+    Args:
+        use_llm: If True AND Ollama available, use LLM for refinement.
+                 Default is False - rule-based works well.
+    """
     # User corrections (Phase 1-3)
     user_proposals = generate_user_proposals()  # From Phase 3
 
-    # Agent learning (Phase 7)
+    # Agent learning (Phase 10)
     agent_engine = AgentLearningEngine()
     agent_proposals = agent_engine.generate_proposals(project=detect_project())
 
-    # Refine agent proposals
-    refiner = ProposalRefiner()
+    # Refine agent proposals (rule-based PRIMARY, LLM optional)
+    refiner = ProposalRefiner(use_llm=use_llm)
     agent_proposals = [refiner.refine(p) for p in agent_proposals]
 
     # Combine
@@ -735,10 +840,12 @@ def on_session_end():
 ✓ ObservationCollector class implemented
 ✓ 4 detection patterns working
 ✓ Proposal generation functional
-✓ LLM refinement working (with fallback)
+✓ Rule-based refinement working (PRIMARY)
+✓ Optional LLM refinement (if enabled)
 ✓ Integration with Phase 3 complete
 ✓ AI-native storage format validated
-✓ Token budget: 1000 tokens (5 proposals)
+✓ System works 100% without Ollama
+✓ Token budget: 0-500 tokens (LLM optional)
 ✓ Tests: 15 scenarios with expected proposals
 ```
 
@@ -781,8 +888,10 @@ observations = [
 ## Dependencies
 
 - Existing: Phase 1-3 components
-- New: LLM client (Ollama or Claude API)
-- Optional: Codebase analyzer (Cerberus tools)
+- Optional: `requests` (only if using LLM refinement)
+- Optional: Ollama (only if LLM refinement enabled)
+
+**LLM is OPTIONAL.** System works 100% without Ollama.
 
 ---
 
@@ -790,8 +899,9 @@ observations = [
 
 - Observation collection: 0 tokens (regex + keywords)
 - Pattern detection: 0 tokens (local analysis)
-- LLM refinement: ~150 tokens per proposal (5 proposals = 750 tokens)
-- Total: 750-1000 tokens per session
+- Rule-based refinement: 0 tokens (local processing)
+- Optional LLM refinement: ~100 tokens per proposal (if enabled)
+- Total: 0-500 tokens per session (depending on LLM usage)
 
 ---
 

@@ -1,7 +1,9 @@
 # PHASE 3: SESSION PROPOSAL
 
 ## Objective
-Summarize session corrections with LLM, propose memories for user approval.
+Generate memory proposals from session corrections using template-based rules.
+
+**LLM Status:** OPTIONAL enhancement only. System works 100% without Ollama.
 
 ---
 
@@ -41,8 +43,20 @@ class SessionSummary:
 
 ```python
 class ProposalEngine:
-    def __init__(self, llm_provider: str = "ollama"):
-        self.llm = LLMClient(llm_provider)
+    """
+    Generate memory proposals from correction clusters.
+
+    PRIMARY: Template-based rules (no dependencies, instant)
+    OPTIONAL: LLM enhancement (if Ollama available AND enabled)
+    """
+
+    def __init__(self, use_llm: bool = False):
+        """
+        Args:
+            use_llm: If True AND Ollama is available, use LLM for refinement.
+                     Default is False - template-based works well.
+        """
+        self.use_llm = use_llm
         self.max_proposals = 5  # Don't overwhelm user
 
     def generate_proposals(
@@ -73,7 +87,7 @@ class ProposalEngine:
         # Take top N clusters
         top_clusters = sorted_clusters[:self.max_proposals]
 
-        # Generate proposals using LLM
+        # Generate proposals using templates (PRIMARY)
         proposals = []
         for i, cluster in enumerate(top_clusters):
             proposal = self._create_proposal(cluster, project, priority=i+1)
@@ -96,90 +110,194 @@ class ProposalEngine:
         priority: int
     ) -> Optional[MemoryProposal]:
         """
-        Use LLM to create structured proposal from cluster.
+        Create proposal using template-based rules.
+        LLM only used for optional refinement if enabled.
         """
-        prompt = f"""Analyze this correction and create a memory rule:
+        # PRIMARY: Template-based proposal generation
+        scope = self._infer_scope(cluster, project)
+        category = self._infer_category(cluster)
+        content = self._generate_content(cluster)
+        rationale = self._generate_rationale(cluster)
 
-Correction variants:
-{chr(10).join(f"- {v}" for v in cluster.variants)}
+        # OPTIONAL: LLM refinement
+        if self.use_llm:
+            refined = self._try_llm_refinement(content, cluster)
+            if refined:
+                content = refined
 
-Type: {cluster.correction_type}
-Frequency: {cluster.frequency}
-
-Output JSON:
-{{
-  "category": "preference|rule|correction",
-  "scope": "universal|language:X|project:Y",
-  "content": "imperative rule (max 15 words)",
-  "rationale": "why store this (max 20 words)"
-}}
-
-Rules:
-- "universal" = applies to ALL projects (e.g., token efficiency, file size limits)
-- "language:X" = language-specific (e.g., Go panic handling)
-- "project:Y" = project-specific (e.g., XCalibr UI patterns)
-- content = actionable, imperative mood
-- rationale = value proposition"""
-
-        try:
-            response = self.llm.generate(prompt, json_mode=True)
-            data = json.loads(response)
-
-            # Validate scope
-            scope = data["scope"]
-            if scope.startswith("project:") and not project:
-                # Correction about non-project context → universal
-                scope = "universal"
-            elif scope.startswith("project:") and project:
-                # Use detected project name
-                scope = f"project:{project}"
-
-            return MemoryProposal(
-                id=f"prop-{uuid.uuid4().hex[:8]}",
-                category=data["category"],
-                scope=scope,
-                content=data["content"],
-                rationale=data["rationale"],
-                source_variants=cluster.variants,
-                confidence=cluster.confidence,
-                priority=priority
-            )
-        except Exception as e:
-            # Fallback: Create proposal from canonical text
-            return MemoryProposal(
-                id=f"prop-{uuid.uuid4().hex[:8]}",
-                category=cluster.correction_type,
-                scope=self._infer_scope(cluster, project),
-                content=cluster.canonical_text,
-                rationale="User corrected this behavior multiple times",
-                source_variants=cluster.variants,
-                confidence=cluster.confidence,
-                priority=priority
-            )
+        return MemoryProposal(
+            id=f"prop-{uuid.uuid4().hex[:8]}",
+            category=category,
+            scope=scope,
+            content=content,
+            rationale=rationale,
+            source_variants=cluster.variants,
+            confidence=cluster.confidence,
+            priority=priority
+        )
 
     def _infer_scope(self, cluster: CorrectionCluster, project: Optional[str]) -> str:
-        """Fallback scope inference without LLM."""
+        """
+        Infer scope from correction content.
+
+        Hierarchy: project > language > universal
+        """
         text_lower = cluster.canonical_text.lower()
 
-        # Check for language keywords
-        lang_keywords = {
-            "go": ["panic", "goroutine", "defer"],
-            "python": ["except", "async", "import"],
-            "typescript": ["async", "promise", "interface"],
-            "rust": ["unsafe", "unwrap", "borrow"]
+        # Language detection keywords
+        LANG_KEYWORDS = {
+            "go": ["panic", "goroutine", "defer", "chan", "go func", "go mod"],
+            "python": ["except", "async def", "import", "def ", "__init__", "pytest"],
+            "typescript": ["interface", "type ", "async", "promise", "tsx", "tsx"],
+            "javascript": ["const ", "let ", "function", "=>", "async"],
+            "rust": ["unsafe", "unwrap", "borrow", "impl", "fn ", "mut"]
         }
 
-        for lang, keywords in lang_keywords.items():
+        # Check for language-specific content
+        for lang, keywords in LANG_KEYWORDS.items():
             if any(kw in text_lower for kw in keywords):
                 return f"language:{lang}"
 
-        # Check for universal patterns
-        universal_keywords = ["token", "file size", "line limit", "concise", "short"]
-        if any(kw in text_lower for kw in universal_keywords):
+        # Check for universal patterns (applies everywhere)
+        UNIVERSAL_KEYWORDS = [
+            "token", "file size", "line limit", "concise", "short",
+            "verbose", "summary", "terse", "split", "200 lines",
+            "ai", "agent", "llm", "context"
+        ]
+        if any(kw in text_lower for kw in UNIVERSAL_KEYWORDS):
             return "universal"
 
-        # Default to project if available
-        return f"project:{project}" if project else "universal"
+        # Project-specific if we have a project context
+        if project:
+            # Check if correction seems project-specific
+            PROJECT_INDICATORS = ["this project", "here", "our", "we use", "portal", "component"]
+            if any(ind in text_lower for ind in PROJECT_INDICATORS):
+                return f"project:{project}"
+
+        # Default to universal (safest)
+        return "universal"
+
+    def _infer_category(self, cluster: CorrectionCluster) -> str:
+        """
+        Infer category from correction type and content.
+        """
+        text_lower = cluster.canonical_text.lower()
+
+        # Correction type mapping
+        TYPE_MAP = {
+            "behavior": "rule",
+            "style": "preference",
+            "rule": "rule",
+            "preference": "preference"
+        }
+
+        base_category = TYPE_MAP.get(cluster.correction_type, "preference")
+
+        # Override based on content
+        if any(kw in text_lower for kw in ["never", "don't", "avoid", "stop"]):
+            return "correction"  # Anti-pattern
+        if any(kw in text_lower for kw in ["always", "must", "limit", "max"]):
+            return "rule"  # Hard rule
+        if any(kw in text_lower for kw in ["prefer", "like", "use", "keep"]):
+            return "preference"  # Soft preference
+
+        return base_category
+
+    def _generate_content(self, cluster: CorrectionCluster) -> str:
+        """
+        Generate content from canonical text using templates.
+
+        Transforms user correction into imperative form.
+        """
+        canonical = cluster.canonical_text.strip()
+        words = canonical.lower().split()
+
+        # Already in good form?
+        GOOD_STARTERS = {'use', 'keep', 'avoid', 'never', 'always', 'prefer',
+                         'write', 'split', 'plan', 'test', 'log', 'limit'}
+        if words and words[0] in GOOD_STARTERS:
+            return canonical
+
+        # Transform common patterns
+        TRANSFORMATIONS = [
+            # "don't X" → "Avoid X"
+            (r"^don'?t\s+", "Avoid "),
+            # "stop X" → "Avoid X"
+            (r"^stop\s+", "Avoid "),
+            # "be X" → "Keep output X"
+            (r"^be\s+(concise|terse|short|brief)", r"Keep output \1"),
+            # "X is bad" → "Avoid X"
+            (r"(.+)\s+is\s+bad", r"Avoid \1"),
+            # "X is good" → "Prefer X"
+            (r"(.+)\s+is\s+good", r"Prefer \1"),
+            # "I want X" → "X"
+            (r"^i\s+want\s+", ""),
+            # "you should X" → "X"
+            (r"^you\s+should\s+", ""),
+        ]
+
+        import re
+        result = canonical
+        for pattern, replacement in TRANSFORMATIONS:
+            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+
+        # Capitalize first letter
+        if result:
+            result = result[0].upper() + result[1:]
+
+        # Ensure reasonable length (max 20 words)
+        words = result.split()
+        if len(words) > 20:
+            result = ' '.join(words[:20]) + '...'
+
+        return result
+
+    def _generate_rationale(self, cluster: CorrectionCluster) -> str:
+        """
+        Generate rationale from cluster data.
+        """
+        freq = cluster.frequency
+        conf = cluster.confidence
+
+        if freq >= 3:
+            return f"User corrected this {freq} times (high priority)"
+        elif freq == 2:
+            return "User corrected this twice"
+        elif conf >= 0.9:
+            return "Explicit correction with high confidence"
+        else:
+            return "User indicated preference"
+
+    def _try_llm_refinement(self, content: str, cluster: CorrectionCluster) -> Optional[str]:
+        """
+        OPTIONAL: Use Ollama for content refinement if available.
+        Returns None if LLM unavailable or fails.
+        """
+        try:
+            import requests
+
+            prompt = f"""Refine this rule to terse imperative form (max 10 words):
+
+Rule: {content}
+Original: {cluster.variants[0] if cluster.variants else content}
+
+Output ONLY the refined rule:"""
+
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={"model": "llama3.2:3b", "prompt": prompt, "stream": False},
+                timeout=5
+            )
+
+            if response.status_code == 200:
+                refined = response.json().get("response", "").strip()
+                if 3 <= len(refined.split()) <= 15:
+                    return refined
+
+        except Exception:
+            pass  # LLM unavailable - that's fine
+
+        return None
 
     def _gen_session_id(self) -> str:
         return datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -371,12 +489,16 @@ def on_session_end():
 
 ```
 ✓ ProposalEngine class implemented
-✓ LLM-based proposal generation functional
-✓ Fallback proposal generation (no LLM) functional
+✓ Template-based proposal generation functional (PRIMARY)
+✓ Optional LLM refinement (if enabled)
+✓ Scope inference working (universal/language/project)
+✓ Category inference working (preference/rule/correction)
+✓ Content transformation to imperative form
 ✓ ApprovalInterface working (CLI version)
 ✓ ProposalStorage integration with existing memory layers
 ✓ Session end hook implemented
 ✓ Tests: 5 scenarios with expected proposals
+✓ System works 100% without Ollama
 ```
 
 ---
@@ -427,21 +549,25 @@ project = "xcalibr"
 ## Dependencies
 
 ```bash
-pip install ollama-python  # Or anthropic SDK for Claude API
+# No required dependencies beyond standard library
+# pip install requests  # Only if using optional LLM refinement
 ```
+
+**LLM is OPTIONAL.** System works 100% without Ollama.
 
 ---
 
 ## Token Budget
 
-- Proposal generation: ~150 tokens per cluster (5 clusters max = 750 tokens)
+- Proposal generation (templates): 0 tokens (local processing)
+- Optional LLM refinement: ~100 tokens per proposal (if enabled)
 - User approval: 0 tokens (CLI interaction)
-- Total per session: 750-1000 tokens
+- Total per session: 0-500 tokens (depending on LLM usage)
 
 ---
 
 ## Performance
 
-- LLM calls: 5 calls per session (one per proposal)
-- Total time: < 5 seconds for typical session
+- Template-based: < 50ms (no network calls)
+- Optional LLM: + ~500ms per proposal (if enabled)
 - User interaction: 10-30 seconds approval time

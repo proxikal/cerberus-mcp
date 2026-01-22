@@ -43,11 +43,11 @@ Session Cycle:
 │ 3. SESSION END                                              │
 │    ├─ Cluster user corrections (Phase 2)                    │
 │    ├─ Detect agent patterns (Phase 10: success, failure)    │
-│    ├─ LLM generates proposals (Phase 3: 10 user + 10 agent) │
+│    ├─ Generate proposals (Phase 3: template-based, LLM opt) │
 │    ├─ CLI approval (Phase 4: < 30 seconds)                  │
 │    ├─ Store to hierarchical layers (Phase 5)                │
 │    └─ Save session codes (Phase 8: no LLM, direct save)     │
-│    └─ Total cost: ~4000 tokens (~$0.06)                     │
+│    └─ Total cost: 0-500 tokens (LLM optional)               │
 ├─────────────────────────────────────────────────────────────┤
 │ 4. WEEKLY MAINTENANCE (automatic)                           │
 │    ├─ Archive stale memories (>180 days) (Phase 11)         │
@@ -101,15 +101,17 @@ Session Cycle:
 ### Phase 3: Session Proposal
 **File:** `src/cerberus/memory/proposal_engine.py`
 
-**Objective:** LLM generates proposals from corrections and agent patterns.
+**Objective:** Generate proposals from corrections using template-based rules.
 
 **Key Features:**
-- LLM generates 10 user proposals (from Phase 2 clusters)
-- LLM generates 10 agent proposals (from Phase 10 patterns)
-- Scope detection (universal, language, project)
+- Template-based proposal generation (PRIMARY, no dependencies)
+- Optional LLM refinement (if Ollama available AND enabled)
+- Scope inference (universal, language, project)
+- Category inference (preference, rule, correction)
+- Content transformation to imperative form
 - Priority ranking
 
-**Token Cost:** 2000 tokens per session (10 user + 10 agent proposals)
+**Token Cost:** 0-500 tokens per session (LLM optional)
 
 **Output:** List of `MemoryProposal` and `AgentProposal` objects
 
@@ -355,23 +357,22 @@ Phase 9 (Session Injection) ───────→        │                 
 
 **Must Have (Phases 1-7):**
 - Phase 1: User correction detection (4 patterns)
-- Phase 2: Clustering (basic, no LLM canonical extraction)
-- Phase 3: Proposal (LLM-based, user corrections only for MVP)
-- Phase 4: TUI approval (arrow keys, inline, with CLI fallback)
+- Phase 2: Clustering (TF-IDF based, rule-based canonical extraction)
+- Phase 3: Proposal (template-based, LLM optional)
+- Phase 4: CLI approval (standard input(), no TUI)
 - Phase 5: Storage (universal + language + project layers)
 - Phase 6: Retrieval (scope-based, relevance scoring)
 - Phase 7: Injection (1500 token budget, memory only)
 
 **Enhancement Layer (Phases 8-10):**
-- Phase 8: Context capture (AI-native codes)
-- Phase 9: Session summary (LLM summary + injection)
-- Phase 10: Agent self-learning (success/failure patterns)
-- Integrated proposal system (10 user + 10 agent = 20 total)
-- Enhanced injection (1500 memory + 500 session = 2000 tokens)
+- Phase 8: Context capture + injection (AI-native codes, NO LLM)
+- Phase 10: Agent self-learning (success/failure patterns, rule-based refinement)
+- Integrated proposal system (user + agent proposals combined)
+- Enhanced injection (1500 memory + 1000 session = 2500 tokens)
 
 **Nice to Have (defer):**
 - Phase 11: Maintenance (manual for MVP)
-- LLM canonical extraction in Phase 2
+- Optional LLM refinement in Phases 2, 3, 10
 - Task layer in Phase 5
 - Advanced conflict detection
 - Codebase pattern analyzer for Phase 10
@@ -430,13 +431,18 @@ Phase 9 (Session Injection) ───────→        │                 
 
 **Dependencies:**
 ```bash
+# Required
 pip install scikit-learn numpy tiktoken
-pip install ollama-python  # Or anthropic SDK (optional, for LLM proposals)
+
+# Optional (only if using LLM refinement)
+pip install requests  # For Ollama API calls
 ```
 
 **Model Requirements:**
-- TF-IDF: scikit-learn (no model download)
-- LLM: Ollama (llama3.2:3b) or Claude API (optional, for proposals)
+- TF-IDF: scikit-learn (no model download, required)
+- LLM: OPTIONAL - Ollama (llama3.2:3b) for refinement only
+  - System works 100% without Ollama
+  - LLM is enhancement, not requirement
 
 ---
 
@@ -602,8 +608,11 @@ src/cerberus/memory/
 **Q: Why not auto-store without user approval?**
 A: Prevents false positives. User confirms = 100% accuracy.
 
-**Q: Why LLM for proposals?**
-A: Extracts intent ("keep it short" + "be terse" → "Keep output concise").
+**Q: Why template-based proposals instead of LLM?**
+A: Works without external dependencies. LLM is optional enhancement only.
+
+**Q: Can I use LLM for better proposals?**
+A: Yes, set `use_llm=True` if Ollama is available. It refines the template output.
 
 **Q: Why 1500 token budget for memory injection?**
 A: Balance: Enough for comprehensive rules, not bloated. Tested optimal.
@@ -611,8 +620,8 @@ A: Balance: Enough for comprehensive rules, not bloated. Tested optimal.
 **Q: Why hierarchical storage?**
 A: Relevance filtering. Go project doesn't need Python rules.
 
-**Q: Why local embeddings vs API?**
-A: Zero cost, zero latency, works offline.
+**Q: Why TF-IDF instead of embeddings?**
+A: Lightweight (~1MB vs 80MB+400MB model), no download, works offline, sufficient for short text.
 
 ---
 
@@ -625,5 +634,11 @@ A: Zero cost, zero latency, works offline.
 ---
 
 **Last Updated:** 2026-01-22
-**Version:** 2.0 (12-phase structure, $0.10 budget, TUI approval)
+**Version:** 2.1 (13-phase structure, $0.10 budget, CLI approval, LLM optional)
 **Status:** Ready for implementation
+
+**Key Design Principles:**
+- LLM is OPTIONAL throughout - system works 100% without Ollama
+- Template-based/rule-based approaches are PRIMARY
+- Simple CLI interface (no TUI dependencies)
+- Phases are self-contained with clear integration points

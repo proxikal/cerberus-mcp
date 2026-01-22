@@ -210,62 +210,123 @@ class SemanticAnalyzer:
 
 ---
 
-## Canonical Form Extraction (Optional LLM)
+## Canonical Form Extraction
 
 ```python
 class CanonicalExtractor:
     """
-    Uses local LLM (Ollama) to extract canonical form.
-    Fallback: Use best variant from TF-IDF analysis.
+    Extract canonical form from variant corrections.
+
+    PRIMARY: Rule-based selection (no dependencies, instant)
+    OPTIONAL: LLM enhancement (if Ollama available)
     """
 
-    def __init__(self, llm_available: bool = False):
-        self.llm_available = llm_available
+    def __init__(self, use_llm: bool = False):
+        """
+        Args:
+            use_llm: If True AND Ollama is available, use LLM for refinement.
+                     Default is False - rule-based selection works well.
+        """
+        self.use_llm = use_llm
 
     def extract(self, variants: List[str]) -> str:
+        """
+        Extract canonical form from variants.
+
+        Always uses rule-based selection first.
+        LLM only used if explicitly enabled AND available.
+        """
         if len(variants) == 1:
             return variants[0]
 
-        if self.llm_available:
-            try:
-                return self._extract_with_llm(variants)
-            except:
-                pass
+        # PRIMARY: Rule-based selection (always works, no dependencies)
+        canonical = self._select_best_variant(variants)
 
-        # Fallback: pick best variant by quality
-        return self._pick_best_variant(variants)
+        # OPTIONAL: LLM refinement (only if explicitly enabled)
+        if self.use_llm:
+            refined = self._try_llm_refinement(canonical, variants)
+            if refined:
+                canonical = refined
 
-    def _pick_best_variant(self, variants: List[str]) -> str:
-        """Pick best variant without LLM."""
+        return canonical
+
+    def _select_best_variant(self, variants: List[str]) -> str:
+        """
+        Select best variant using quality scoring.
+
+        Scoring criteria:
+        1. Starts with imperative verb (+3)
+        2. Optimal length 5-12 words (+2)
+        3. Contains actionable keywords (+1)
+        4. Shorter preferred among equals
+        """
+        IMPERATIVE_VERBS = {
+            'use', 'keep', 'avoid', 'never', 'always', 'prefer',
+            'write', 'add', 'remove', 'check', 'ensure', 'follow',
+            'split', 'plan', 'test', 'log', 'handle', 'return'
+        }
+
+        ACTION_KEYWORDS = {
+            'before', 'after', 'instead', 'when', 'always', 'never',
+            'must', 'should', 'limit', 'max', 'min'
+        }
+
         def score(text: str) -> tuple:
-            words = len(text.split())
-            # Prefer 5-12 words, imperative mood
-            length_score = -abs(words - 8)  # Optimal around 8 words
-            # Prefer starting with verb
-            starts_with_verb = text.split()[0].lower() in [
-                'use', 'keep', 'avoid', 'never', 'always', 'prefer',
-                'write', 'add', 'remove', 'check', 'ensure', 'follow'
-            ] if text else False
-            return (starts_with_verb, length_score, -len(text))
+            words = text.split()
+            word_count = len(words)
+            text_lower = text.lower()
+
+            # Score 1: Starts with imperative verb (highest priority)
+            starts_verb = words[0].lower() in IMPERATIVE_VERBS if words else False
+            verb_score = 3 if starts_verb else 0
+
+            # Score 2: Optimal length (5-12 words)
+            if 5 <= word_count <= 12:
+                length_score = 2
+            elif 3 <= word_count <= 15:
+                length_score = 1
+            else:
+                length_score = 0
+
+            # Score 3: Contains actionable keywords
+            action_score = sum(1 for kw in ACTION_KEYWORDS if kw in text_lower)
+
+            # Tiebreaker: shorter is better
+            return (verb_score, length_score, action_score, -len(text))
 
         return max(variants, key=score)
 
-    def _extract_with_llm(self, variants: List[str]) -> str:
-        """Optional: Use Ollama for better canonical extraction."""
-        import requests
+    def _try_llm_refinement(self, canonical: str, variants: List[str]) -> Optional[str]:
+        """
+        OPTIONAL: Use Ollama for refinement if available.
+        Returns None if LLM unavailable or fails.
+        """
+        try:
+            import requests
 
-        prompt = f"""Extract canonical rule from these similar corrections:
+            prompt = f"""Refine this rule to canonical form (max 10 words, imperative mood):
 
-{chr(10).join(f"- {v}" for v in variants)}
+Current: {canonical}
+Variants: {', '.join(variants[:3])}
 
-Return ONLY the canonical form (10 words max, imperative mood):"""
+Output ONLY the refined rule:"""
 
-        response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={"model": "llama3.2:3b", "prompt": prompt, "stream": False},
-            timeout=10
-        )
-        return response.json()["response"].strip()
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={"model": "llama3.2:3b", "prompt": prompt, "stream": False},
+                timeout=5
+            )
+
+            if response.status_code == 200:
+                refined = response.json().get("response", "").strip()
+                # Validate: must be reasonable length
+                if 3 <= len(refined.split()) <= 15:
+                    return refined
+
+        except Exception:
+            pass  # LLM unavailable or failed - that's fine
+
+        return None
 ```
 
 ---
@@ -371,10 +432,13 @@ variants = [
 ## Dependencies
 
 ```bash
-pip install scikit-learn numpy
+pip install scikit-learn numpy  # Required
+# pip install requests  # Only if using optional LLM refinement
 ```
 
 **No model download required.** TF-IDF is computed on-the-fly.
+
+**Optional:** Ollama for LLM refinement (not required, rule-based works well)
 
 ---
 
