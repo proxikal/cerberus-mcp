@@ -1,13 +1,13 @@
-# PHASE 9: SESSION SUMMARY
+# PHASE 9: SESSION CONTEXT INJECTION
 
 ## Objective
-Generate LLM summary from session context, inject at session start. 500 token budget.
+Inject Phase 8 codes at session start. Pure data, no LLM, no prose. 1000-1500 token budget.
 
 ---
 
 ## Implementation Location
 
-**File:** `src/cerberus/memory/session_summary.py`
+**File:** `src/cerberus/memory/session_injection.py`
 
 ---
 
@@ -16,7 +16,7 @@ Generate LLM summary from session context, inject at session start. 500 token bu
 ```python
 @dataclass
 class SessionContext:
-    """Raw context from Phase 8 capture."""
+    """Raw codes from Phase 8 capture."""
     session_id: str
     project: str
     timestamp: str
@@ -25,170 +25,15 @@ class SessionContext:
     decisions: List[str]  # dec:choice codes
     blockers: List[str]  # block:type:desc codes
     next_actions: List[str]  # next:action codes
-    raw_context: Dict[str, Any]  # Full capture data
-
-@dataclass
-class SessionSummary:
-    """LLM-generated summary for injection."""
-    session_id: str
-    project: str
-    summary: str  # 2-3 sentences
-    key_context: List[str]  # Top 5 most important items
-    next_actions: List[str]  # Unprefixed actions
-    token_estimate: int
-    timestamp: str
-    expires_at: str  # 7 days from creation
+    metadata: Dict[str, Any]  # Additional context
 
 @dataclass
 class InjectionPackage:
-    """Ready-to-inject summary."""
-    markdown: str  # Formatted for prompt injection
+    """Ready-to-inject codes."""
+    codes: str  # Raw codes, newline-separated
     token_count: int
-    session_info: SessionSummary
-```
-
----
-
-## Session Summarizer
-
-```python
-class SessionSummarizer:
-    """
-    Generate LLM summary from session context.
-    """
-
-    def __init__(self, llm_client: Any):
-        self.llm = llm_client
-
-    def generate_summary(
-        self,
-        context: SessionContext
-    ) -> SessionSummary:
-        """
-        Generate 2-3 sentence summary from context.
-        """
-        # Build prompt
-        prompt = self._build_prompt(context)
-
-        # Call LLM
-        response = self.llm.generate(
-            prompt=prompt,
-            max_tokens=200,
-            temperature=0.3
-        )
-
-        # Parse response
-        summary_text = self._extract_summary(response)
-
-        # Identify key context items
-        key_context = self._select_key_items(context, limit=5)
-
-        # Token estimate
-        token_est = self._estimate_tokens(summary_text, key_context)
-
-        return SessionSummary(
-            session_id=context.session_id,
-            project=context.project,
-            summary=summary_text,
-            key_context=key_context,
-            next_actions=context.next_actions,
-            token_estimate=token_est,
-            timestamp=datetime.now().isoformat(),
-            expires_at=self._calc_expiry()
-        )
-
-    def _build_prompt(self, context: SessionContext) -> str:
-        """
-        Build LLM prompt from context codes.
-        """
-        return f"""Summarize this coding session in 2-3 sentences:
-
-Project: {context.project}
-
-Files modified: {len(context.files)}
-{chr(10).join(f"- {f}" for f in context.files[:5])}
-
-Key decisions:
-{chr(10).join(f"- {d}" for d in context.decisions[:3])}
-
-Blockers:
-{chr(10).join(f"- {b}" for b in context.blockers)}
-
-Output format (2-3 sentences):
-1. What was accomplished
-2. Key decisions made
-3. What's next (if clear)
-
-Keep it terse, imperative, AI-readable."""
-
-    def _extract_summary(self, response: str) -> str:
-        """
-        Extract clean summary from LLM response.
-        """
-        # Remove any preamble
-        lines = response.strip().split("\n")
-        summary_lines = [
-            line for line in lines
-            if line.strip() and not line.startswith("#")
-        ]
-
-        # Join and limit to 3 sentences
-        text = " ".join(summary_lines)
-        sentences = text.split(". ")[:3]
-        return ". ".join(sentences).strip()
-
-    def _select_key_items(
-        self,
-        context: SessionContext,
-        limit: int
-    ) -> List[str]:
-        """
-        Select most important context items.
-        Priority: blockers > decisions > files > functions
-        """
-        key_items = []
-
-        # Blockers (highest priority)
-        key_items.extend(context.blockers)
-
-        # Decisions
-        key_items.extend(context.decisions[:3])
-
-        # Files (top 3)
-        key_items.extend(context.files[:3])
-
-        # Functions (if space)
-        remaining = limit - len(key_items)
-        if remaining > 0:
-            key_items.extend(context.functions[:remaining])
-
-        return key_items[:limit]
-
-    def _estimate_tokens(
-        self,
-        summary: str,
-        key_context: List[str]
-    ) -> int:
-        """
-        Estimate tokens for injection.
-        """
-        # Summary
-        tokens = len(summary.split()) * 1.3
-
-        # Key context items
-        tokens += sum(len(item.split()) * 1.3 for item in key_context)
-
-        # Formatting overhead
-        tokens += 50
-
-        return int(tokens)
-
-    def _calc_expiry(self) -> str:
-        """
-        Calculate 7-day expiry timestamp.
-        """
-        expiry = datetime.now() + timedelta(days=7)
-        return expiry.isoformat()
+    session_id: str
+    expires_at: str
 ```
 
 ---
@@ -198,56 +43,59 @@ Keep it terse, imperative, AI-readable."""
 ```python
 class SessionContextInjector:
     """
-    Load and inject session context at session start.
+    Load Phase 8 codes, inject at session start.
+    NO LLM. NO PROSE. Pure data injection.
     """
 
     def __init__(self, base_path: Path):
-        self.base_path = base_path / "memory" / "sessions"
-        self.base_path.mkdir(parents=True, exist_ok=True)
+        self.sessions_dir = base_path / "memory" / "sessions"
+        self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
     def inject(self, project: str) -> Optional[InjectionPackage]:
         """
-        Load and format session context for injection.
+        Load codes for injection. Return None if no active session.
         """
-        # Find active session for project
-        summary = self._load_active_session(project)
+        # Load active session
+        context = self._load_active_session(project)
 
-        if not summary:
+        if not context:
             return None
 
         # Check expiry
-        if self._is_expired(summary):
-            self._archive(summary)
+        if self._is_expired(context):
+            self._archive(context)
             return None
 
-        # Format for injection
-        markdown = self._format_markdown(summary)
-        token_count = self._count_tokens(markdown)
+        # Format codes (minimal formatting, no prose)
+        codes = self._format_codes(context)
+        token_count = self._count_tokens(codes)
 
         return InjectionPackage(
-            markdown=markdown,
+            codes=codes,
             token_count=token_count,
-            session_info=summary
+            session_id=context.session_id,
+            expires_at=context.metadata.get("expires_at")
         )
 
-    def save_context(
-        self,
-        summary: SessionSummary
-    ):
+    def save_context(self, context: SessionContext):
         """
-        Save session summary to storage.
+        Save Phase 8 codes to storage.
         """
-        file_path = self.base_path / f"active-{summary.project}.json"
+        file_path = self.sessions_dir / f"active-{context.project}.json"
 
         data = {
-            "session_id": summary.session_id,
-            "project": summary.project,
-            "summary": summary.summary,
-            "key_context": summary.key_context,
-            "next_actions": summary.next_actions,
-            "token_estimate": summary.token_estimate,
-            "timestamp": summary.timestamp,
-            "expires_at": summary.expires_at
+            "session_id": context.session_id,
+            "project": context.project,
+            "timestamp": context.timestamp,
+            "files": context.files,
+            "functions": context.functions,
+            "decisions": context.decisions,
+            "blockers": context.blockers,
+            "next_actions": context.next_actions,
+            "metadata": {
+                **context.metadata,
+                "expires_at": self._calc_expiry()
+            }
         }
 
         with open(file_path, "w") as f:
@@ -256,11 +104,11 @@ class SessionContextInjector:
     def _load_active_session(
         self,
         project: str
-    ) -> Optional[SessionSummary]:
+    ) -> Optional[SessionContext]:
         """
-        Load active session for project.
+        Load active session codes.
         """
-        file_path = self.base_path / f"active-{project}.json"
+        file_path = self.sessions_dir / f"active-{project}.json"
 
         if not file_path.exists():
             return None
@@ -269,78 +117,102 @@ class SessionContextInjector:
             with open(file_path) as f:
                 data = json.load(f)
 
-            return SessionSummary(**data)
+            return SessionContext(
+                session_id=data["session_id"],
+                project=data["project"],
+                timestamp=data["timestamp"],
+                files=data.get("files", []),
+                functions=data.get("functions", []),
+                decisions=data.get("decisions", []),
+                blockers=data.get("blockers", []),
+                next_actions=data.get("next_actions", []),
+                metadata=data.get("metadata", {})
+            )
 
-        except (json.JSONDecodeError, IOError, TypeError):
+        except (json.JSONDecodeError, IOError, KeyError):
             return None
 
-    def _is_expired(self, summary: SessionSummary) -> bool:
+    def _is_expired(self, context: SessionContext) -> bool:
         """
-        Check if summary has expired (>7 days).
+        Check if session expired (>7 days).
         """
         try:
-            expires = datetime.fromisoformat(summary.expires_at)
-            return datetime.now() > expires
+            expires = context.metadata.get("expires_at")
+            if not expires:
+                return True
+
+            expires_dt = datetime.fromisoformat(expires)
+            return datetime.now() > expires_dt
+
         except (ValueError, TypeError):
             return True
 
-    def _archive(self, summary: SessionSummary):
+    def _archive(self, context: SessionContext):
         """
         Move expired session to archive.
         """
         # Remove active file
-        active_path = self.base_path / f"active-{summary.project}.json"
+        active_path = self.sessions_dir / f"active-{context.project}.json"
         if active_path.exists():
             active_path.unlink()
 
-        # Save to archive (optional)
-        archive_dir = self.base_path / "archive"
+        # Save to archive
+        archive_dir = self.sessions_dir / "archive"
         archive_dir.mkdir(exist_ok=True)
 
-        archive_path = archive_dir / f"{summary.session_id}.json"
+        archive_path = archive_dir / f"{context.session_id}.json"
         with open(archive_path, "w") as f:
             json.dump({
-                "session_id": summary.session_id,
-                "project": summary.project,
-                "summary": summary.summary,
-                "timestamp": summary.timestamp,
+                "session_id": context.session_id,
+                "project": context.project,
+                "timestamp": context.timestamp,
                 "archived_at": datetime.now().isoformat()
             }, f, indent=2)
 
-    def _format_markdown(self, summary: SessionSummary) -> str:
+    def _format_codes(self, context: SessionContext) -> str:
         """
-        Format summary as markdown for injection.
+        Format codes for injection.
+        NO PROSE. NO MARKDOWN. Pure data.
         """
-        lines = [
-            "## Previous Session Context",
-            "",
-            f"**Project:** {summary.project}",
-            "",
-            f"**Summary:** {summary.summary}",
-            ""
-        ]
+        lines = []
 
-        # Key context
-        if summary.key_context:
-            lines.append("**Context:**")
-            for item in summary.key_context:
-                lines.append(f"- {item}")
-            lines.append("")
+        # Project context
+        lines.append(f"proj:{context.project}")
 
-        # Next actions
-        if summary.next_actions:
-            lines.append("**Next:**")
-            for action in summary.next_actions:
-                lines.append(f"- {action}")
-            lines.append("")
+        # Files (all of them)
+        if context.files:
+            lines.extend(context.files)
+
+        # Functions (all of them)
+        if context.functions:
+            lines.extend(context.functions)
+
+        # Decisions (all of them)
+        if context.decisions:
+            lines.extend(context.decisions)
+
+        # Blockers (highest priority)
+        if context.blockers:
+            lines.extend(context.blockers)
+
+        # Next actions (what to do)
+        if context.next_actions:
+            lines.extend(context.next_actions)
 
         return "\n".join(lines)
 
     def _count_tokens(self, text: str) -> int:
         """
-        Count tokens in markdown text.
+        Count tokens (rough estimate).
         """
         return int(len(text.split()) * 1.3)
+
+    def _calc_expiry(self) -> str:
+        """
+        Calculate 7-day expiry.
+        """
+        expiry = datetime.now() + timedelta(days=7)
+        return expiry.isoformat()
 ```
 
 ---
@@ -350,28 +222,24 @@ class SessionContextInjector:
 ```python
 def on_session_end():
     """
-    Phase 8 → Phase 9: Capture → Summary
+    Phase 8 → Phase 9: Capture → Save
     """
-    # Phase 8: Capture context during session
+    # Phase 8: Get codes
     capture_engine = SessionContextCapture()
     context = capture_engine.get_context()
 
-    # Phase 9: Generate summary
-    summarizer = SessionSummarizer(llm_client)
-    summary = summarizer.generate_summary(context)
-
-    # Save for next session
+    # Phase 9: Save codes (no LLM, no processing)
     injector = SessionContextInjector(Path.home() / ".cerberus")
-    injector.save_context(summary)
+    injector.save_context(context)
 
-    print(f"✓ Session context saved ({summary.token_estimate} tokens)")
+    print(f"✓ Session context saved ({len(context.files)} files)")
 
 def on_session_start(project: str):
     """
-    Phase 9: Inject previous session context
+    Phase 9: Inject codes
     Phase 7: Inject memories
     """
-    # Phase 9: Load session context
+    # Phase 9: Load codes
     injector = SessionContextInjector(Path.home() / ".cerberus")
     session_pkg = injector.inject(project)
 
@@ -385,7 +253,7 @@ def on_session_start(project: str):
 
     # Combine
     if session_pkg:
-        full_context = memory_context + "\n\n" + session_pkg.markdown
+        full_context = memory_context + "\n\n" + session_pkg.codes
         total_tokens = memory_context.token_count + session_pkg.token_count
     else:
         full_context = memory_context
@@ -423,11 +291,12 @@ class SessionCleanupManager:
                     data = json.load(f)
 
                 # Check expiry
-                expires = datetime.fromisoformat(data["expires_at"])
-                if datetime.now() > expires:
-                    # Archive
-                    self._archive_file(file_path, data)
-                    archived += 1
+                expires = data.get("metadata", {}).get("expires_at")
+                if expires:
+                    expires_dt = datetime.fromisoformat(expires)
+                    if datetime.now() > expires_dt:
+                        self._archive_file(file_path, data)
+                        archived += 1
 
             except (json.JSONDecodeError, IOError, KeyError, ValueError):
                 # Malformed file, remove
@@ -437,7 +306,7 @@ class SessionCleanupManager:
 
     def _archive_file(self, file_path: Path, data: Dict):
         """
-        Move file to archive.
+        Move to archive.
         """
         archive_dir = self.sessions_dir / "archive"
         archive_dir.mkdir(exist_ok=True)
@@ -447,29 +316,83 @@ class SessionCleanupManager:
         # Add archive timestamp
         data["archived_at"] = datetime.now().isoformat()
 
-        # Save to archive
         with open(archive_path, "w") as f:
             json.dump(data, f, indent=2)
 
-        # Remove active file
         file_path.unlink()
 ```
+
+---
+
+## Token Budget Allocation
+
+**Phase 9 budget: 1000-1500 tokens (TEMPORARY, deleted after injection)**
+
+```
+Files:          300-500 tokens (ALL files, not just top 5)
+Functions:      200-400 tokens (ALL functions touched)
+Decisions:      200-300 tokens (ALL decisions made)
+Blockers:       100-200 tokens (ALL blockers)
+Next actions:   100-200 tokens (ALL next actions)
+Metadata:        50-100 tokens (proj:, timestamps)
+────────────────────────────────────────────────────
+Total:         1000-1500 tokens (comprehensive, temporary)
+```
+
+**Why generous budget:**
+- Temporary storage (deleted after read)
+- Goal is ZERO re-explanation
+- Worth extra tokens to maintain momentum
+- No LLM cost (removed)
+
+---
+
+## Injection Format Example
+
+**Input (Phase 8 codes):**
+```
+impl:proxy.go
+impl:supervisor.Process
+impl:config_test.go
+dec:split-proxy-3-files
+dec:plan-splits-before-writing
+block:race:test-failure-line-712
+next:add-mutex-process-struct
+next:rerun-race-detector
+```
+
+**Output (Phase 9 injection):**
+```
+proj:hydra
+impl:proxy.go
+impl:supervisor.Process
+impl:config_test.go
+dec:split-proxy-3-files
+dec:plan-splits-before-writing
+block:race:test-failure-line-712
+next:add-mutex-process-struct
+next:rerun-race-detector
+```
+
+**Agent reads:** Project hydra, files touched, decisions made, race blocker, next actions.
+**Zero re-explanation needed.**
 
 ---
 
 ## Exit Criteria
 
 ```
-✓ SessionSummarizer class implemented
-✓ LLM summary generation working (2-3 sentences)
-✓ SessionContextInjector implemented
-✓ Session storage working (active-{project}.json)
-✓ Expiry detection working (7 days)
+✓ SessionContextInjector class implemented
+✓ NO LLM (removed entirely)
+✓ Load Phase 8 codes directly
+✓ Format codes (minimal, no prose)
+✓ Save/load working
+✓ Expiry detection (7 days)
 ✓ Archival working
 ✓ Integration with Phase 8 complete
 ✓ Integration with Phase 7 complete
-✓ Token budget enforced (500 tokens)
-✓ Tests: 10 summary scenarios
+✓ Token budget: 1000-1500 tokens
+✓ Tests: 10 injection scenarios
 ```
 
 ---
@@ -477,40 +400,39 @@ class SessionCleanupManager:
 ## Test Scenarios
 
 ```python
-# Scenario 1: Basic summary generation
+# Scenario 1: Basic code injection
 context: 5 files, 3 decisions, 1 blocker
-→ expect: 2-3 sentence summary, < 150 tokens
+→ expect: codes injected, < 1500 tokens
 
 # Scenario 2: Save and load
-save summary for project "hydra"
+save context for project "hydra"
 → load on next session
-→ expect: same summary returned
+→ expect: same codes returned
 
 # Scenario 3: Expiry detection
-summary: created 8 days ago
+context: created 8 days ago
 → expect: archived, not returned
 
-# Scenario 4: Priority selection
-context: 2 blockers, 5 decisions, 10 files
-→ expect: key_context = [2 blockers, 3 decisions]
+# Scenario 4: Comprehensive capture
+context: 20 files, 10 decisions, 5 blockers
+→ expect: ALL captured, not truncated
 
 # Scenario 5: No previous session
 project: "new-project"
 → expect: inject() returns None, no error
 
-# Scenario 6: Token budget enforcement
-summary: 300 tokens
-key_context: 5 items × 50 tokens = 250 tokens
-→ expect: total < 500 tokens
+# Scenario 6: Token budget
+context: 15 files, 8 decisions, 3 blockers
+→ expect: total < 1500 tokens
 
 # Scenario 7: Malformed session file
 storage: corrupted JSON
 → expect: skip, return None, no crash
 
 # Scenario 8: Multiple projects
-save summaries for "hydra", "cerberus"
+save contexts for "hydra", "cerberus"
 → load "hydra"
-→ expect: only hydra summary returned
+→ expect: only hydra codes returned
 
 # Scenario 9: Cleanup expired
 3 sessions: expired, expired, active
@@ -518,17 +440,16 @@ save summaries for "hydra", "cerberus"
 → expect: 2 archived, 1 active remains
 
 # Scenario 10: Integration with Phase 7
-session context: 200 tokens
+session codes: 1000 tokens
 memory injection: 1500 tokens
-→ expect: combined < 2000 tokens
+→ expect: combined < 2500 tokens
 ```
 
 ---
 
 ## Dependencies
 
-- LLM client (ollama-python or anthropic SDK)
-- Phase 8 (SessionContextCapture for raw context)
+- Phase 8 (SessionContextCapture for codes)
 - Phase 7 (ContextInjector for memory integration)
 - Phase 6 (MemoryRetrieval used by Phase 7)
 
@@ -536,61 +457,26 @@ memory injection: 1500 tokens
 
 ## Performance
 
-- LLM summary generation: < 2 seconds
-- Save context: < 5ms
-- Load context: < 10ms
+- Load codes: < 5ms (JSON read)
+- Format codes: < 1ms (string join)
+- Save codes: < 5ms (JSON write)
 - Cleanup expired: < 100ms (10 sessions)
 
 ---
 
-## Token Budget Breakdown
+## Key Changes from V1
 
-**Session End (500 tokens):**
-```
-LLM prompt:         150 tokens (context codes)
-LLM response:       100 tokens (2-3 sentences)
-Key context:        200 tokens (5 items)
-Formatting:          50 tokens (markdown)
-─────────────────────────────
-Total:              500 tokens
-```
+**REMOVED:**
+- LLM summary generation (was 150 tokens, unnecessary prose)
+- Canonical sentence extraction
+- Markdown formatting
+- Headers, titles, sections
+- "Top 5" selection (now captures ALL items)
 
-**Session Start (500 tokens):**
-```
-Summary text:       100 tokens (2-3 sentences)
-Key context:        200 tokens (5 items)
-Next actions:       150 tokens (3-5 actions)
-Formatting:          50 tokens (markdown headers)
-─────────────────────────────
-Total:              500 tokens (injection)
-```
+**ADDED:**
+- Direct code injection (Phase 8 → Phase 9, no LLM)
+- Comprehensive capture (all files, not top 5)
+- Higher budget (500 → 1000-1500 tokens)
+- Temporary storage justification
 
-**Combined with Phase 7:**
-```
-Memory injection:   1500 tokens (Phase 7 budget)
-Session context:     500 tokens (Phase 9 budget)
-─────────────────────────────
-Total start:        2000 tokens (session start total)
-```
-
----
-
-## AI-Native Storage Codes
-
-**Phase 8 captures in terse codes, Phase 9 summarizes:**
-
-```
-Input (Phase 8 codes):
-- impl:proxy.go
-- impl:supervisor.Process
-- dec:split-proxy-3-files
-- block:test:race-condition
-- next:fix-race-add-mutex
-
-Output (Phase 9 summary):
-"Split proxy.go into 3 files (forwarding, recording, state).
-Decided to modularize for 200-line limit.
-Next: Fix race condition with mutex."
-```
-
-**Token efficiency:** Codes = 50 tokens, Summary = 100 tokens (vs 300+ verbose)
+**Result:** Zero re-explanation, pure AI-native data, worth the tokens.

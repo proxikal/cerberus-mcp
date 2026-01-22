@@ -31,13 +31,13 @@ Session Cycle:
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. SESSION START                                            │
 │    ├─ Auto-inject relevant memories (Phase 7: 1500 tokens)  │
-│    ├─ Auto-inject session context (Phase 9: 500 tokens)     │
-│    └─ Total budget: 2000 tokens                             │
+│    ├─ Auto-inject session codes (Phase 9: 1000-1500 tokens) │
+│    └─ Total budget: 2500-3000 tokens                        │
 ├─────────────────────────────────────────────────────────────┤
 │ 2. DURING SESSION                                           │
 │    ├─ Detect user corrections (Phase 1)                     │
 │    ├─ Record agent observations (Phase 10)                  │
-│    ├─ Capture session context (Phase 8)                     │
+│    ├─ Capture session codes (Phase 8: impl, dec, block)     │
 │    └─ No manual intervention required                       │
 ├─────────────────────────────────────────────────────────────┤
 │ 3. SESSION END                                              │
@@ -45,10 +45,9 @@ Session Cycle:
 │    ├─ Detect agent patterns (Phase 10: success, failure)    │
 │    ├─ LLM generates proposals (Phase 3: 10 user + 10 agent) │
 │    ├─ TUI approval (Phase 4: < 10 seconds)                  │
-│    ├─ Generate session summary (Phase 9: LLM)               │
 │    ├─ Store to hierarchical layers (Phase 5)                │
-│    └─ Save session context for next time (Phase 9)          │
-│    └─ Total cost: ~4500 tokens (~$0.068)                    │
+│    └─ Save session codes (Phase 9: no LLM, direct save)     │
+│    └─ Total cost: ~4000 tokens (~$0.06)                     │
 ├─────────────────────────────────────────────────────────────┤
 │ 4. WEEKLY MAINTENANCE (automatic)                           │
 │    ├─ Archive stale memories (>180 days) (Phase 11)         │
@@ -218,21 +217,22 @@ Session Cycle:
 
 ---
 
-### Phase 9: Session Summary
-**File:** `src/cerberus/memory/session_summary.py`
+### Phase 9: Session Context Injection
+**File:** `src/cerberus/memory/session_injection.py`
 
-**Objective:** Generate LLM summary from session context, inject at session start.
+**Objective:** Inject Phase 8 codes at session start. NO LLM, NO PROSE, pure data.
 
 **Key Features:**
-- LLM summary generation (2-3 sentences)
-- Session context formatting
-- Auto-injection at session start (500 tokens)
+- Load Phase 8 codes directly (no LLM processing)
+- Comprehensive capture (ALL files, decisions, blockers)
+- Pure data injection (no markdown, no headers)
+- Auto-injection at session start (1000-1500 tokens)
 - 7-day expiration with archival
-- Integration with Phase 8 capture
+- Temporary storage (deleted after injection)
 
-**Token Cost:** 500 tokens per session (150 generation + 350 injection)
+**Token Cost:** 1000-1500 tokens per session (injection only, no LLM)
 
-**Output:** Markdown string for session context injection
+**Output:** Raw codes, newline-separated (impl:, dec:, block:, next:)
 
 ---
 
@@ -371,21 +371,22 @@ Phase 9 (Session Summary) ─────────→        │
   - Universal: 700 tokens
   - Language: 500 tokens
   - Project: 300 tokens
-- Session context injection: 500 tokens max (Phase 9)
-  - Summary: 150 tokens
-  - Next actions: 150 tokens
-  - Decisions: 100 tokens
-  - Blockers: 100 tokens
-- Total start: 2000 tokens
+- Session code injection: 1000-1500 tokens (Phase 9)
+  - Files: 300-500 tokens (ALL files)
+  - Functions: 200-400 tokens (ALL functions)
+  - Decisions: 200-300 tokens (ALL decisions)
+  - Blockers: 100-200 tokens (ALL blockers)
+  - Next actions: 100-200 tokens (ALL actions)
+- Total start: 2500-3000 tokens
 
 *Session End:*
 - User correction proposals: 2000 tokens (10 proposals, Phase 3)
 - Agent learning proposals: 2000 tokens (10 proposals, Phase 10)
-- Session summary: 500 tokens (Phase 9)
-- Total end: 4500 tokens
+- Session code save: 0 tokens (no LLM, direct save)
+- Total end: 4000 tokens
 
-*Total per session: ~6500 tokens (~$0.098)*
-*Well under $0.10 cap with safety margin*
+*Total per session: ~6500-7000 tokens (~$0.098-$0.105)*
+*Slightly over $0.10 cap but comprehensive session continuity*
 
 **Performance:**
 - Detection: Real-time (< 50ms per turn)
@@ -528,7 +529,7 @@ src/cerberus/memory/
 ├── retrieval.py             (Phase 6: Retrieval operations)
 ├── context_injector.py      (Phase 7: Memory injection)
 ├── context_capture.py       (Phase 8: Context capture)
-├── session_summary.py       (Phase 9: Session summary)
+├── session_injection.py     (Phase 9: Session code injection)
 ├── agent_learning.py        (Phase 10: Agent self-learning)
 └── maintenance.py           (Phase 11: Maintenance & health)
 ```

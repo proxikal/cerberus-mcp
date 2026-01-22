@@ -104,10 +104,11 @@
 - Ranking algorithms
 - Integration with Phase 7 injection
 
-**PHASE-9-SESSION-SUMMARY.md**
-- LLM summary generation (2-3 sentences)
-- Session context formatting
-- Injection at session start
+**PHASE-9-SESSION-CONTEXT-INJECTION.md**
+- Direct Phase 8 code injection (NO LLM)
+- Comprehensive capture (ALL files, decisions, blockers)
+- Pure data injection (no prose, no markdown)
+- 1000-1500 token budget (temporary, deleted after read)
 - Expiration/cleanup (7 days)
 
 ---
@@ -276,7 +277,7 @@ PHASE-11-MAINTENANCE-HEALTH.md:           18K ✓
 **Medium Risk (70% confidence):**
 - Phase 4: TUI library compatibility
 - Phase 6: Relevance scoring needs tuning
-- Phase 9: Summary quality varies by LLM
+- Phase 9: Direct code injection (removed LLM risk)
 
 **High Risk (50% confidence):**
 - Phase 8: Auto-capture accuracy
@@ -312,11 +313,41 @@ PHASE-11-MAINTENANCE-HEALTH.md:           18K ✓
 
 ## Final System Capacity
 
-**With $0.10 budget:**
+**With $0.10-0.105 budget:**
 - 20 proposals per session (10 user + 10 agent)
 - 1500 tokens memory injection (vs 1000 before)
-- 500 tokens session context (new capability)
-- Rich session continuity (zero momentum loss)
+- 1000-1500 tokens session codes (comprehensive, temporary)
+- Rich session continuity (zero re-explanation)
 - Fast TUI approval (< 10 sec vs 30+ sec)
+- Pure AI-native data (no human prose anywhere)
 
 **Result:** Revolutionary memory system that actually works.
+
+---
+
+## Phase 9 V2 Changes (AI-Native Session Continuity)
+
+**Problem:** V1 used LLM to summarize into 2-3 sentences (human prose, token waste, detail loss)
+
+**Solution:** Direct code injection, no LLM, comprehensive capture
+
+**REMOVED from Phase 9:**
+- LLM summary generation (was 150 tokens)
+- Human prose sentences
+- Markdown formatting
+- Headers, sections
+- "Top 5" selection (now captures ALL)
+
+**ADDED to Phase 9:**
+- Direct Phase 8 code injection (no processing)
+- Comprehensive capture (ALL files, decisions, blockers)
+- Higher budget: 500 → 1000-1500 tokens
+- Temporary storage justification
+- Pure AI-native format (impl:, dec:, block:, next:)
+
+**Budget Impact:**
+- Session start: 2000 → 2500-3000 tokens (increased)
+- Session end: 4500 → 4000 tokens (decreased, no LLM)
+- Total: 6500 → 6500-7000 tokens (~$0.098-0.105)
+
+**Result:** Zero re-explanation, worth slight budget overage.
