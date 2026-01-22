@@ -1,13 +1,31 @@
 # PHASE 5: STORAGE OPERATIONS
 
+**Rollout Phase:** Alpha (JSON) → Beta (SQLite)
+**Status:** Implemented in 2 stages
+
 ## Objective
 Write approved proposals to hierarchical storage: Universal → Language → Project → Task.
+
+## Implementation Strategy
+
+**Phase Alpha (Weeks 1-2):**
+- Implement JSON storage ONLY
+- Validate learning pipeline works
+- Simple, proven, easy to debug
+
+**Phase Beta (Weeks 3-4):**
+- Update to SQLite FTS5 writes
+- Triggered after Phase 12 migration complete
+- Keep JSON for backward compatibility
 
 ---
 
 ## Implementation Location
 
 **File:** `src/cerberus/memory/storage.py`
+
+**Version 1 (Alpha):** JSON writes
+**Version 2 (Beta):** SQLite writes (Phase 13 integration)
 
 ---
 

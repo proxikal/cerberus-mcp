@@ -1,7 +1,26 @@
 # PHASE 13: INDEXED SEARCH & INTEGRATION
 
+**Rollout Phase:** Beta (Weeks 3-4)
+**Status:** Deferred until Phase 12 complete
+
+## Prerequisites
+
+⚠️ **DO NOT implement until Phase 12 complete**
+
+**Required:**
+- ✅ Phase 12 implemented (SQLite schema + migration)
+- ✅ Migration validated (100% data integrity)
+- ✅ Database stable (no corruption, backups work)
+
 ## Objective
 FTS5 search queries, update Phase 5-6 to use SQLite, add MCP `memory_search()` tool.
+
+**What this phase does:**
+1. Updates Phase 5 (storage.py) to write to SQLite
+2. Updates Phase 6 (retrieval.py) to query SQLite FTS5
+3. Adds FTS5 search engine (search.py)
+4. Adds new MCP tool: `memory_search()`
+5. Measures actual token savings (target: 80%+)
 
 ---
 

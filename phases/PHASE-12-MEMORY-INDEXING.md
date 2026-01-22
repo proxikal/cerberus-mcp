@@ -1,7 +1,28 @@
 # PHASE 12: MEMORY INDEXING
 
+**Rollout Phase:** Beta (Weeks 3-4)
+**Status:** Deferred until Phase Alpha validated
+
+## Prerequisites
+
+⚠️ **DO NOT implement until Phase Alpha complete**
+
+**Required validation gates:**
+- ✅ Phases 1-7 implemented with JSON storage
+- ✅ Detection accuracy: 90%+
+- ✅ Clustering compression: 60%+
+- ✅ User approval rate: 70%+
+- ✅ Token budget: <1500 tokens
+- ✅ Real-world testing: 5+ sessions successful
+
 ## Objective
 Migrate memories from JSON → SQLite FTS5. Foundation for scalable search.
+
+**Why Phase Beta (not Alpha):**
+- Database complexity isolated from learning logic
+- Can measure actual token savings empirically
+- MVP proves value before optimization investment
+- Rollback to JSON if issues
 
 ---
 

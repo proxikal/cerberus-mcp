@@ -1,7 +1,52 @@
 # PHASE 0: ADAPTIVE LEARNING MEMORY SYSTEM - OVERVIEW
 
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│  ⚠️  CRITICAL: PHASED ROLLOUT REQUIRED                            │
+│                                                                     │
+│  DO NOT build all 13 phases at once. Follow 3-stage validation:   │
+│                                                                     │
+│  🔸 ALPHA (Weeks 1-2):  Phases 1-7 with JSON storage              │
+│     Gate: 70%+ approval, 90%+ accuracy                             │
+│                                                                     │
+│  🔸 BETA (Weeks 3-4):   Phases 12-13, update 5-6 for SQLite       │
+│     Gate: 80%+ token savings, 2+ weeks stable                      │
+│                                                                     │
+│  🔸 GAMMA (Weeks 5-6):  Phases 8, 10, 11 (enhancements)           │
+│     Gate: Session continuity works, agent proposals 50%+           │
+│                                                                     │
+│  Each phase must pass validation gates before proceeding.          │
+│  Rollback to previous phase if gates fail.                         │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
 ## Vision
 Revolutionary memory system that learns from user corrections automatically, stores intelligently, and injects contextually.
+
+---
+
+## TL;DR: 30-Second Summary
+
+**What:** AI memory system that learns from you automatically, stores in SQLite FTS5, injects contextually.
+
+**How:** 3-phase rollout
+1. **Alpha (Weeks 1-2):** Validate learning pipeline with JSON (Phases 1-7)
+2. **Beta (Weeks 3-4):** Migrate to SQLite FTS5 for scale (Phases 12-13, update 5-6)
+3. **Gamma (Weeks 5-6):** Add enhancements (Phases 8, 10, 11)
+
+**Tech:**
+- TF-IDF clustering (not embeddings) - lightweight, no downloads
+- SQLite FTS5 (same as Cerberus code index) - scales to 10,000+ memories
+- Template-based proposals (LLM optional) - works 100% without Ollama
+- 80% token savings (FTS5 search vs JSON load-all)
+
+**Validation gates:** Each phase must pass metrics before proceeding (70%+ approval, 90%+ accuracy, 80%+ savings).
+
+**Storage:** JSON (Alpha) → SQLite FTS5 (Beta) with backward compat.
+
+**Start here:** Build Phase Alpha (Phases 1-7) with JSON storage. Validate. Then migrate.
 
 ---
 
@@ -59,7 +104,28 @@ Session Cycle:
 
 ---
 
-## Phase Breakdown (0-11)
+## ⚠️ CRITICAL: Phased Rollout Strategy
+
+**DO NOT implement all phases at once. Build and validate in 3 stages:**
+
+| Phase | Scope | Storage | Duration | Gate |
+|-------|-------|---------|----------|------|
+| **Alpha** | Phases 1-7 | JSON | Weeks 1-2 | 70%+ approval, 90%+ accuracy |
+| **Beta** | Phases 12-13 | SQLite FTS5 | Weeks 3-4 | 80%+ token savings, 2+ weeks stable |
+| **Gamma** | Phases 8, 10, 11 | Enhancements | Weeks 5-6 | Session continuity works |
+
+**Why phased:**
+1. **Validate learning pipeline** (detection → clustering → proposals) **independently** before adding database complexity
+2. **Measure actual token savings** empirically before full SQLite commitment
+3. **Iterate fast on MVP** (JSON is simple, easy to inspect/debug)
+4. **Risk mitigation** (rollback to JSON if SQLite issues)
+5. **Clear validation gates** (each phase must pass metrics)
+
+**If in doubt:** Build Phase Alpha first, validate with real usage, then proceed.
+
+---
+
+## Phase Breakdown (0-13)
 
 ### Phase 0: Overview
 **File:** `phases/PHASE-0-OVERVIEW.md` (this file)
@@ -140,13 +206,17 @@ Session Cycle:
 
 **Objective:** Write approved proposals to hierarchical storage.
 
+**Implementation:**
+- **Phase Alpha (MVP):** JSON storage ONLY
+- **Phase Beta (Migration):** Updated to write to SQLite FTS5
+
 **Key Features:**
 - Hierarchical routing (universal → language → project → task)
 - Batch optimization (group by file, write once)
 - Metadata tracking
 - Directory auto-creation
 
-**Directory Structure:**
+**Directory Structure (Phase Alpha - JSON):**
 ```
 ~/.cerberus/memory/
 ├── profile.json              # Universal preferences
@@ -164,6 +234,11 @@ Session Cycle:
     └── active-{session_id}.json
 ```
 
+**Storage Evolution:**
+- Phase Alpha: JSON files (simple, proven)
+- Phase Beta: SQLite FTS5 (scales to 10,000+ memories)
+- Backward compat: Keep JSON for gradual migration
+
 **Token Cost:** 0 tokens (pure storage)
 
 ---
@@ -173,11 +248,20 @@ Session Cycle:
 
 **Objective:** Query and filter memories for context-aware injection.
 
+**Implementation:**
+- **Phase Alpha (MVP):** JSON file loading
+- **Phase Beta (Migration):** Updated to query SQLite FTS5 (80% token savings)
+
 **Key Features:**
 - Scope-based loading (universal, language, project, task)
 - Relevance scoring (scope + recency + confidence + task)
 - Budget-aware retrieval (stop when budget exhausted)
 - Integration with Phase 7 injection
+
+**Retrieval Evolution:**
+- Phase Alpha: Load all JSON, filter in Python (simple, works)
+- Phase Beta: FTS5 search (returns only matches, 80% token savings)
+- Backward compat: JSON fallback if SQLite unavailable
 
 **Token Cost:** 0 tokens (pure retrieval, tokens counted in Phase 7)
 
@@ -205,7 +289,13 @@ Session Cycle:
 ### Phase 8: Session Continuity
 **File:** `src/cerberus/memory/session_continuity.py`
 
+**Phase:** Gamma (Enhancement layer)
+
 **Objective:** Capture session context during work, inject at next session start. Zero re-explanation. NO LLM.
+
+**Prerequisites:**
+- ✅ Phase Beta complete (SQLite stable, 2+ weeks production)
+- ✅ Core memory system proven (Phases 1-7, 12-13)
 
 **Key Features:**
 - Context Capture: AI-native codes (impl:, dec:, block:, next:)
@@ -219,6 +309,12 @@ Session Cycle:
 
 **Output:** Raw codes, newline-separated (impl:, dec:, block:, next:)
 
+**Why Phase Gamma (not Alpha/Beta):**
+- Core memory system must be stable first
+- Session continuity is enhancement, not blocker
+- Can be added incrementally without risk
+- Depends on stable Phase 7 injection
+
 ---
 
 ### Phase 9: (Merged into Phase 8)
@@ -229,7 +325,13 @@ Session Cycle:
 ### Phase 10: Agent Self-Learning
 **File:** `src/cerberus/memory/agent_learning.py`
 
+**Phase:** Gamma (Enhancement layer)
+
 **Objective:** Agent detects success/failure patterns and proposes memories proactively.
+
+**Prerequisites:**
+- ✅ Phase Beta complete (SQLite stable)
+- ✅ User learning validated (Phases 1-7 proven)
 
 **Key Features:**
 - Success reinforcement (repeated approved actions)
@@ -242,35 +344,60 @@ Session Cycle:
 
 **Output:** List of `AgentProposal` objects (fed into Phase 3)
 
+**Why Phase Gamma:**
+- User learning must work first (agent builds on top)
+- Can be added incrementally
+- Feeds into proven Phase 3 proposal engine
+- 50%+ approval target (validation gate)
+
 ---
 
 ### Phase 11: Maintenance & Health
 **File:** `src/cerberus/memory/maintenance.py`
 
+**Phase:** Gamma (Enhancement layer)
+
 **Objective:** Auto-maintain memory health.
 
+**Prerequisites:**
+- ✅ Phase Beta complete (SQLite with access tracking)
+- ✅ Phase 8 complete (session cleanup needed)
+
 **Key Features:**
-- Stale detection (>60 days unused)
+- Stale detection (>60 days unused, using access_count)
 - Auto-archival (>180 days)
 - Conflict detection (contradictions, redundancies, obsolete)
 - Cross-project promotion (pattern in 3+ projects → universal)
-- Session cleanup (>7 days expired)
-- Weekly health checks
+- Session cleanup (>7 days expired, Phase 8 integration)
+- Weekly health checks (automated cron job)
 
 **Token Cost:** 0 tokens (offline analysis)
+
+**Why Phase Gamma:**
+- Operates on stable SQLite (Phase Beta)
+- Requires access tracking (Phase 13)
+- Session cleanup depends on Phase 8
+- Manual maintenance sufficient for MVP
 
 ---
 
 ### Phase 12: Memory Indexing
 **File:** `src/cerberus/memory/indexing.py`
 
+**Phase:** Beta (Migration layer)
+
 **Objective:** Migrate memories from JSON → SQLite FTS5. Foundation for scalable search.
+
+**Prerequisites:**
+- ✅ Phase Alpha complete (Phases 1-7 validated with JSON)
+- ✅ Validation gates passed (70%+ approval, 90%+ accuracy)
+- ✅ Real-world testing complete (5+ sessions)
 
 **Key Features:**
 - SQLite schema with FTS5 (full-text search)
-- Auto-migration from JSON
+- Auto-migration from JSON (one-time, transparent)
 - Backward compatibility (keep JSON as fallback)
-- WAL mode for concurrency
+- WAL mode for concurrency (same as Cerberus code index)
 - Integrity verification
 - CLI tools (migrate, verify)
 
@@ -278,120 +405,300 @@ Session Cycle:
 
 **Storage:** `~/.cerberus/memory.db`
 
+**Why Phase Beta (not Alpha):**
+- Database complexity isolated from learning logic
+- Can measure actual token savings empirically
+- MVP proves value before optimization investment
+- Rollback to JSON if issues
+
 ---
 
 ### Phase 13: Indexed Search & Integration
 **File:** `src/cerberus/memory/search.py`
 
+**Phase:** Beta (Migration layer)
+
 **Objective:** FTS5 search queries, update Phase 5-6 to use SQLite.
+
+**Prerequisites:**
+- ✅ Phase 12 complete (SQLite schema + migration)
+- ✅ Migration validated (100% data integrity)
 
 **Key Features:**
 - FTS5-powered search (text, scope, category filters)
-- Relevance scoring from FTS5 rank
+- Relevance scoring from FTS5 rank (BM25 algorithm)
 - Snippet extraction (match context)
-- Phase 5 updates (write to SQLite)
-- Phase 6 updates (query SQLite)
-- New MCP tool: `memory_search()`
+- Phase 5 updates (write to SQLite instead of JSON)
+- Phase 6 updates (query SQLite instead of loading JSON)
+- New MCP tool: `memory_search(query, scope, category, limit)`
 - Access tracking (last_accessed, count)
 
 **Token Cost:** 0 tokens (pure search, no LLM)
 
-**Token Savings:** 80% reduction (load 10 matches vs 50 all memories)
+**Token Savings:** 80% reduction target (load 10 matches vs 50 all memories)
+
+**Validation:**
+- Measure actual token savings (must achieve 80%+)
+- Performance: Search < 50ms for 100 memories
+- Backward compat: JSON fallback works
+- Production testing: 2+ weeks stable
 
 ---
 
-## Implementation Order
+## Implementation Strategy: Phased Rollout
+
+**CRITICAL: Build and validate in 3 distinct phases, NOT all at once.**
+
+### **PHASE ALPHA: MVP with JSON Storage (Weeks 1-2)**
+**Goal:** Validate learning pipeline works before adding database complexity.
 
 ```
-Phase 1 (User Correction Detection) ┐
-                                     ├→ Phase 2 (Deduplication)
-Phase 10 (Agent Self-Learning)      ┘       ↓
-                                          Phase 3 (Proposal: User + Agent)
-                                             ↓ approval by
-                                          Phase 4 (TUI Approval)
-                                             ↓ stores to
-Phase 8 (Context Capture) ─────────→ Phase 5 (Storage) ←─ Phase 12 (Indexing)
-Phase 9 (Session Injection) ───────→        │                    │
-                                             ↓ loaded by          ↓
-                                          Phase 6 (Retrieval) ←─ Phase 13 (Search)
-                                             ↓ injected by
-                                          Phase 7 (Injection: Memory + Session)
-                                             ↓ maintained by
-                                          Phase 11 (Maintenance)
+Phase 1 (Detection) → Phase 2 (Deduplication) → Phase 3 (Proposals)
+         ↓                    ↓                         ↓
+    Corrections          Clusters              User Proposals
+         └────────────────┴─────────────────────┘
+                           ↓
+                    Phase 4 (CLI Approval)
+                           ↓
+         Phase 5 (JSON Storage) ←─── START WITH JSON
+                           ↓
+         Phase 6 (JSON Retrieval)
+                           ↓
+         Phase 7 (Context Injection)
 ```
 
-**Recommended Order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
+**Implementation order:** 1 → 2 → 3 → 4 → 5 (JSON) → 6 (JSON) → 7
 
-**MVP (Phases 1-7):**
-- Phase 1: User correction detection
-- Phase 2: Semantic deduplication
-- Phase 3: Proposal generation
-- Phase 4: TUI approval interface
-- Phase 5: Storage operations
-- Phase 6: Retrieval operations
-- Phase 7: Context-aware injection
+**Validation gates (MUST PASS before Phase Beta):**
+- ✓ Detection: 90%+ accuracy on 10 test scenarios
+- ✓ Clustering: 60%+ compression ratio (TF-IDF threshold tuned)
+- ✓ Proposal: User approves 70%+ of proposals
+- ✓ Injection: Always under 1500 tokens
+- ✓ Zero false positives (bad memories stored)
+- ✓ Real-world testing: 5+ sessions with actual corrections
 
-**Enhancement (Phases 8-10):**
-- Phase 8: Context capture (session context)
-- Phase 9: Session code injection (continuity)
-- Phase 10: Agent self-learning (agent proposals)
-
-**Maintenance (Phase 11):**
-- Phase 11: Maintenance & health (deferred)
-
-**Optimization (Phases 12-13):**
-- Phase 12: Memory indexing (SQLite FTS5 foundation)
-- Phase 13: Indexed search (FTS5 queries, 80% token savings)
-
-**Reasoning:**
-- Phases 1-4 form complete "user learning pipeline"
-- Phase 5-6 must exist before Phase 7 (storage before retrieval before injection)
-- Phase 8-9 add session continuity (can be built after MVP)
-- Phase 10 adds agent learning (feeds back into Phase 3)
-- Phase 11 operates on existing system (build last)
-- Phases 12-13 optimize at scale (defer until 100+ memories)
+**Why JSON first:**
+- Simple, proven, no migration complexity
+- Validates learning pipeline independently
+- Fast iteration during development
+- Easy to inspect/debug
 
 ---
 
-## MVP Definition (1-2 weeks)
+### **PHASE BETA: SQLite Migration (Weeks 3-4)**
+**Goal:** Scale to thousands of memories, 80% token savings.
 
-**Must Have (Phases 1-7):**
-- Phase 1: User correction detection (4 patterns)
-- Phase 2: Clustering (TF-IDF based, rule-based canonical extraction)
-- Phase 3: Proposal (template-based, LLM optional)
-- Phase 4: CLI approval (standard input(), no TUI)
-- Phase 5: Storage (universal + language + project layers)
-- Phase 6: Retrieval (scope-based, relevance scoring)
+```
+Phase 12 (Indexing) → SQLite FTS5 schema + auto-migration
+         ↓
+Phase 5 (UPDATED: write to SQLite)
+         ↓
+Phase 6 (UPDATED: query SQLite FTS5)
+         ↓
+Phase 13 (Search) → New MCP tool: memory_search()
+```
+
+**Implementation order:** 12 → Update 5 → Update 6 → 13
+
+**Validation gates (MUST PASS before Phase Gamma):**
+- ✓ Migration: 100% data integrity (JSON → SQLite)
+- ✓ Token savings: Measure actual 80% reduction
+- ✓ Performance: Search < 50ms for 100 memories
+- ✓ Backward compat: JSON fallback works
+- ✓ Real-world testing: 2+ weeks stable, no data loss
+
+**Why after MVP:**
+- Database complexity isolated from learning logic
+- Can measure actual token savings empirically
+- MVP proves value before optimization investment
+- Rollback to JSON if issues
+
+---
+
+### **PHASE GAMMA: Enhancements (Weeks 5-6)**
+**Goal:** Session continuity, agent learning, maintenance.
+
+```
+Phase 8 (Session Continuity) → AI-native codes, NO LLM
+         ↓
+    Enhanced injection (1500 memory + 1000 session = 2500 tokens)
+
+Phase 10 (Agent Learning) → Success/failure pattern detection
+         ↓
+    Agent proposals feed into Phase 3
+
+Phase 11 (Maintenance) → Auto-cleanup, conflict detection
+```
+
+**Implementation order:** 8 → 10 → 11
+
+**Validation gates:**
+- ✓ Session continuity: Zero re-explanation needed
+- ✓ Agent learning: 50%+ agent proposals approved
+- ✓ Maintenance: Stale detection works, no data loss
+
+**Why deferred:**
+- Core memory system must be stable first
+- Session continuity is enhancement, not blocker
+- Agent learning can be added incrementally
+- Maintenance operates on proven system
+
+---
+
+## Dependency Graph
+
+```
+PHASE ALPHA (MVP - JSON):
+Phase 1 (Detection) ──────────┐
+                               ├─→ Phase 2 (Deduplication)
+                               │         ↓
+                               │    Phase 3 (Proposals)
+                               │         ↓
+                               │    Phase 4 (CLI Approval)
+                               │         ↓
+                               └─→ Phase 5 (JSON Storage)
+                                        ↓
+                                  Phase 6 (JSON Retrieval)
+                                        ↓
+                                  Phase 7 (Injection)
+
+        ───────── VALIDATION GATE ─────────
+
+PHASE BETA (SQLite Migration):
+Phase 12 (Indexing) ──→ Phase 5 (UPDATED: SQLite writes)
+                            ↓
+                       Phase 6 (UPDATED: SQLite queries)
+                            ↓
+                       Phase 13 (FTS5 Search + MCP tool)
+
+        ───────── VALIDATION GATE ─────────
+
+PHASE GAMMA (Enhancements):
+Phase 8 (Session Continuity) ──→ Integrated with Phase 7
+Phase 10 (Agent Learning) ──────→ Feeds into Phase 3
+Phase 11 (Maintenance) ──────────→ Operates on Phases 5-6
+```
+
+**Critical principle:** Each phase is independently shippable and validated before moving to next.
+
+---
+
+## MVP Definition: Phase Alpha (Weeks 1-2)
+
+**Scope:** Validate learning pipeline with JSON storage ONLY.
+
+**Must Have (Phases 1-7 with JSON):**
+- Phase 1: User correction detection (4 patterns, 90%+ accuracy)
+- Phase 2: Clustering (TF-IDF based, 60%+ compression ratio)
+- Phase 3: Proposal (template-based PRIMARY, LLM optional)
+- Phase 4: CLI approval (standard input(), batch mode)
+- Phase 5: Storage (JSON ONLY - universal + language + project layers)
+- Phase 6: Retrieval (JSON ONLY - scope-based, relevance scoring)
 - Phase 7: Injection (1500 token budget, memory only)
 
-**Enhancement Layer (Phases 8-10):**
-- Phase 8: Context capture + injection (AI-native codes, NO LLM)
-- Phase 10: Agent self-learning (success/failure patterns, rule-based refinement)
-- Integrated proposal system (user + agent proposals combined)
-- Enhanced injection (1500 memory + 1000 session = 2500 tokens)
+**Storage format for MVP:**
+```
+~/.cerberus/memory/
+├── profile.json              # Universal preferences
+├── corrections.json          # Universal corrections
+├── languages/
+│   ├── go.json
+│   ├── python.json
+│   └── typescript.json
+└── projects/
+    └── {project}/
+        └── decisions.json
+```
 
-**Nice to Have (defer):**
-- Phase 11: Maintenance (manual for MVP)
-- Optional LLM refinement in Phases 2, 3, 10
-- Task layer in Phase 5
-- Advanced conflict detection
-- Codebase pattern analyzer for Phase 10
+**Explicitly OUT OF SCOPE for MVP:**
+- SQLite migration (Phase 12-13) - defer until MVP validated
+- Session continuity (Phase 8) - enhancement layer
+- Agent learning (Phase 10) - enhancement layer
+- Maintenance (Phase 11) - manual cleanup for MVP
+- Task-specific storage - defer
+- Advanced conflict detection - defer
+
+**Success criteria (gate to Phase Beta):**
+- User approves 70%+ of proposals (real sessions)
+- Detection accuracy 90%+ on test scenarios
+- TF-IDF clustering compression 60%+
+- Injection always under 1500 tokens
+- Zero false positives (no bad memories stored)
+- 5+ real sessions tested successfully
 
 ---
 
-## Success Metrics
+## Success Metrics & Validation Gates
 
-**Week 1-2 (MVP):**
-- ✓ Detection: 90%+ accuracy on 10 test scenarios
-- ✓ Clustering: 60%+ compression ratio
-- ✓ Proposal: User approves 70%+ of proposals
-- ✓ Injection: Always under 1000 tokens
+### **Phase Alpha: MVP with JSON (Weeks 1-2)**
+**Validation gates (MUST PASS to proceed to Phase Beta):**
 
-**Week 3-4 (Full System):**
-- ✓ Zero repeated corrections across sessions
-- ✓ Memory growth: < 10 entries per week
-- ✓ Health: No conflicts after 2 weeks
-- ✓ User satisfaction: "This is revolutionary"
+| Metric | Target | Test Method |
+|--------|--------|-------------|
+| Detection accuracy | 90%+ | 10 test scenarios with known corrections |
+| Clustering compression | 60%+ | 50+ real corrections, measure deduplication |
+| Proposal approval rate | 70%+ | 5+ real sessions, user approves proposals |
+| Injection token budget | < 1500 tokens | Measure actual injection across contexts |
+| False positive rate | 0% | No bad memories stored after review |
+| TF-IDF threshold | Tuned | Empirical testing for 65% similarity |
+
+**Exit criteria:**
+- All metrics pass
+- Real-world testing complete (5+ sessions)
+- User feedback: "This learns from me"
+- No regressions in existing Cerberus functionality
+
+**If gates fail:** Iterate on MVP, do NOT proceed to SQLite.
+
+---
+
+### **Phase Beta: SQLite Migration (Weeks 3-4)**
+**Validation gates (MUST PASS to proceed to Phase Gamma):**
+
+| Metric | Target | Test Method |
+|--------|--------|-------------|
+| Migration integrity | 100% | All JSON data migrated, checksums match |
+| Token savings | 80%+ | Measure FTS5 vs JSON retrieval |
+| Search performance | < 50ms | 100 memories, FTS5 query time |
+| Database size | ~1MB per 1000 memories | Verify SQLite efficiency |
+| Backward compatibility | 100% | JSON fallback works if SQLite fails |
+| Stability | 2+ weeks | No crashes, no data loss |
+
+**Exit criteria:**
+- All metrics pass
+- Production testing (2+ weeks stable)
+- Rollback plan tested and works
+- Documentation updated
+
+**If gates fail:** Rollback to JSON, debug SQLite issues.
+
+---
+
+### **Phase Gamma: Enhancements (Weeks 5-6)**
+**Validation gates (OPTIONAL - enhancement layer):**
+
+| Metric | Target | Test Method |
+|--------|--------|-------------|
+| Session continuity | Zero re-explanation | Resume work from last session seamlessly |
+| Agent proposal approval | 50%+ | Agent-detected patterns user approves |
+| Maintenance effectiveness | Stale detection works | 180+ day memories archived correctly |
+| Total system health | No conflicts | 4+ weeks production, no issues |
+
+**Exit criteria:**
+- Session continuity works (Phase 8)
+- Agent learning adds value (Phase 10)
+- Maintenance runs automatically (Phase 11)
+- User satisfaction: "This is revolutionary"
+
+---
+
+### **Overall System Success (Month 2+)**
+**Long-term metrics:**
+- Zero repeated corrections across sessions
+- Memory growth: < 10 entries per week (deduplication working)
+- Token efficiency: 80%+ savings maintained
+- User retention: Daily active usage
+- System reliability: 99%+ uptime, no data loss
 
 ---
 
@@ -587,19 +894,119 @@ src/cerberus/memory/
 
 ---
 
+## Implementation Roadmap: Timeline & Deliverables
+
+### **Week 1-2: Phase Alpha (MVP with JSON)**
+**Deliverables:**
+- ✅ Phase 1: Detection (session_analyzer.py)
+- ✅ Phase 2: Deduplication (semantic_analyzer.py)
+- ✅ Phase 3: Proposals (proposal_engine.py)
+- ✅ Phase 4: CLI Approval (approval_cli.py)
+- ✅ Phase 5: JSON Storage (storage.py - JSON version)
+- ✅ Phase 6: JSON Retrieval (retrieval.py - JSON version)
+- ✅ Phase 7: Injection (context_injector.py)
+
+**Testing:**
+- 10 test scenarios (90%+ detection accuracy)
+- 50+ corrections (60%+ clustering compression)
+- 5+ real sessions (70%+ approval rate)
+- Token budget validation (<1500 tokens)
+
+**Gate:** All metrics pass → Proceed to Phase Beta
+
+---
+
+### **Week 3-4: Phase Beta (SQLite Migration)**
+**Deliverables:**
+- ✅ Phase 12: Indexing (indexing.py + migration tool)
+- ✅ Phase 5 UPDATE: SQLite writes (storage.py updated)
+- ✅ Phase 6 UPDATE: FTS5 queries (retrieval.py updated)
+- ✅ Phase 13: Search engine (search.py + memory_search MCP tool)
+
+**Testing:**
+- Migration integrity (100% data preserved)
+- Token savings measurement (80%+ target)
+- Performance benchmarks (<50ms search)
+- Production stability (2+ weeks)
+
+**Gate:** Metrics pass + 2 weeks stable → Proceed to Phase Gamma
+
+---
+
+### **Week 5-6: Phase Gamma (Enhancements)**
+**Deliverables:**
+- ✅ Phase 8: Session Continuity (session_continuity.py)
+- ✅ Phase 10: Agent Learning (agent_learning.py)
+- ✅ Phase 11: Maintenance (maintenance.py)
+
+**Testing:**
+- Session continuity validation (zero re-explanation)
+- Agent proposal approval (50%+ target)
+- Maintenance automation (stale detection works)
+
+**Gate:** Enhancement layer works → Production ready
+
+---
+
+### **Month 2+: Production & Iteration**
+**Focus:**
+- Monitor real-world usage
+- Tune TF-IDF threshold based on data
+- Optimize token budgets
+- Gather user feedback
+- Plan future enhancements
+
+---
+
+## Quick Reference: Phase Assignment
+
+| Phase | Name | File | Rollout |
+|-------|------|------|---------|
+| 1 | Detection | session_analyzer.py | **Alpha** |
+| 2 | Deduplication | semantic_analyzer.py | **Alpha** |
+| 3 | Proposals | proposal_engine.py | **Alpha** |
+| 4 | CLI Approval | approval_cli.py | **Alpha** |
+| 5 | Storage | storage.py (JSON → SQLite) | **Alpha** → **Beta** |
+| 6 | Retrieval | retrieval.py (JSON → SQLite) | **Alpha** → **Beta** |
+| 7 | Injection | context_injector.py | **Alpha** |
+| 8 | Session Continuity | session_continuity.py | **Gamma** |
+| 10 | Agent Learning | agent_learning.py | **Gamma** |
+| 11 | Maintenance | maintenance.py | **Gamma** |
+| 12 | Indexing | indexing.py | **Beta** |
+| 13 | Search | search.py | **Beta** |
+
+**Storage Evolution:**
+- **Alpha:** Phases 5-6 use JSON
+- **Beta:** Phases 5-6 updated for SQLite + Phase 12-13 added
+- **Gamma:** Enhancements (8, 10, 11) on top of stable SQLite
+
+---
+
 ## Quick Start for AI Agents
+
+**IMPORTANT: Follow phased rollout. Do NOT build all phases at once.**
 
 **Step 1:** Read this overview (PHASE-0-OVERVIEW.md)
 
-**Step 2:** Choose a phase to implement
+**Step 2:** Identify current rollout phase (Alpha/Beta/Gamma)
 
-**Step 3:** Read phase-specific document (e.g., PHASE-1-SESSION-CORRECTION-DETECTION.md)
+**Step 3:** Read phase-specific documents for that rollout phase ONLY
 
-**Step 4:** Implement following exit criteria in phase document
+**Step 4:** Implement phases in order within rollout phase
 
-**Step 5:** Run tests specified in phase document
+**Step 5:** Run tests and validate against gate criteria
 
-**Step 6:** Verify integration with adjacent phases
+**Step 6:** Only proceed to next rollout phase if gates pass
+
+**Example for Phase Alpha:**
+1. Read PHASE-0-OVERVIEW.md (this file)
+2. Read PHASE-1-SESSION-CORRECTION-DETECTION.md
+3. Implement Phase 1 (detection)
+4. Read PHASE-2-SEMANTIC-DEDUPLICATION.md
+5. Implement Phase 2 (deduplication with TF-IDF)
+6. Continue through Phases 3-7 (all JSON-based)
+7. Test against validation gates
+8. If gates pass → proceed to Phase Beta
 
 ---
 
@@ -634,11 +1041,15 @@ A: Lightweight (~1MB vs 80MB+400MB model), no download, works offline, sufficien
 ---
 
 **Last Updated:** 2026-01-22
-**Version:** 2.1 (13-phase structure, $0.10 budget, CLI approval, LLM optional)
-**Status:** Ready for implementation
+**Version:** 3.0 (Phased rollout strategy: JSON MVP → SQLite → Enhancements)
+**Status:** Ready for Phase Alpha implementation
 
 **Key Design Principles:**
-- LLM is OPTIONAL throughout - system works 100% without Ollama
-- Template-based/rule-based approaches are PRIMARY
-- Simple CLI interface (no TUI dependencies)
-- Phases are self-contained with clear integration points
+- **Phased validation:** Build MVP with JSON, validate, THEN migrate to SQLite
+- **LLM is OPTIONAL** throughout - system works 100% without Ollama
+- **Template-based/rule-based approaches are PRIMARY** (TF-IDF, not embeddings)
+- **Cerberus infrastructure reuse:** SQLite FTS5 (same as code indexing)
+- **Simple CLI interface** (no TUI dependencies)
+- **Validation gates:** Each phase must pass metrics before proceeding
+- **Backward compatibility:** JSON fallback, gradual migration
+- **Token efficiency:** 80% savings target (FTS5 vs JSON)

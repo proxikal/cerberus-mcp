@@ -1,7 +1,26 @@
 # PHASE 8: SESSION CONTINUITY
 
+**Rollout Phase:** Gamma (Weeks 5-6)
+**Status:** Enhancement layer - deferred until core stable
+
+## Prerequisites
+
+⚠️ **DO NOT implement until Phase Beta complete**
+
+**Required:**
+- ✅ Phase Beta complete (SQLite stable, 2+ weeks production)
+- ✅ Phases 1-7, 12-13 validated and stable
+- ✅ Token savings achieved (80%+ measured)
+- ✅ Core memory system proven in real-world usage
+
 ## Objective
 Capture session context during work, inject at next session start. Zero re-explanation needed. NO LLM.
+
+**Why Phase Gamma (not Alpha/Beta):**
+- Core memory system must be stable first
+- Session continuity is enhancement, not blocker
+- Can be added incrementally without risk
+- Depends on stable Phase 7 injection
 
 ---
 
