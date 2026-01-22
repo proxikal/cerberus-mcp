@@ -351,3 +351,83 @@ PHASE-11-MAINTENANCE-HEALTH.md:           18K ✓
 - Total: 6500 → 6500-7000 tokens (~$0.098-0.105)
 
 **Result:** Zero re-explanation, worth slight budget overage.
+
+---
+
+## Phase 12-13: Memory Indexing & Search (Optimization Layer)
+
+**Problem:** JSON-based storage doesn't scale past 100 memories, wastes tokens
+
+**Solution:** SQLite FTS5 indexing (same pattern as Cerberus code indexing)
+
+### Phase 12: Memory Indexing (Foundation)
+**File:** `src/cerberus/memory/indexing.py`
+
+**Created:**
+- SQLite schema with FTS5
+- Auto-migration from JSON → SQLite
+- Backward compatibility (keep JSON as fallback)
+- CLI tools (cerberus memory migrate, verify)
+- Integrity verification
+
+**Key Features:**
+- `~/.cerberus/memory.db` (SQLite with FTS5)
+- WAL mode for concurrency
+- Stale detection support (last_accessed, access_count)
+- One-time migration, no LLM
+
+**Why Defer to Optimization:**
+- MVP proves concept with JSON
+- Add indexing when scale matters (100+ memories)
+- Can migrate JSON → SQL later without breaking
+
+### Phase 13: Indexed Search & Integration
+**File:** `src/cerberus/memory/search.py`
+
+**Created:**
+- FTS5 search engine
+- Relevance scoring (FTS5 rank)
+- Snippet extraction (match context)
+- Budget-aware search
+- Phase 5 updates (write to SQLite)
+- Phase 6 updates (query SQLite)
+- New MCP tool: `memory_search(query, scope, category, limit)`
+
+**Token Efficiency Gain:**
+```
+Before (JSON):
+  Load all 50 memories → Filter in Python → Keep 10
+  Tokens: 50 × 30 = 1500 tokens (1200 wasted)
+
+After (SQLite FTS5):
+  FTS5 query returns 10 matches only
+  Tokens: 10 × 30 = 300 tokens (0 wasted)
+
+Savings: 80% token reduction
+```
+
+**Example Queries:**
+```python
+# Find Go split rules
+memory_search("split files", scope="language:go", limit=5)
+
+# Recent project decisions
+memory_search("", scope="project:hydra", category="decision", limit=10)
+
+# High-confidence corrections
+memory_search("keep output short", min_confidence=0.8, limit=20)
+```
+
+**No Infrastructure Needed:**
+- SQLite is just a file (no daemon)
+- Python sqlite3 module (built-in)
+- Same pattern as Cerberus index.db
+- File locking handled automatically (WAL mode)
+
+**Implementation Order:**
+- Defer to optimization phase (after MVP working)
+- Phase 12 → Phase 13 (foundation then search)
+- Update Phase 5-6 incrementally
+- Keep JSON fallback during transition
+
+**Result:** Scales to 1000+ memories, 80% token savings, no infrastructure.

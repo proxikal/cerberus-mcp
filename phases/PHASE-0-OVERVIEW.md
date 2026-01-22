@@ -271,6 +271,45 @@ Session Cycle:
 
 ---
 
+### Phase 12: Memory Indexing
+**File:** `src/cerberus/memory/indexing.py`
+
+**Objective:** Migrate memories from JSON → SQLite FTS5. Foundation for scalable search.
+
+**Key Features:**
+- SQLite schema with FTS5 (full-text search)
+- Auto-migration from JSON
+- Backward compatibility (keep JSON as fallback)
+- WAL mode for concurrency
+- Integrity verification
+- CLI tools (migrate, verify)
+
+**Token Cost:** 0 tokens (one-time migration, no LLM)
+
+**Storage:** `~/.cerberus/memory.db`
+
+---
+
+### Phase 13: Indexed Search & Integration
+**File:** `src/cerberus/memory/search.py`
+
+**Objective:** FTS5 search queries, update Phase 5-6 to use SQLite.
+
+**Key Features:**
+- FTS5-powered search (text, scope, category filters)
+- Relevance scoring from FTS5 rank
+- Snippet extraction (match context)
+- Phase 5 updates (write to SQLite)
+- Phase 6 updates (query SQLite)
+- New MCP tool: `memory_search()`
+- Access tracking (last_accessed, count)
+
+**Token Cost:** 0 tokens (pure search, no LLM)
+
+**Token Savings:** 80% reduction (load 10 matches vs 50 all memories)
+
+---
+
 ## Implementation Order
 
 ```
@@ -281,17 +320,17 @@ Phase 10 (Agent Self-Learning)      ┘       ↓
                                              ↓ approval by
                                           Phase 4 (TUI Approval)
                                              ↓ stores to
-Phase 8 (Context Capture) ─────────→ Phase 5 (Storage)
-Phase 9 (Session Summary) ─────────→        │
-                                             ↓ loaded by
-                                          Phase 6 (Retrieval)
+Phase 8 (Context Capture) ─────────→ Phase 5 (Storage) ←─ Phase 12 (Indexing)
+Phase 9 (Session Injection) ───────→        │                    │
+                                             ↓ loaded by          ↓
+                                          Phase 6 (Retrieval) ←─ Phase 13 (Search)
                                              ↓ injected by
                                           Phase 7 (Injection: Memory + Session)
                                              ↓ maintained by
                                           Phase 11 (Maintenance)
 ```
 
-**Recommended Order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
+**Recommended Order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
 
 **MVP (Phases 1-7):**
 - Phase 1: User correction detection
@@ -304,11 +343,15 @@ Phase 9 (Session Summary) ─────────→        │
 
 **Enhancement (Phases 8-10):**
 - Phase 8: Context capture (session context)
-- Phase 9: Session summary (continuity)
+- Phase 9: Session code injection (continuity)
 - Phase 10: Agent self-learning (agent proposals)
 
 **Maintenance (Phase 11):**
 - Phase 11: Maintenance & health (deferred)
+
+**Optimization (Phases 12-13):**
+- Phase 12: Memory indexing (SQLite FTS5 foundation)
+- Phase 13: Indexed search (FTS5 queries, 80% token savings)
 
 **Reasoning:**
 - Phases 1-4 form complete "user learning pipeline"
@@ -316,6 +359,7 @@ Phase 9 (Session Summary) ─────────→        │
 - Phase 8-9 add session continuity (can be built after MVP)
 - Phase 10 adds agent learning (feeds back into Phase 3)
 - Phase 11 operates on existing system (build last)
+- Phases 12-13 optimize at scale (defer until 100+ memories)
 
 ---
 
@@ -518,20 +562,35 @@ phases/
 ├── PHASE-8-CONTEXT-CAPTURE.md
 ├── PHASE-9-SESSION-SUMMARY.md
 ├── PHASE-10-AGENT-SELF-LEARNING.md
-└── PHASE-11-MAINTENANCE-HEALTH.md
+├── PHASE-11-MAINTENANCE-HEALTH.md
+├── PHASE-12-MEMORY-INDEXING.md
+└── PHASE-13-INDEXED-SEARCH.md
 
 src/cerberus/memory/
 ├── session_analyzer.py      (Phase 1: User correction detection)
 ├── semantic_analyzer.py     (Phase 2: Clustering/deduplication)
 ├── proposal_engine.py       (Phase 3: LLM proposal generation)
 ├── approval_tui.py          (Phase 4: TUI approval interface)
-├── storage.py               (Phase 5: Storage operations)
-├── retrieval.py             (Phase 6: Retrieval operations)
+├── storage.py               (Phase 5: Storage operations, Phase 13: SQLite writes)
+├── retrieval.py             (Phase 6: Retrieval operations, Phase 13: SQLite queries)
 ├── context_injector.py      (Phase 7: Memory injection)
 ├── context_capture.py       (Phase 8: Context capture)
 ├── session_injection.py     (Phase 9: Session code injection)
 ├── agent_learning.py        (Phase 10: Agent self-learning)
-└── maintenance.py           (Phase 11: Maintenance & health)
+├── maintenance.py           (Phase 11: Maintenance & health)
+├── indexing.py              (Phase 12: SQLite FTS5 indexing)
+└── search.py                (Phase 13: FTS5 search engine)
+
+~/.cerberus/
+├── memory.db                (SQLite FTS5 index, Phase 12-13)
+├── memory.db-wal            (Write-ahead log)
+├── memory.db-shm            (Shared memory)
+└── memory/                  (Legacy JSON, backward compat)
+    ├── profile.json
+    ├── corrections.json
+    ├── languages/
+    ├── projects/
+    └── sessions/
 ```
 
 ---
