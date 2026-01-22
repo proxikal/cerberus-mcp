@@ -1,7 +1,7 @@
-# PHASE 7: CONTEXT-AWARE INJECTION
+# PHASE 7: CONTEXT-AWARE RETRIEVAL
 
 ## Objective
-Inject only relevant memories based on current context with strict token budget.
+Provide MCP tool for on-demand memory retrieval based on current context. Zero startup cost.
 
 ---
 
@@ -488,26 +488,58 @@ class ContextDetector:
 
 ---
 
-## Hook Integration
+## MCP Tool Integration (On-Demand Retrieval)
 
 ```python
-def auto_inject_memory():
+@mcp_tool
+def memory_context(
+    scope: Optional[str] = None,
+    category: Optional[str] = None,
+    limit: int = 20
+) -> str:
     """
-    Called at session start (hook-based, not tool call).
+    MCP tool: Retrieve memories on-demand (like cerberus search).
+
+    Zero startup cost. Claude calls this when needed.
+
+    Args:
+        scope: Filter by scope (universal, language:X, project:Y)
+        category: Filter by category (preference, rule, correction)
+        limit: Max memories to return
+
+    Returns:
+        Markdown-formatted memories
     """
     # Detect context
     detector = ContextDetector()
     context = detector.detect()
 
-    # Inject memories
+    # Override with explicit scope if provided
+    if scope:
+        if scope.startswith("language:"):
+            context.language = scope.split(":")[1]
+        elif scope.startswith("project:"):
+            context.project = scope.split(":")[1]
+
+    # Retrieve memories
     injector = ContextInjector(get_memory_store())
-    memory_context = injector.inject(context)
+    return injector.inject(context, limit=limit)
+```
 
-    if memory_context:
-        # Inject into system prompt or initial context
-        return memory_context
+**Architecture (Same as Cerberus Indexing):**
+- Database: `.cerberus/memory.db`
+- Zero startup cost (no auto-injection)
+- Claude calls `memory_context()` when needed
+- On-demand retrieval only
 
-    return ""
+**Example Usage:**
+```python
+# Claude's internal thought process:
+# "User asked about Python style preferences, let me check memories"
+result = memory_context(scope="language:python", category="preference")
+
+# "User corrected me about this project, check project decisions"
+result = memory_context(scope="project:myapp")
 ```
 
 ---
@@ -519,8 +551,8 @@ def auto_inject_memory():
 ✓ TokenBudgetEnforcer class implemented
 ✓ ContextInjector class implemented
 ✓ ContextDetector class implemented
-✓ Auto-injection hook working
-✓ Token budget enforced (max 1500 tokens)
+✓ MCP tool: memory_context() registered
+✓ Zero startup cost (no auto-injection)
 ✓ Tests: 10 scenarios with expected memories
 ```
 

@@ -5,7 +5,7 @@
 │                                                                     │
 │  ⚠️  CRITICAL: PHASED ROLLOUT REQUIRED                            │
 │                                                                     │
-│  DO NOT build all 13 phases at once. Follow 3-stage validation:   │
+│  DO NOT build all phases at once. Follow 5-stage validation:      │
 │                                                                     │
 │  🔸 ALPHA (Weeks 1-2):  Phases 1-7 with JSON storage              │
 │     Gate: 70%+ approval, 90%+ accuracy                             │
@@ -15,6 +15,12 @@
 │                                                                     │
 │  🔸 GAMMA (Weeks 5-6):  Phases 8, 10, 11 (enhancements)           │
 │     Gate: Session continuity works, agent proposals 50%+           │
+│                                                                     │
+│  🔸 DELTA (Weeks 7-8):  Phases 14-15 (anchoring + mode detection) │
+│     Gate: 90%+ example following, mode detection 85%+              │
+│                                                                     │
+│  🔸 EPSILON (Weeks 9-10): Phases 16-20 (critical fixes)           │
+│     Gate: Integration works, 80%+ silent detection, <20s approval  │
 │                                                                     │
 │  Each phase must pass validation gates before proceeding.          │
 │  Rollback to previous phase if gates fail.                         │
@@ -31,15 +37,20 @@ Revolutionary memory system that learns from user corrections automatically, sto
 
 **What:** AI memory system that learns from you automatically, stores in SQLite FTS5, injects contextually.
 
-**How:** 3-phase rollout
+**How:** 5-phase rollout
 1. **Alpha (Weeks 1-2):** Validate learning pipeline with JSON (Phases 1-7)
 2. **Beta (Weeks 3-4):** Migrate to SQLite FTS5 for scale (Phases 12-13, update 5-6)
 3. **Gamma (Weeks 5-6):** Add enhancements (Phases 8, 10, 11)
+4. **Delta (Weeks 7-8):** Dynamic anchoring + mode detection (Phases 14-15)
+5. **Epsilon (Weeks 9-10):** Critical fixes (Phases 16-20: integration, lifecycle, approval, conflicts, silent divergence)
 
 **Tech:**
 - TF-IDF clustering (not embeddings) - lightweight, no downloads
 - SQLite FTS5 (same as Cerberus code index) - scales to 10,000+ memories
 - Template-based proposals (LLM optional) - works 100% without Ollama
+- Dynamic anchoring (link rules to code examples) - addresses "text vs code disconnect"
+- Mode detection (prototype/production/hotfix) - addresses "mode blindness"
+- Silent divergence (catches 80% of corrections Phase 1 misses) - addresses Gemini's #1 critique
 - 80% token savings (FTS5 search vs JSON load-all)
 
 **Validation gates:** Each phase must pass metrics before proceeding (70%+ approval, 90%+ accuracy, 80%+ savings).
@@ -113,6 +124,8 @@ Session Cycle:
 | **Alpha** | Phases 1-7 | JSON | Weeks 1-2 | 70%+ approval, 90%+ accuracy |
 | **Beta** | Phases 12-13 | SQLite FTS5 | Weeks 3-4 | 80%+ token savings, 2+ weeks stable |
 | **Gamma** | Phases 8, 10, 11 | Enhancements | Weeks 5-6 | Session continuity works |
+| **Delta** | Phases 14-15 | Post-Gamma | Weeks 7-8 | 90%+ example following, mode detection 85%+ |
+| **Epsilon** | Phases 16-20 | Critical fixes | Weeks 9-10 | Integration works, 80%+ silent detection, approval time < 20s |
 
 **Why phased:**
 1. **Validate learning pipeline** (detection → clustering → proposals) **independently** before adding database complexity
@@ -269,20 +282,21 @@ Session Cycle:
 
 ---
 
-### Phase 7: Context-Aware Injection
+### Phase 7: Context-Aware Retrieval
 **File:** `src/cerberus/memory/context_injector.py`
 
-**Objective:** Inject only relevant memories with 1500 token budget.
+**Objective:** Provide MCP tool for on-demand memory retrieval. Zero startup cost.
 
 **Key Features:**
-- Uses Phase 6 retrieval
-- Token budget enforcement (700 universal + 500 language + 300 project)
+- MCP tool: memory_context() (like cerberus search)
+- On-demand retrieval (Claude calls when needed)
+- Token budget enforcement (per-query limit)
 - Context detection (project, language, task auto-detected)
-- Hook-based injection (automatic, not tool call)
+- Zero startup cost (no auto-injection)
 
-**Token Cost:** 1500 tokens max (enforced)
+**Token Cost:** 0 tokens at startup, ~1500 tokens per query (only when Claude calls it)
 
-**Output:** Markdown string for prompt injection
+**Output:** Markdown string for Claude's use
 
 ---
 
@@ -445,6 +459,218 @@ Session Cycle:
 
 ---
 
+### Phase 14: Dynamic Anchoring
+**File:** `src/cerberus/memory/anchoring.py`
+
+**Phase:** Delta (Post-Gamma enhancements)
+
+**Objective:** Link abstract rules to concrete code examples. Inject example files alongside text rules.
+
+**Prerequisites:**
+- ✅ Phase Beta complete (SQLite stable)
+- ✅ Phase 7 complete (context injection working)
+- ✅ Phase 13 complete (memory search operational)
+
+**Key Features:**
+- Anchor discovery: Scan codebase for best example file matching rule
+- TF-IDF relevance scoring between rule text and file content
+- Size penalty (prefer concise examples < 500 lines)
+- Recency scoring (prefer recently modified files)
+- SQLite extension (anchor_file, anchor_symbol, anchor_score columns)
+- Phase 7 extension (inject code examples alongside text rules)
+- Token reallocation (40% text rules, 60% code examples = 1500 tokens)
+
+**Token Cost:** 1500 tokens (same as Phase 7, reallocated for code examples)
+
+**Impact:** LLM follows examples 90%+ of time vs 70% for text-only rules
+
+**Why Phase Delta:**
+- Requires stable code indexing (Cerberus)
+- Enhancement layer on proven injection
+- Addresses "text vs code disconnect" (Gemini critique)
+
+---
+
+### Phase 15: Mode-Aware Context
+**File:** `src/cerberus/memory/mode_detection.py`
+
+**Phase:** Delta (Post-Gamma enhancements)
+
+**Objective:** Detect user intent mode and filter memory injection based on mode appropriateness.
+
+**Prerequisites:**
+- ✅ Phase Beta complete (SQLite stable)
+- ✅ Phase 7 complete (context injection working)
+- ✅ Phase 13 complete (memory search with filtering)
+
+**Key Features:**
+- Mode detection (prototype/production/hotfix/refactor/audit/exploration)
+- Keyword-based scoring (urgency, scope, time indicators)
+- Context signal analysis (tool usage, file count, session history)
+- Memory tagging (valid_modes, mode_priority per mode)
+- Auto-tagging algorithm (quality rules → production, speed rules → prototype)
+- Phase 7 extension (filter memories by detected mode before injection)
+- SQLite extension (valid_modes, mode_priority columns)
+
+**Token Cost:** 0 tokens (filtering is free, happens before injection)
+
+**Impact:** Prevents inappropriate rule injection (e.g., "Always write tests" blocked in prototype mode)
+
+**Why Phase Delta:**
+- Core memory system must work first
+- Mode detection is enhancement layer
+- Addresses "mode blindness" (Gemini critique)
+
+---
+
+### Phase 16: Integration Specification
+**File:** `src/cerberus/memory/hooks.py`, `src/cerberus/memory/ipc.py`
+
+**Phase:** Epsilon (Critical infrastructure)
+
+**Objective:** Define concrete integration between memory system and Claude Code/Codex/Gemini CLIs.
+
+**Prerequisites:**
+- ✅ Phase Alpha complete (Phases 1-7 working)
+- ✅ Phase 7 complete (injection logic proven)
+
+**Key Features:**
+- Hook implementation (session end ONLY - no session start)
+- MCP tool for memory retrieval (memory_context, on-demand)
+- Python subprocess for proposal hook
+- Session state tracking (.cerberus/session_active.json)
+- CLI commands (cerberus memory propose, install-hooks)
+- Multi-CLI support (claude-code, codex-cli, gemini-cli)
+- Zero startup cost (no auto-injection)
+
+**Token Cost:** 0 tokens at startup, 0-500 tokens at session end (proposal pipeline)
+
+**Why Phase Epsilon:**
+- Integration can use Phase Alpha's JSON first
+- Proves integration works before SQLite complexity
+- Critical for system to function
+
+---
+
+### Phase 17: Session Lifecycle & Recovery
+**File:** `src/cerberus/memory/session_lifecycle.py`
+
+**Phase:** Epsilon (Critical infrastructure)
+
+**Objective:** Define session boundaries, detect crashes, implement recovery.
+
+**Prerequisites:**
+- ✅ Phase 16 complete (integration hooks)
+- ✅ Phase 1 complete (correction tracking)
+
+**Key Features:**
+- Session start/end detection (CLI process, explicit commands, idle timeout)
+- Crash detection (stale session_active.json > 5 minutes)
+- Auto-recovery (high-confidence proposals auto-approved)
+- Manual recovery CLI (cerberus memory recover)
+- Idle timeout (30 minutes default)
+- File locking (prevent race conditions)
+- Session history/analytics
+
+**Token Cost:** 0-500 tokens (if running proposal pipeline during recovery)
+
+**Why Phase Epsilon:**
+- Session management needed for reliable correction detection
+- Crash recovery prevents data loss
+- Critical for production reliability
+
+---
+
+### Phase 18: Approval Optimization
+**File:** `src/cerberus/memory/approval_optimizer.py`
+
+**Phase:** Epsilon (User experience enhancement)
+
+**Objective:** Reduce approval fatigue through auto-approval, batching, smart grouping.
+
+**Prerequisites:**
+- ✅ Phase 4 complete (CLI approval working)
+- ✅ Phase 3 complete (proposals with confidence scores)
+
+**Key Features:**
+- Auto-approval (0.9+ confidence, safety checks)
+- Smart batching (group similar proposals by theme)
+- Skip low-confidence (< 0.5)
+- Batch mode (non-interactive, CI/CD friendly)
+- Approval history learning (adjust thresholds based on user behavior)
+- Reduces approval time from 60s → 15s
+
+**Token Cost:** 0 tokens (optimization is free)
+
+**Impact:** 30-40% auto-approval rate, user satisfaction increase
+
+**Why Phase Epsilon:**
+- Addresses approval fatigue (10+ proposals per session)
+- Enhancement layer on Phase 4
+- Critical for user retention
+
+---
+
+### Phase 19: Conflict Resolution
+**File:** `src/cerberus/memory/conflict_resolver.py`
+
+**Phase:** Epsilon (Data quality enhancement)
+
+**Objective:** Resolve memory conflicts (contradictions, redundancies, obsolescence).
+
+**Prerequisites:**
+- ✅ Phase 11 complete (conflict detection)
+- ✅ Phase 5 complete (storage)
+- ✅ Phase 13 complete (memory search)
+
+**Key Features:**
+- Auto-resolution (redundancy → keep newer, obsolescence → keep newer)
+- Contradiction resolution (recency/confidence-based)
+- User-mediated resolution (interactive prompts for ambiguous conflicts)
+- Merge resolution (user provides merged content)
+- Execution (delete/merge memories in storage)
+- 60-70% auto-resolution rate
+
+**Token Cost:** 0 tokens (resolution is free)
+
+**Why Phase Epsilon:**
+- Phase 11 detects, Phase 19 resolves
+- Prevents memory database rot
+- Critical for long-term quality
+
+---
+
+### Phase 20: Silent Divergence Detection
+**File:** `src/cerberus/memory/silent_divergence.py`
+
+**Phase:** Epsilon (Critical detection enhancement)
+
+**Objective:** Detect when user silently fixes AI code without verbal correction.
+
+**Prerequisites:**
+- ✅ Phase 1 complete (verbal correction detection)
+- ✅ Phase 17 complete (session activity tracking)
+- ✅ Phase 16 complete (tool usage tracking)
+
+**Key Features:**
+- Tool usage tracking (Edit/Write after AI response)
+- Diff analysis (difflib + AST structural changes)
+- Pattern extraction (variable_rename, bug_fix, style_change, error_handling)
+- Correction candidate generation (feeds into Phase 2)
+- Integration with Phase 1 (verbal + silent combined)
+- 80%+ silent correction detection
+
+**Token Cost:** 0 tokens (detection is free)
+
+**Impact:** Catches 80% of corrections Phase 1 misses
+
+**Why Phase Epsilon:**
+- Addresses Gemini's #1 critique (80% of corrections are silent)
+- Critical enhancement to Phase 1
+- Requires tool tracking infrastructure
+
+---
+
 ## Implementation Strategy: Phased Rollout
 
 **CRITICAL: Build and validate in 3 distinct phases, NOT all at once.**
@@ -545,6 +771,40 @@ Phase 11 (Maintenance) → Auto-cleanup, conflict detection
 
 ---
 
+**PHASE DELTA: Post-Gamma Enhancements (Weeks 7-8)**
+**Goal:** Dynamic anchoring and mode-aware context.
+
+```
+Phase 14 (Dynamic Anchoring) → Link rules to code examples
+         ↓
+    Find best example file in codebase
+         ↓
+    Inject code alongside text rules
+
+Phase 15 (Mode-Aware Context) → Detect intent mode
+         ↓
+    Filter memories by mode appropriateness
+         ↓
+    Prototype mode: Skip quality rules
+    Production mode: Include all quality rules
+```
+
+**Implementation order:** 14 → 15
+
+**Validation gates:**
+- ✓ Anchor discovery: 80%+ success rate
+- ✓ Mode detection: 85%+ accuracy
+- ✓ LLM example following: 90%+
+- ✓ User approval increase: 70% → 85%
+
+**Why Phase Delta (not Gamma):**
+- Addresses Gemini's critiques (anchoring, mode blindness)
+- Requires stable Gamma foundation
+- Enhancement layer on proven system
+- Can be added incrementally
+
+---
+
 ## Dependency Graph
 
 ```
@@ -577,6 +837,23 @@ PHASE GAMMA (Enhancements):
 Phase 8 (Session Continuity) ──→ Integrated with Phase 7
 Phase 10 (Agent Learning) ──────→ Feeds into Phase 3
 Phase 11 (Maintenance) ──────────→ Operates on Phases 5-6
+
+        ───────── VALIDATION GATE ─────────
+
+PHASE DELTA (Post-Gamma Enhancements):
+Phase 14 (Dynamic Anchoring) ──→ Extends Phase 7 (injection)
+                                 └─→ Extends Phase 5 (storage)
+Phase 15 (Mode-Aware Context) ──→ Extends Phase 7 (filtering)
+                                 └─→ Extends Phase 5 (storage)
+
+        ───────── VALIDATION GATE ─────────
+
+PHASE EPSILON (Critical Fixes):
+Phase 16 (Integration) ──────────→ Enables entire system
+Phase 17 (Session Lifecycle) ────→ Supports Phase 1 + 16
+Phase 18 (Approval Optimization) ─→ Extends Phase 4
+Phase 19 (Conflict Resolution) ───→ Extends Phase 11
+Phase 20 (Silent Divergence) ────→ Extends Phase 1
 ```
 
 **Critical principle:** Each phase is independently shippable and validated before moving to next.
@@ -864,7 +1141,14 @@ phases/
 ├── PHASE-10-AGENT-SELF-LEARNING.md
 ├── PHASE-11-MAINTENANCE-HEALTH.md
 ├── PHASE-12-MEMORY-INDEXING.md
-└── PHASE-13-INDEXED-SEARCH.md
+├── PHASE-13-INDEXED-SEARCH.md
+├── PHASE-14-DYNAMIC-ANCHORING.md
+├── PHASE-15-MODE-AWARE-CONTEXT.md
+├── PHASE-16-INTEGRATION-SPECIFICATION.md
+├── PHASE-17-SESSION-LIFECYCLE.md
+├── PHASE-18-APPROVAL-OPTIMIZATION.md
+├── PHASE-19-CONFLICT-RESOLUTION.md
+└── PHASE-20-SILENT-DIVERGENCE.md
 
 src/cerberus/memory/
 ├── session_analyzer.py      (Phase 1: User correction detection)
@@ -878,7 +1162,15 @@ src/cerberus/memory/
 ├── agent_learning.py        (Phase 10: Agent self-learning)
 ├── maintenance.py           (Phase 11: Maintenance & health)
 ├── indexing.py              (Phase 12: SQLite FTS5 indexing)
-└── search.py                (Phase 13: FTS5 search engine)
+├── search.py                (Phase 13: FTS5 search engine)
+├── anchoring.py             (Phase 14: Dynamic anchoring)
+├── mode_detection.py        (Phase 15: Mode-aware context)
+├── hooks.py                 (Phase 16: Integration hooks)
+├── ipc.py                   (Phase 16: Inter-process communication)
+├── session_lifecycle.py     (Phase 17: Session boundaries & recovery)
+├── approval_optimizer.py    (Phase 18: Smart approval)
+├── conflict_resolver.py     (Phase 19: Conflict resolution)
+└── silent_divergence.py     (Phase 20: Silent correction detection)
 
 ~/.cerberus/
 ├── memory.db                (SQLite FTS5 index, Phase 12-13)
@@ -944,11 +1236,46 @@ src/cerberus/memory/
 - Agent proposal approval (50%+ target)
 - Maintenance automation (stale detection works)
 
-**Gate:** Enhancement layer works → Production ready
+**Gate:** Enhancement layer works → Proceed to Phase Delta
 
 ---
 
-### **Month 2+: Production & Iteration**
+### **Week 7-8: Phase Delta (Post-Gamma Enhancements)**
+**Deliverables:**
+- ✅ Phase 14: Dynamic Anchoring (anchoring.py)
+- ✅ Phase 15: Mode-Aware Context (mode_detection.py)
+
+**Testing:**
+- Anchor discovery (80%+ success rate for project memories)
+- Anchor quality (score >= 0.7)
+- Mode detection accuracy (85%+ on test prompts)
+- LLM example following (90%+ match anchor style)
+- User approval increase (70% → 85%)
+
+**Gate:** Anchoring + mode filtering validated → Proceed to Phase Epsilon
+
+---
+
+### **Week 9-10: Phase Epsilon (Critical Fixes)**
+**Deliverables:**
+- ✅ Phase 16: Integration Specification (hooks.py, ipc.py)
+- ✅ Phase 17: Session Lifecycle & Recovery (session_lifecycle.py)
+- ✅ Phase 18: Approval Optimization (approval_optimizer.py)
+- ✅ Phase 19: Conflict Resolution (conflict_resolver.py)
+- ✅ Phase 20: Silent Divergence Detection (silent_divergence.py)
+
+**Testing:**
+- Integration (hooks install, inject/propose work)
+- Crash recovery (deliberate SIGKILL, verify recovery)
+- Auto-approval (30-40% rate, approval time < 20s)
+- Conflict resolution (60-70% auto-resolution)
+- Silent divergence (80%+ detection rate)
+
+**Gate:** All critical fixes validated → Production ready
+
+---
+
+### **Month 3+: Production & Iteration**
 **Focus:**
 - Monitor real-world usage
 - Tune TF-IDF threshold based on data
@@ -974,6 +1301,13 @@ src/cerberus/memory/
 | 11 | Maintenance | maintenance.py | **Gamma** |
 | 12 | Indexing | indexing.py | **Beta** |
 | 13 | Search | search.py | **Beta** |
+| 14 | Dynamic Anchoring | anchoring.py | **Delta** |
+| 15 | Mode-Aware Context | mode_detection.py | **Delta** |
+| 16 | Integration | hooks.py, ipc.py | **Epsilon** |
+| 17 | Session Lifecycle | session_lifecycle.py | **Epsilon** |
+| 18 | Approval Optimization | approval_optimizer.py | **Epsilon** |
+| 19 | Conflict Resolution | conflict_resolver.py | **Epsilon** |
+| 20 | Silent Divergence | silent_divergence.py | **Epsilon** |
 
 **Storage Evolution:**
 - **Alpha:** Phases 5-6 use JSON
@@ -1041,7 +1375,7 @@ A: Lightweight (~1MB vs 80MB+400MB model), no download, works offline, sufficien
 ---
 
 **Last Updated:** 2026-01-22
-**Version:** 3.0 (Phased rollout strategy: JSON MVP → SQLite → Enhancements)
+**Version:** 5.0 (Added Phase Epsilon: Critical Fixes - Integration, Lifecycle, Approval, Conflicts, Silent Divergence)
 **Status:** Ready for Phase Alpha implementation
 
 **Key Design Principles:**
@@ -1053,3 +1387,5 @@ A: Lightweight (~1MB vs 80MB+400MB model), no download, works offline, sufficien
 - **Validation gates:** Each phase must pass metrics before proceeding
 - **Backward compatibility:** JSON fallback, gradual migration
 - **Token efficiency:** 80% savings target (FTS5 vs JSON)
+- **Phase Delta additions:** Dynamic anchoring (Gemini critique: text vs code disconnect), Mode detection (Gemini critique: mode blindness)
+- **Phase Epsilon additions:** Integration spec (HOW system works), Session lifecycle (crash recovery), Approval optimization (reduce fatigue), Conflict resolution (beyond detection), Silent divergence (Gemini critique: 80% of corrections are silent)
