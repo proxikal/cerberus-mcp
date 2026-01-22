@@ -17,7 +17,7 @@ Revolutionary memory system that learns from user corrections automatically, sto
 **Desired State:**
 - Zero repeated corrections
 - Automatic learning from user feedback AND agent observations
-- Context-aware injection (1500 token budget: 1000 memories + 500 session)
+- Context-aware injection (2500 token budget: 1500 memories + 1000 session)
 - Hierarchical storage (universal → language → project → task)
 - Self-healing system (archive stale, detect conflicts, promote patterns)
 - Session continuity (zero re-explanation between sessions)
@@ -31,7 +31,7 @@ Session Cycle:
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. SESSION START                                            │
 │    ├─ Auto-inject relevant memories (Phase 7: 1500 tokens)  │
-│    ├─ Auto-inject session codes (Phase 9: 1000-1500 tokens) │
+│    ├─ Auto-inject session codes (Phase 8: 1000-1500 tokens) │
 │    └─ Total budget: 2500-3000 tokens                        │
 ├─────────────────────────────────────────────────────────────┤
 │ 2. DURING SESSION                                           │
@@ -44,16 +44,16 @@ Session Cycle:
 │    ├─ Cluster user corrections (Phase 2)                    │
 │    ├─ Detect agent patterns (Phase 10: success, failure)    │
 │    ├─ LLM generates proposals (Phase 3: 10 user + 10 agent) │
-│    ├─ TUI approval (Phase 4: < 10 seconds)                  │
+│    ├─ CLI approval (Phase 4: < 30 seconds)                  │
 │    ├─ Store to hierarchical layers (Phase 5)                │
-│    └─ Save session codes (Phase 9: no LLM, direct save)     │
+│    └─ Save session codes (Phase 8: no LLM, direct save)     │
 │    └─ Total cost: ~4000 tokens (~$0.06)                     │
 ├─────────────────────────────────────────────────────────────┤
 │ 4. WEEKLY MAINTENANCE (automatic)                           │
 │    ├─ Archive stale memories (>180 days) (Phase 11)         │
 │    ├─ Detect conflicts (contradictions, redundancies)       │
 │    ├─ Promote cross-project patterns                        │
-│    └─ Cleanup expired sessions (>7 days) (Phase 9)          │
+│    └─ Cleanup expired sessions (>7 days) (Phase 8)          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -89,9 +89,9 @@ Session Cycle:
 **Objective:** Cluster similar corrections to prevent duplicates.
 
 **Key Features:**
-- Embeddings (sentence-transformers, local model)
-- Threshold clustering (75% similarity)
-- Canonical form extraction (LLM or fallback)
+- TF-IDF similarity (scikit-learn, no model download)
+- Threshold clustering (65% similarity)
+- Canonical form extraction (rule-based + optional LLM)
 - 60% compression ratio (10 corrections → 4 clusters)
 
 **Output:** List of `CorrectionCluster` objects
@@ -115,17 +115,17 @@ Session Cycle:
 
 ---
 
-### Phase 4: TUI Approval Interface
-**File:** `src/cerberus/memory/approval_tui.py`
+### Phase 4: Approval Interface
+**File:** `src/cerberus/memory/approval_cli.py`
 
-**Objective:** Inline TUI for instant proposal approval. Arrow keys, no typing.
+**Objective:** Simple CLI interface for proposal approval. No special dependencies.
 
 **Key Features:**
-- Inline rendering (same terminal session)
-- Arrow key navigation + space toggle
-- Bulk operations (a=all, n=none)
-- 6x faster than CLI typing (< 10 seconds vs 30+)
-- Graceful fallback to CLI if TUI unavailable
+- Uses standard `input()` only (no keyboard library)
+- Works in any terminal (including Claude Code)
+- Bulk operations (all, none, 1,2,3)
+- Batch mode for automation (auto-approve high confidence)
+- No special dependencies
 
 **Token Cost:** 0 tokens (pure UI)
 
@@ -200,39 +200,27 @@ Session Cycle:
 
 ---
 
-### Phase 8: Context Capture
-**File:** `src/cerberus/memory/context_capture.py`
+### Phase 8: Session Continuity
+**File:** `src/cerberus/memory/session_continuity.py`
 
-**Objective:** Auto-capture session context during work.
-
-**Key Features:**
-- AI-native storage codes (impl:, dec:, block:, next:)
-- Detects: files, functions, decisions, blockers, next actions
-- Real-time capture (during session, not end)
-- Integration with Phase 9 summary
-
-**Token Cost:** 0 tokens (pure capture, tokens counted in Phase 9)
-
-**Output:** `SessionContext` object with terse codes
-
----
-
-### Phase 9: Session Context Injection
-**File:** `src/cerberus/memory/session_injection.py`
-
-**Objective:** Inject Phase 8 codes at session start. NO LLM, NO PROSE, pure data.
+**Objective:** Capture session context during work, inject at next session start. Zero re-explanation. NO LLM.
 
 **Key Features:**
-- Load Phase 8 codes directly (no LLM processing)
+- Context Capture: AI-native codes (impl:, dec:, block:, next:)
+- Auto-capture from tool usage (Edit, Write, Bash)
+- Context Injection: Pure data, no LLM, no prose
 - Comprehensive capture (ALL files, decisions, blockers)
-- Pure data injection (no markdown, no headers)
-- Auto-injection at session start (1000-1500 tokens)
 - 7-day expiration with archival
-- Temporary storage (deleted after injection)
+- Session cleanup manager
 
 **Token Cost:** 1000-1500 tokens per session (injection only, no LLM)
 
 **Output:** Raw codes, newline-separated (impl:, dec:, block:, next:)
+
+---
+
+### Phase 9: (Merged into Phase 8)
+*Session Context Injection merged into Phase 8: Session Continuity*
 
 ---
 
@@ -442,13 +430,13 @@ Phase 9 (Session Injection) ───────→        │                 
 
 **Dependencies:**
 ```bash
-pip install sentence-transformers numpy tiktoken
-pip install ollama-python  # Or anthropic SDK
+pip install scikit-learn numpy tiktoken
+pip install ollama-python  # Or anthropic SDK (optional, for LLM proposals)
 ```
 
 **Model Requirements:**
-- Embeddings: all-MiniLM-L6-v2 (~80MB, local)
-- LLM: Ollama (llama3.2:3b) or Claude API
+- TF-IDF: scikit-learn (no model download)
+- LLM: Ollama (llama3.2:3b) or Claude API (optional, for proposals)
 
 ---
 
@@ -555,12 +543,11 @@ phases/
 ├── PHASE-1-SESSION-CORRECTION-DETECTION.md
 ├── PHASE-2-SEMANTIC-DEDUPLICATION.md
 ├── PHASE-3-SESSION-PROPOSAL.md
-├── PHASE-4-TUI-APPROVAL-INTERFACE.md
+├── PHASE-4-TUI-APPROVAL-INTERFACE.md (CLI approval, no TUI)
 ├── PHASE-5-STORAGE-OPERATIONS.md
 ├── PHASE-6-RETRIEVAL-OPERATIONS.md
 ├── PHASE-7-CONTEXT-AWARE-INJECTION.md
-├── PHASE-8-CONTEXT-CAPTURE.md
-├── PHASE-9-SESSION-SUMMARY.md
+├── PHASE-8-SESSION-CONTINUITY.md (merged: capture + injection)
 ├── PHASE-10-AGENT-SELF-LEARNING.md
 ├── PHASE-11-MAINTENANCE-HEALTH.md
 ├── PHASE-12-MEMORY-INDEXING.md
@@ -568,14 +555,13 @@ phases/
 
 src/cerberus/memory/
 ├── session_analyzer.py      (Phase 1: User correction detection)
-├── semantic_analyzer.py     (Phase 2: Clustering/deduplication)
+├── semantic_analyzer.py     (Phase 2: TF-IDF clustering/deduplication)
 ├── proposal_engine.py       (Phase 3: LLM proposal generation)
-├── approval_tui.py          (Phase 4: TUI approval interface)
+├── approval_cli.py          (Phase 4: CLI approval interface)
 ├── storage.py               (Phase 5: Storage operations, Phase 13: SQLite writes)
 ├── retrieval.py             (Phase 6: Retrieval operations, Phase 13: SQLite queries)
 ├── context_injector.py      (Phase 7: Memory injection)
-├── context_capture.py       (Phase 8: Context capture)
-├── session_injection.py     (Phase 9: Session code injection)
+├── session_continuity.py    (Phase 8: Session capture + injection)
 ├── agent_learning.py        (Phase 10: Agent self-learning)
 ├── maintenance.py           (Phase 11: Maintenance & health)
 ├── indexing.py              (Phase 12: SQLite FTS5 indexing)

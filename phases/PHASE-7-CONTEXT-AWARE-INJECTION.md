@@ -1,4 +1,4 @@
-# PHASE 4: CONTEXT-AWARE INJECTION
+# PHASE 7: CONTEXT-AWARE INJECTION
 
 ## Objective
 Inject only relevant memories based on current context with strict token budget.
@@ -175,14 +175,14 @@ class TokenBudgetEnforcer:
     Enforce strict token limits for injected context.
     """
 
-    # Budget allocation (total: 1000 tokens)
+    # Budget allocation (total: 1500 tokens)
     BUDGET = {
-        "universal": 500,   # Cross-project rules
-        "language": 300,    # Language-specific rules
-        "project": 200,     # Project-specific rules
+        "universal": 700,   # Cross-project rules
+        "language": 500,    # Language-specific rules
+        "project": 300,     # Project-specific rules
     }
 
-    TOTAL_BUDGET = 1000
+    TOTAL_BUDGET = 1500
 
     def __init__(self):
         self.tokenizer = TokenCounter()
@@ -520,7 +520,7 @@ def auto_inject_memory():
 ✓ ContextInjector class implemented
 ✓ ContextDetector class implemented
 ✓ Auto-injection hook working
-✓ Token budget enforced (max 1000 tokens)
+✓ Token budget enforced (max 1500 tokens)
 ✓ Tests: 10 scenarios with expected memories
 ```
 
@@ -540,7 +540,7 @@ context = InjectionContext(project="hydra", language="go", task="coding")
 
 # Scenario 3: Budget exceeded
 memories = 50 rules (3000 tokens total)
-→ expect: Top 15-20 by score (exactly 1000 tokens)
+→ expect: Top 20-25 by score (exactly 1500 tokens)
 
 # Scenario 4: Low relevance filtered
 context = InjectionContext(project="cerberus", language="python", task="coding")
@@ -560,7 +560,7 @@ pip install tiktoken  # Token counting
 
 ## Token Budget
 
-- Injection output: 1000 tokens max (enforced)
+- Injection output: 1500 tokens max (enforced)
 - Scoring computation: 0 tokens (local)
 - Context detection: 0 tokens (file system analysis)
 

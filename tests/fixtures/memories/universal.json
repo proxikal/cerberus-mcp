@@ -1,0 +1,41 @@
+{
+  "general": [
+    {
+      "content": "Early returns over nested conditionals",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "async/await over raw Promises",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "Max line length: 80",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "content": "Components: PascalCase",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "No console.log in production code",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 0.8
+    }
+  ],
+  "corrections": [
+    {
+      "content": "Keep output concise",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "Always log errors before rethrowing",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 0.9
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "preferences": [
+    {
+      "content": "Use goroutines for concurrent I/O",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "Panic only for programmer errors, not runtime errors",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "Use defer for cleanup (file close, unlock)",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "content": "Return error as last return value",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "Prefer table-driven tests",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 0.8
+    }
+  ]
+}

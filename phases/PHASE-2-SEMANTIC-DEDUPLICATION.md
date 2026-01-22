@@ -37,26 +37,48 @@ class AnalyzedCorrections:
 
 ---
 
-## Embedding Model
+## Text Similarity Engine (TF-IDF)
 
-**Library:** `sentence-transformers`
+**Library:** `scikit-learn` (lightweight, no model download)
 
 ```python
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
-class EmbeddingEngine:
+class SimilarityEngine:
+    """
+    TF-IDF based text similarity.
+    Lightweight: ~1MB dependency, no model downloads.
+    """
+
     def __init__(self):
-        # Use lightweight model for local execution (no API calls)
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        # Model size: ~80MB, inference: ~50ms per sentence
+        self.vectorizer = TfidfVectorizer(
+            lowercase=True,
+            stop_words='english',
+            ngram_range=(1, 2),  # Unigrams and bigrams
+            max_features=1000
+        )
 
-    def embed(self, text: str) -> np.ndarray:
-        return self.model.encode(text, convert_to_numpy=True)
+    def compute_similarity_matrix(self, texts: List[str]) -> np.ndarray:
+        """
+        Compute pairwise cosine similarity between texts.
+        """
+        if len(texts) < 2:
+            return np.array([[1.0]])
+
+        # Fit and transform
+        tfidf_matrix = self.vectorizer.fit_transform(texts)
+
+        # Compute cosine similarity
+        return cosine_similarity(tfidf_matrix)
 
     def similarity(self, text1: str, text2: str) -> float:
-        emb1 = self.embed(text1)
-        emb2 = self.embed(text2)
-        return np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
+        """
+        Compute similarity between two texts.
+        """
+        matrix = self.compute_similarity_matrix([text1, text2])
+        return matrix[0, 1]
 ```
 
 ---
@@ -66,8 +88,8 @@ class EmbeddingEngine:
 ```python
 class SemanticAnalyzer:
     def __init__(self):
-        self.embedder = EmbeddingEngine()
-        self.similarity_threshold = 0.75  # 75% semantic similarity = same cluster
+        self.similarity_engine = SimilarityEngine()
+        self.similarity_threshold = 0.65  # 65% TF-IDF similarity = same cluster
 
     def cluster_corrections(
         self,
@@ -79,11 +101,8 @@ class SemanticAnalyzer:
         # Extract messages
         messages = [c.user_message for c in candidates]
 
-        # Compute embeddings
-        embeddings = np.array([self.embedder.embed(msg) for msg in messages])
-
         # Compute similarity matrix
-        similarity_matrix = self._compute_similarity_matrix(embeddings)
+        similarity_matrix = self.similarity_engine.compute_similarity_matrix(messages)
 
         # Cluster using threshold-based grouping
         clusters = self._threshold_clustering(
@@ -103,14 +122,8 @@ class SemanticAnalyzer:
             outliers=self._find_outliers(candidates, canonical_clusters),
             total_raw=len(candidates),
             total_clustered=len(canonical_clusters),
-            compression_ratio=len(canonical_clusters) / len(candidates)
+            compression_ratio=len(canonical_clusters) / len(candidates) if candidates else 0.0
         )
-
-    def _compute_similarity_matrix(self, embeddings: np.ndarray) -> np.ndarray:
-        # Cosine similarity matrix
-        norm = np.linalg.norm(embeddings, axis=1, keepdims=True)
-        normalized = embeddings / norm
-        return normalized @ normalized.T
 
     def _threshold_clustering(
         self,
@@ -151,14 +164,23 @@ class SemanticAnalyzer:
     ) -> CorrectionCluster:
         """
         Extract canonical form from cluster.
-        Strategy: Use LLM to synthesize or pick shortest clear variant.
+        Strategy: Pick clearest variant (shortest that's >5 words, or shortest overall).
         """
         variants = [candidates[i].user_message for i in cluster_indices]
         correction_types = [candidates[i].correction_type for i in cluster_indices]
         confidences = [candidates[i].confidence for i in cluster_indices]
 
-        # Simple strategy: pick shortest variant (LLM synthesis in Phase 3)
-        canonical = min(variants, key=len)
+        # Strategy: prefer medium-length variants (not too short, not too long)
+        def quality_score(text: str) -> float:
+            words = len(text.split())
+            if words < 3:
+                return 0.5  # Too short, might lose meaning
+            elif words > 15:
+                return 0.7  # Too long
+            else:
+                return 1.0  # Good length
+
+        canonical = max(variants, key=lambda v: (quality_score(v), -len(v)))
 
         # Use most common correction type
         correction_type = max(set(correction_types), key=correction_types.count)
@@ -188,43 +210,62 @@ class SemanticAnalyzer:
 
 ---
 
-## Canonical Form Extraction (LLM-based)
+## Canonical Form Extraction (Optional LLM)
 
 ```python
 class CanonicalExtractor:
     """
     Uses local LLM (Ollama) to extract canonical form.
-    Fallback: Use shortest variant if LLM unavailable.
+    Fallback: Use best variant from TF-IDF analysis.
     """
 
-    def __init__(self, llm_available: bool = True):
+    def __init__(self, llm_available: bool = False):
         self.llm_available = llm_available
 
     def extract(self, variants: List[str]) -> str:
-        if not self.llm_available or len(variants) == 1:
+        if len(variants) == 1:
             return variants[0]
 
-        # LLM prompt
+        if self.llm_available:
+            try:
+                return self._extract_with_llm(variants)
+            except:
+                pass
+
+        # Fallback: pick best variant by quality
+        return self._pick_best_variant(variants)
+
+    def _pick_best_variant(self, variants: List[str]) -> str:
+        """Pick best variant without LLM."""
+        def score(text: str) -> tuple:
+            words = len(text.split())
+            # Prefer 5-12 words, imperative mood
+            length_score = -abs(words - 8)  # Optimal around 8 words
+            # Prefer starting with verb
+            starts_with_verb = text.split()[0].lower() in [
+                'use', 'keep', 'avoid', 'never', 'always', 'prefer',
+                'write', 'add', 'remove', 'check', 'ensure', 'follow'
+            ] if text else False
+            return (starts_with_verb, length_score, -len(text))
+
+        return max(variants, key=score)
+
+    def _extract_with_llm(self, variants: List[str]) -> str:
+        """Optional: Use Ollama for better canonical extraction."""
+        import requests
+
         prompt = f"""Extract canonical rule from these similar corrections:
 
 {chr(10).join(f"- {v}" for v in variants)}
 
 Return ONLY the canonical form (10 words max, imperative mood):"""
 
-        # Call local Ollama (or fallback)
-        try:
-            canonical = self._call_ollama(prompt)
-            return canonical.strip()
-        except:
-            return min(variants, key=len)
-
-    def _call_ollama(self, prompt: str) -> str:
-        import requests
         response = requests.post(
             "http://localhost:11434/api/generate",
-            json={"model": "llama3.2:3b", "prompt": prompt, "stream": False}
+            json={"model": "llama3.2:3b", "prompt": prompt, "stream": False},
+            timeout=10
         )
-        return response.json()["response"]
+        return response.json()["response"].strip()
 ```
 
 ---
@@ -288,10 +329,10 @@ store_clusters(analyzed.clusters)
 ## Exit Criteria
 
 ```
-✓ EmbeddingEngine class implemented
+✓ SimilarityEngine (TF-IDF) implemented
 ✓ SemanticAnalyzer clustering functional
 ✓ Similarity threshold tuning (test with 50+ examples)
-✓ Canonical extraction working (LLM-based + fallback)
+✓ Canonical extraction working (rule-based + optional LLM)
 ✓ Integration with Phase 1 complete
 ✓ Storage format validated
 ✓ Compression ratio > 0.6 (60% reduction in duplicates)
@@ -308,21 +349,21 @@ variants = [
     "be concise in summaries",
     "summaries should be brief"
 ]
-→ expect: 1 cluster, canonical="Keep summaries concise"
+→ expect: 1 cluster, canonical="keep summaries short"
 
 # Scenario 2: Different topics (should NOT cluster)
 variants = [
     "keep summaries short",
     "never exceed 200 lines"
 ]
-→ expect: 2 clusters (similarity < 0.75)
+→ expect: 2 clusters (similarity < 0.65)
 
 # Scenario 3: Partial similarity
 variants = [
     "keep summaries short and informative",
     "keep code short and maintainable"
 ]
-→ expect: 2 clusters (different contexts)
+→ expect: depends on overlap; may cluster if threshold met
 ```
 
 ---
@@ -330,23 +371,43 @@ variants = [
 ## Dependencies
 
 ```bash
-pip install sentence-transformers numpy
+pip install scikit-learn numpy
 ```
 
-**Model download:** First run downloads ~80MB model
+**No model download required.** TF-IDF is computed on-the-fly.
 
 ---
 
 ## Token Budget
 
-- Embedding: 0 tokens (local model)
-- LLM canonical extraction: ~50 tokens per cluster (optional, only if Ollama available)
-- Total per session: 50-200 tokens (5-10 clusters typical)
+- TF-IDF: 0 tokens (local computation)
+- LLM canonical extraction: 0 tokens (optional, local Ollama only)
+- Total per session: 0 tokens
 
 ---
 
 ## Performance
 
-- Embedding: ~50ms per sentence
+- TF-IDF vectorization: ~10ms for 100 texts
+- Similarity matrix: ~5ms for 100×100
 - Clustering: O(n²) for n candidates (acceptable for n < 100)
-- Session end processing: < 2 seconds for typical session
+- Session end processing: < 500ms for typical session
+
+---
+
+## Why TF-IDF over Embeddings
+
+| Aspect | TF-IDF | sentence-transformers |
+|--------|--------|----------------------|
+| Dependency size | ~1MB | ~80MB + 400MB model |
+| Model download | None | Required (first run) |
+| Inference speed | ~10ms | ~50ms |
+| Accuracy | Good for short text | Better for complex semantics |
+| Memory usage | ~10MB | ~500MB |
+
+**TF-IDF is sufficient** for deduplicating short correction phrases. The phrases are typically:
+- Short (5-15 words)
+- Use similar vocabulary ("keep", "concise", "short")
+- Don't require deep semantic understanding
+
+Embeddings add complexity without proportional benefit for this use case.

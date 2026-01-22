@@ -1,0 +1,28 @@
+{
+  "session_id": "20260121-143022",
+  "project": "hydra",
+  "timestamp": "2026-01-21T14:30:22Z",
+  "files": [
+    "impl:proxy.go",
+    "impl:supervisor.go",
+    "impl:config_test.go"
+  ],
+  "functions": [
+    "impl:supervisor.Process",
+    "impl:config.Load"
+  ],
+  "decisions": [
+    "dec:split-proxy-into-3-files",
+    "dec:plan-splits-before-writing"
+  ],
+  "blockers": [
+    "block:race:test-failure-line-712"
+  ],
+  "next_actions": [
+    "next:add-mutex-to-process-struct",
+    "next:rerun-race-detector"
+  ],
+  "metadata": {
+    "expires_at": "2026-01-28T14:30:22Z"
+  }
+}

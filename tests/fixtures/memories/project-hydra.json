@@ -1,0 +1,24 @@
+{
+  "decisions": [
+    {
+      "content": "Use Chi router for all HTTP endpoints",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "PostgreSQL for primary storage, Redis for cache",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 1.0
+    },
+    {
+      "content": "All API responses use standard envelope: {data, error, meta}",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 0.9
+    },
+    {
+      "content": "Feature flags stored in database, not config files",
+      "timestamp": "2026-01-15T10:00:00Z",
+      "confidence": 0.8
+    }
+  ]
+}

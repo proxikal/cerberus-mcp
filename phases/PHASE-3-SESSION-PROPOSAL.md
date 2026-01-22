@@ -1,4 +1,4 @@
-# PHASE 3: END-OF-SESSION PROPOSAL
+# PHASE 3: SESSION PROPOSAL
 
 ## Objective
 Summarize session corrections with LLM, propose memories for user approval.
