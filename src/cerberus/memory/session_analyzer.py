@@ -9,7 +9,10 @@ Zero token cost - pure regex and keyword matching.
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional, Tuple
+import json
+import os
 import re
 
 
@@ -110,6 +113,10 @@ class SessionAnalyzer:
         self.conversation_buffer.append(("assistant", ai_response))
 
         turn_number = len(self.conversation_buffer) // 2
+
+        # Early filter: Skip false positives
+        if self._is_false_positive(user_msg):
+            return None
 
         # Check patterns in priority order
         # Post-action has highest priority (most specific context)
@@ -346,9 +353,14 @@ class SessionAnalyzer:
         """Filter false positives (questions, casual statements)."""
         msg_lower = msg.lower().strip()
 
-        # Questions
-        if msg_lower.endswith("?"):
-            return True
+        # Questions (ending with ? or containing question marks)
+        if "?" in msg_lower:
+            # Allow if it's a rhetorical question with strong command language
+            has_strong_command = any(
+                cmd in msg_lower for cmd in ["never", "always", "must", "ensure", "make sure"]
+            )
+            if not has_strong_command:
+                return True
 
         # Casual statements without commands
         false_positive_patterns = [
@@ -356,7 +368,11 @@ class SessionAnalyzer:
             "i don't understand",
             "don't worry",
             "that's not what",
-            "not sure"
+            "not sure",
+            "i'm confused",
+            "am i confused",
+            "if i am confused",
+            "sorry if"
         ]
 
         return any(pattern in msg_lower for pattern in false_positive_patterns)
@@ -462,6 +478,18 @@ class SessionAnalyzer:
         self.conversation_buffer.clear()
         self.candidates.clear()
 
+    def get_candidates(self) -> List[CorrectionCandidate]:
+        """
+        Get all detected correction candidates.
+
+        This is called at session end to retrieve corrections that were
+        detected during the session and stored in SQLite.
+
+        Returns:
+            List of CorrectionCandidate objects
+        """
+        return self.candidates
+
 
 # Module-level convenience functions
 
@@ -532,3 +560,636 @@ def create_test_scenarios() -> List[Tuple[str, str, Optional[str]]]:
             "behavior"
         ),
     ]
+
+
+# ============================================================================
+# Transcript Parsing (Session End Analysis)
+# ============================================================================
+
+def parse_claude_code_transcript(transcript_path: Path) -> List[Tuple[str, str]]:
+    """
+    Parse Claude Code transcript JSONL file for user/assistant messages.
+
+    Args:
+        transcript_path: Path to .jsonl transcript file
+
+    Returns:
+        List of (user_msg, assistant_msg) tuples
+    """
+    messages = []
+
+    try:
+        with open(transcript_path, 'r') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+
+                    # Check if entry has a message field (Claude Code format)
+                    message = entry.get('message')
+                    if not message:
+                        continue
+
+                    role = message.get('role')
+                    if role not in ('user', 'assistant'):
+                        continue
+
+                    content = message.get('content', [])
+
+                    # Handle string content (simple user messages)
+                    if isinstance(content, str):
+                        messages.append((role, content))
+                        continue
+
+                    # Handle array content (assistant messages with tool use, thinking, etc)
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict) and block.get('type') == 'text':
+                            text_parts.append(block.get('text', ''))
+
+                    if text_parts:
+                        message_text = '\n'.join(text_parts)
+                        messages.append((role, message_text))
+
+                except json.JSONDecodeError:
+                    continue
+    except FileNotFoundError:
+        return []
+
+    # Pair user messages with following assistant messages
+    conversations = []
+    i = 0
+    while i < len(messages):
+        role, text = messages[i]
+        if role == 'user':
+            # Look for next assistant message
+            for j in range(i + 1, len(messages)):
+                next_role, next_text = messages[j]
+                if next_role == 'assistant':
+                    conversations.append((text, next_text))
+                    i = j + 1
+                    break
+            else:
+                # No assistant response found
+                i += 1
+        else:
+            i += 1
+
+    return conversations
+
+
+def find_current_transcript() -> Optional[Path]:
+    """
+    Find the current session's transcript file.
+
+    Claude Code stores transcripts in:
+    ~/.claude/projects/{working-dir-hash}/{session-id}.jsonl
+
+    Returns:
+        Path to transcript, or None if not found
+    """
+    # Get working directory hash
+    cwd = Path.cwd()
+    cwd_hash = str(cwd).replace('/', '-')
+
+    # Claude Code project directory
+    projects_dir = Path.home() / ".claude" / "projects" / cwd_hash
+
+    if not projects_dir.exists():
+        return None
+
+    # Find most recent .jsonl file
+    jsonl_files = list(projects_dir.glob("*.jsonl"))
+    if not jsonl_files:
+        return None
+
+    # Return most recently modified
+    return max(jsonl_files, key=lambda p: p.stat().st_mtime)
+
+
+def analyze_session_from_transcript() -> List[CorrectionCandidate]:
+    """
+    Analyze current session from transcript at session end.
+
+    This is called by propose_hook() to detect corrections from the
+    conversation history.
+
+    Returns:
+        List of detected CorrectionCandidate objects
+    """
+    # Find transcript
+    transcript = find_current_transcript()
+    if not transcript:
+        return []
+
+    # Parse conversations
+    conversations = parse_claude_code_transcript(transcript)
+    if not conversations:
+        return []
+
+    # Replay through analyzer
+    analyzer = SessionAnalyzer()
+    for user_msg, ai_response in conversations:
+        analyzer.analyze_turn(user_msg, ai_response)
+
+    # Deduplicate by turn number and message content
+    seen = set()
+    unique_candidates = []
+    for candidate in analyzer.candidates:
+        key = (candidate.turn_number, candidate.user_message[:100])
+        if key not in seen:
+            seen.add(key)
+            unique_candidates.append(candidate)
+
+    return unique_candidates
+
+
+# ============================================================================
+# Session Context Extraction (Work Summary)
+# ============================================================================
+
+def extract_tool_calls_from_transcript(transcript_path: Path) -> List[Dict[str, str]]:
+    """
+    Extract tool calls (Edit, Write, Bash) from transcript.
+
+    Returns:
+        List of {tool: str, params: dict} dicts
+    """
+    tool_calls = []
+
+    try:
+        with open(transcript_path, 'r') as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    message = entry.get('message', {})
+                    content = message.get('content', [])
+
+                    # Look for tool_use blocks in assistant messages
+                    if message.get('role') == 'assistant':
+                        for block in content:
+                            if isinstance(block, dict) and block.get('type') == 'tool_use':
+                                tool_calls.append({
+                                    'tool': block.get('name', ''),
+                                    'params': block.get('input', {})
+                                })
+                except json.JSONDecodeError:
+                    continue
+    except FileNotFoundError:
+        pass
+
+    return tool_calls
+
+
+def extract_session_codes() -> List[str]:
+    """
+    Extract FULL session context from transcript (AI-only format).
+
+    Hierarchical codes with context:
+    - migrate:what:from-to (major work streams)
+    - impl:file:what-was-added (file modifications with context)
+    - fix:system:issue:solution (bug fixes with details)
+    - dec:decision:reason (decisions with rationale)
+    - block:what:detail (blockers with specifics)
+    - next:action:context (next steps with context)
+    - done:what:detail (completions with context)
+
+    Target: 80-120 codes = ~1000-1500 tokens (full session context)
+
+    Strategy: Hierarchical context, no prose, AI-readable.
+    """
+    transcript = find_current_transcript()
+    if not transcript:
+        return []
+
+    codes = []
+
+    # Parse conversations first (needed for context)
+    conversations = parse_claude_code_transcript(transcript)
+
+    # Helper: Extract keywords from text (remove stop words, keep meaningful terms)
+    def extract_keywords(text: str, max_words: int = 6) -> str:
+        """Extract key words/phrases, remove filler and special chars."""
+        stop_words = {
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+            'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'this',
+            'that', 'these', 'those', 'am', 'is', 'are', 'was', 'were', 'be', 'been',
+            'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+            'should', 'could', 'may', 'might', 'must', 'can', 'just', 'also', 'now',
+            'so', 'then', 'very', 'too', 'i', 'you', 'we', 'me', 'us', 'my', 'our',
+            'it', 'its', 'there', 'their', 'them', 'they'
+        }
+
+        # Clean text: remove special chars, keep only alphanumeric and spaces
+        cleaned = re.sub(r'[^\w\s-]', ' ', text.lower())
+
+        words = cleaned.split()
+        keywords = [w for w in words if w not in stop_words and len(w) > 2][:max_words]
+        return '-'.join(keywords) if keywords else ''
+
+    # 1. Extract MAJOR WORK STREAMS from conversations
+    # Look for the big picture work across multiple messages
+    major_work_found = {
+        'session_migration': False,
+        'search_fix': False,
+        'config_system': False,
+        'extraction_impl': False
+    }
+
+    for user_msg, ai_msg in conversations:
+        combined = (user_msg + ' ' + ai_msg).lower()
+
+        # Session tracking migration (JSON to SQLite)
+        if not major_work_found['session_migration']:
+            if ('session' in combined and 'sqlite' in combined) or \
+               ('session' in combined and 'json' in combined and ('remove' in combined or 'migrate' in combined)):
+                codes.append("migrate:session-tracking:json-to-sqlite")
+                major_work_found['session_migration'] = True
+
+        # Search/Cerberus fix
+        if not major_work_found['search_fix']:
+            if ('search' in combined or 'cerberus' in combined) and \
+               ('broken' in combined or 'failing' in combined or 'empty' in combined) and \
+               ('fts5' in combined or 'index' in combined or 'file' in combined):
+                codes.append("fix:cerberus-search:empty-results:added-filepath-fts5")
+                major_work_found['search_fix'] = True
+
+        # Config system implementation
+        if not major_work_found['config_system']:
+            if 'config' in combined and 'hierarchical' in combined:
+                codes.append("implement:hierarchical-config:global-and-project")
+                major_work_found['config_system'] = True
+
+        # Session extraction implementation
+        if not major_work_found['extraction_impl']:
+            if ('transcript' in combined and 'parsing' in combined) or \
+               ('nlp' in combined and 'extraction' in combined) or \
+               ('comprehensive' in combined and 'extraction' in combined):
+                codes.append("implement:session-extraction:transcript-nlp-codes")
+                major_work_found['extraction_impl'] = True
+
+    # 2. Extract tool calls WITH CONTEXT from surrounding messages
+    tool_calls = extract_tool_calls_from_transcript(transcript)
+    file_context = {}  # Maps filename -> list of contexts
+
+    # Build context map from conversations
+    for i, (user_msg, ai_msg) in enumerate(conversations):
+        msg_text = (user_msg + ' ' + ai_msg).lower()
+
+        # Extract what work is being discussed
+        work_contexts = []
+        if 'transcript' in msg_text and 'parsing' in msg_text:
+            work_contexts.append('transcript-parsing')
+        if 'nlp' in msg_text or 'extraction' in msg_text or 'keyword' in msg_text:
+            work_contexts.append('nlp-extraction')
+        if 'quality' in msg_text and ('filter' in msg_text or 'check' in msg_text):
+            work_contexts.append('quality-filter')
+        if 'dedupe' in msg_text or 'duplicate' in msg_text:
+            work_contexts.append('deduplication')
+        if 'delete' in msg_text and 'read' in msg_text:
+            work_contexts.append('delete-on-read')
+        if 'semantic' in msg_text:
+            work_contexts.append('semantic-analysis')
+        if 'fts5' in msg_text or 'index' in msg_text:
+            work_contexts.append('fts5-index')
+        if 'config' in msg_text and ('user' in msg_text or 'hierarchical' in msg_text):
+            work_contexts.append('config-system')
+        if 'hook' in msg_text and 'session' in msg_text:
+            work_contexts.append('session-hooks')
+        if 'sqlite' in msg_text:
+            work_contexts.append('sqlite-backend')
+        if 'comprehensive' in msg_text:
+            work_contexts.append('comprehensive-extraction')
+        if 'pattern' in msg_text:
+            work_contexts.append('pattern-matching')
+
+        # Map contexts to files mentioned
+        for context in work_contexts:
+            # Look for file mentions in next few tool calls
+            for j in range(max(0, i-2), min(len(tool_calls), i+3)):
+                if j < len(tool_calls):
+                    call = tool_calls[j]
+                    if call['tool'] in ('Edit', 'Write'):
+                        file_path = call['params'].get('file_path', '')
+                        if file_path:
+                            filename = Path(file_path).name
+                            if filename not in file_context:
+                                file_context[filename] = []
+                            if context not in file_context[filename]:
+                                file_context[filename].append(context)
+
+    # Generate impl: codes with context
+    files_processed = set()
+    for call in tool_calls:
+        tool = call['tool']
+        params = call['params']
+
+        if tool in ('Edit', 'Write'):
+            file_path = params.get('file_path', '')
+            if file_path:
+                filename = Path(file_path).name
+                if filename in files_processed:
+                    continue
+                files_processed.add(filename)
+
+                # Add context if we have it
+                contexts = file_context.get(filename, [])
+                if contexts:
+                    for ctx in contexts[:3]:  # Max 3 contexts per file
+                        codes.append(f"impl:{filename}:{ctx}")
+                else:
+                    # Fallback: just filename
+                    codes.append(f"impl:{filename}")
+
+    # Analyze bash commands for completions
+    bash_commands = [call['params'].get('command', '') for call in tool_calls if call['tool'] == 'Bash']
+    for cmd in bash_commands:
+        cmd_lower = cmd.lower()
+        if 'pytest' in cmd_lower or 'test' in cmd_lower:
+            codes.append("done:tests:pytest")
+        elif 'git commit' in cmd_lower:
+            codes.append("done:git:commit")
+        elif 'git push' in cmd_lower:
+            codes.append("done:git:push")
+        elif 'build' in cmd_lower or 'compile' in cmd_lower:
+            codes.append("done:build")
+
+    # 3. Extract DECISIONS with context and rationale
+    decision_patterns_contextual = [
+        # With reason/alternative
+        (r'use\s+(\w+(?:\s+\w+){0,2})\s+instead\s+of\s+(\w+(?:\s+\w+){0,2})',
+         lambda m: f"dec:use-{extract_keywords(m.group(1), 2)}:not-{extract_keywords(m.group(2), 2)}"),
+        (r'(?:removed|deleted)\s+(?:completely\s+)?after\s+(?:being\s+)?(?:read|injected)',
+         lambda m: f"dec:delete-on-read:prevent-bloat"),
+        (r"(?:make\s+sure\s+)?(?:no|there'?s\s+no)\s+more\s+(.{5,30}?)(?:\s+files?|\s+or|\.|$)",
+         lambda m: f"dec:remove-{extract_keywords(m.group(1), 2)}:cleanup"),
+        (r'(?:within|under)\s+(?:the\s+)?(\d+(?:-\d+)?k?)\s+tokens?',
+         lambda m: f"dec:token-limit:{m.group(1)}"),
+        (r'compact.*ai\s+only',
+         lambda m: f"dec:ai-only-format:no-human-prose"),
+        (r'sqlite\s+(?:for|database|backend)',
+         lambda m: f"dec:sqlite-backend:not-json"),
+        (r'needs?\s+to\s+be\s+(perfect|accurate|compact|clear)',
+         lambda m: f"dec:quality-{m.group(1)}"),
+        (r'hierarchical.*config',
+         lambda m: f"dec:hierarchical-config:global-and-project"),
+        (r'(?:config|configuration)\s+option',
+         lambda m: f"dec:add-config-option:user-control"),
+    ]
+
+    for user_msg, ai_msg in conversations:
+        if len(user_msg) < 20:
+            continue
+
+        msg_lower = user_msg.lower()
+        ai_lower = ai_msg.lower() if ai_msg else ''
+
+        # Extract DECISIONS with context
+        for pattern, formatter in decision_patterns_contextual:
+            match = re.search(pattern, msg_lower, re.IGNORECASE)
+            if match:
+                try:
+                    code = formatter(match)
+                    if code and len(code) > 10:
+                        codes.append(code)
+                except:
+                    pass
+
+        # Extract FIXES from assistant messages (what was fixed + how)
+        fix_patterns = [
+            (r'fixed\s+(.{10,40}?)\s+by\s+(.{10,50}?)(?:\.|$)',
+             lambda m: f"fix:{extract_keywords(m.group(1), 3)}:{extract_keywords(m.group(2), 4)}"),
+            (r'(?:search|cerberus)\s+(?:was\s+)?(?:failing|broken).*(?:added|fixed)\s+(.{10,40}?)(?:\.|$)',
+             lambda m: f"fix:search:{extract_keywords(m.group(1), 4)}"),
+        ]
+
+        for pattern, formatter in fix_patterns:
+            match = re.search(pattern, ai_lower, re.IGNORECASE)
+            if match:
+                try:
+                    code = formatter(match)
+                    if code and len(code) > 12:
+                        codes.append(code)
+                except:
+                    pass
+
+        # Extract BLOCKERS with specifics
+        blocker_patterns_contextual = [
+            (r'(?:session\s+)?end\s+hook.*error(?:ing)?',
+             'block:session-end-hook:erroring'),
+            (r'(?:cerberus|search)\s+(?:is\s+)?broken.*(?:search|empty|failing)',
+             'block:cerberus-search:empty-results'),
+            (r"can'?t\s+(.{10,40}?)\s+(?:because|until)\s+(.{10,40}?)(?:\.|$)",
+             lambda m: f"block:{extract_keywords(m.group(1), 3)}:needs-{extract_keywords(m.group(2), 3)}"),
+        ]
+
+        for pattern, formatter in blocker_patterns_contextual:
+            match = re.search(pattern, msg_lower, re.IGNORECASE)
+            if match:
+                if callable(formatter):
+                    try:
+                        code = formatter(match)
+                        if len(code) > 12:
+                            codes.append(code)
+                    except:
+                        pass
+                else:
+                    codes.append(formatter)
+
+        # Extract NEXT ACTIONS with context
+        next_patterns_contextual = [
+            (r'(?:we\s+)?need\s+to\s+(.{10,50}?)(?:\.|,|$)',
+             lambda m: f"next:{extract_keywords(m.group(1), 5)}"),
+            (r'figure\s+out\s+(.{10,50}?)(?:\.|$)',
+             lambda m: f"next:investigate-{extract_keywords(m.group(1), 5)}"),
+            (r'(?:run\s+through|audit)\s+(.{10,40}?)(?:\.|$)',
+             lambda m: f"next:audit-{extract_keywords(m.group(1), 4)}"),
+        ]
+
+        for pattern, formatter in next_patterns_contextual:
+            match = re.search(pattern, msg_lower, re.IGNORECASE)
+            if match:
+                try:
+                    code = formatter(match)
+                    if code and len(code) > 10:
+                        codes.append(code)
+                except:
+                    pass
+
+        # Extract COMPLETIONS with context
+        completion_patterns_contextual = [
+            (r'(?:awesome|great).*(?:now|so)\s+(.{10,40}?)\s+(?:is\s+)?(?:working|functional)',
+             lambda m: f"done:{extract_keywords(m.group(1), 3)}:working"),
+            (r'(?:so\s+)?memories\s+(?:are\s+)?working',
+             'done:memories:functional'),
+        ]
+
+        for pattern, formatter in completion_patterns_contextual:
+            match = re.search(pattern, msg_lower, re.IGNORECASE)
+            if match:
+                if callable(formatter):
+                    try:
+                        code = formatter(match)
+                        if code:
+                            codes.append(code)
+                    except:
+                        pass
+                else:
+                    codes.append(formatter)
+
+        # Extract completions from AI messages
+        ai_completion_patterns = [
+            (r'(?:successfully\s+)?(?:implemented|migrated|fixed|removed)\s+(.{10,50}?)(?:\.|$)',
+             lambda m: f"done:{extract_keywords(m.group(1), 5)}"),
+            (r'removed\s+all\s+(.{10,40}?)(?:\s+references|\s+code|\.| $)',
+             lambda m: f"done:removed-{extract_keywords(m.group(1), 3)}"),
+        ]
+
+        for pattern, formatter in ai_completion_patterns:
+            match = re.search(pattern, ai_lower, re.IGNORECASE)
+            if match:
+                try:
+                    code = formatter(match)
+                    if code and len(code) > 10:
+                        codes.append(code)
+                except:
+                    pass
+
+    # 4. Quality filter and deduplicate
+    def is_meaningful(code: str) -> bool:
+        """Filter out fragmented or meaningless codes."""
+        if not code or ':' not in code:
+            return False
+
+        parts = code.split(':')
+        category = parts[0]
+
+        # Minimum length
+        if len(code) < 12:
+            return False
+
+        # Filter codes with question marks (not actual actions)
+        if '?' in code:
+            return False
+
+        # Filter meaningless single-word fragments
+        meaningless_patterns = [
+            ':now:', ':then:', ':ok:', ':yes:', ':no:', ':fix:',
+            ':what:', ':this:', ':that:'
+        ]
+        if any(pattern in code for pattern in meaningless_patterns):
+            return False
+
+        return True
+
+    def semantic_dedupe(codes_list: List[str]) -> List[str]:
+        """Remove semantically duplicate codes."""
+        unique = []
+        seen = set()
+
+        for code in codes_list:
+            if ':' not in code:
+                continue
+
+            # Exact duplicate check
+            if code in seen:
+                continue
+
+            # For hierarchical codes, check for semantic duplicates
+            # E.g., "impl:file.py:feature-a" vs "impl:file.py:feature-a" (exact)
+            # But allow "impl:file.py:feature-a" and "impl:file.py:feature-b" (different)
+
+            # Get normalized form (lowercase, collapse multiple colons)
+            normalized = code.lower().strip()
+
+            # Check if very similar code exists
+            is_duplicate = False
+            for existing in seen:
+                # If 90%+ character overlap and same category, likely duplicate
+                if existing.split(':')[0] == normalized.split(':')[0]:  # Same category
+                    existing_content = ':'.join(existing.split(':')[1:])
+                    current_content = ':'.join(normalized.split(':')[1:])
+
+                    if existing_content and current_content:
+                        # Character-level similarity
+                        shorter = min(len(existing_content), len(current_content))
+                        longer = max(len(existing_content), len(current_content))
+
+                        # Count matching characters
+                        matches = sum(1 for a, b in zip(existing_content, current_content) if a == b)
+                        similarity = matches / longer if longer > 0 else 0
+
+                        if similarity > 0.85:
+                            is_duplicate = True
+                            break
+
+            if not is_duplicate:
+                unique.append(code)
+                seen.add(normalized)
+
+        return unique
+
+    # Apply quality filter
+    quality_codes = [c for c in codes if is_meaningful(c)]
+
+    # Deduplicate
+    unique_codes = semantic_dedupe(quality_codes)
+
+    # Limit to 150 codes (~1500 tokens target)
+    return unique_codes[:150]
+
+
+def save_session_context_to_db():
+    """
+    Save session context codes to SQLite sessions table.
+
+    Called at session end to persist work summary.
+    """
+    from cerberus.memory.session_continuity import detect_session_scope
+    import sqlite3
+    import uuid
+
+    codes = extract_session_codes()
+    if not codes:
+        return
+
+    scope, project_path = detect_session_scope()
+
+    # Build context_data JSON - preserve ALL codes with categories
+    context_data = {
+        "work_streams": [c for c in codes if c.startswith(("migrate:", "implement:", "fix:", "integrate:", "add:", "remove:"))],
+        "files": [c for c in codes if c.startswith("impl:")],
+        "completed": [c for c in codes if c.startswith("done:")],
+        "decisions": [c for c in codes if c.startswith("dec:")],
+        "blockers": [c for c in codes if c.startswith("block:")],
+        "next_actions": [c for c in codes if c.startswith("next:")],
+    }
+
+    # Store in sessions table
+    db_path = Path.home() / ".cerberus" / "memory.db"
+    conn = sqlite3.connect(db_path)
+
+    try:
+        # Check if active session exists
+        row = conn.execute("""
+            SELECT id FROM sessions
+            WHERE scope = ? AND status = 'active'
+        """, (scope,)).fetchone()
+
+        if row:
+            # Update existing session
+            conn.execute("""
+                UPDATE sessions
+                SET context_data = ?, last_activity = CURRENT_TIMESTAMP
+                WHERE scope = ? AND status = 'active'
+            """, (json.dumps(context_data), scope))
+        else:
+            # Create new session
+            session_id = f"session-{uuid.uuid4().hex[:12]}"
+            conn.execute("""
+                INSERT INTO sessions (id, scope, project_path, status, context_data)
+                VALUES (?, ?, ?, 'active', ?)
+            """, (session_id, scope, project_path, json.dumps(context_data)))
+
+        conn.commit()
+    finally:
+        conn.close()

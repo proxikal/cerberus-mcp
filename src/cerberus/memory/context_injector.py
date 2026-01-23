@@ -31,6 +31,9 @@ from cerberus.memory.anchoring import AnchorEngine
 # Phase 15: Mode-Aware Context
 from cerberus.memory.mode_detection import ModeDetector
 
+# Session Continuity: Load previous session work context
+from cerberus.memory.session_continuity import SessionContextInjector
+
 
 @dataclass
 class DetectedContext:
@@ -208,6 +211,7 @@ class ContextInjector:
         Priority: High relevance only (min_relevance=0.5)
 
         Phase 15: Filters by detected mode if user_prompt provided
+        Phase 17+: Includes previous session work context (read-once-delete)
 
         Args:
             context: Optional detected context (auto-detects if None)
@@ -215,11 +219,33 @@ class ContextInjector:
             min_relevance: Minimum relevance score (default: 0.5)
 
         Returns:
-            Markdown-formatted memories for injection
+            Markdown-formatted memories for injection with optional session context
         """
         if context is None:
             detector = ContextDetector()
             context = detector.detect()
+
+        output_sections = []
+        has_session_context = False
+
+        # Try to load previous session work context (read-once-delete pattern)
+        try:
+            session_injector = SessionContextInjector()
+            session_package = session_injector.inject()
+
+            if session_package:
+                has_session_context = True
+                # Format session context section - clean AI format
+                session_lines = [
+                    "## Session Context",
+                    f"*{session_package.scope}*",
+                    "",
+                    session_package.codes
+                ]
+                output_sections.append("\n".join(session_lines))
+        except Exception:
+            # Silently fail if session loading fails - don't block startup
+            pass
 
         # Retrieve memories with startup budget
         memories = self.retrieval.retrieve(
@@ -229,20 +255,31 @@ class ContextInjector:
             min_relevance=min_relevance
         )
 
-        if not memories:
-            return ""
-
         # Phase 15: Filter by mode if enabled
-        if self.enable_mode_filtering and user_prompt and self._mode_detector:
+        if memories and self.enable_mode_filtering and user_prompt and self._mode_detector:
             memories = self._filter_by_mode(memories, user_prompt, context)
 
-        # Format for injection
-        formatted = self._format_memories(memories, context)
+        # Format memories
+        if memories:
+            formatted = self._format_memories(memories, context, has_session=has_session_context)
+            output_sections.append(formatted)
+        else:
+            # No memories - minimal output
+            if not has_session_context:
+                # Only show if we also have no session
+                header_lines = [
+                    "## Memory Context",
+                    f"*Project: {context.project} | Language: {context.language}*" if context.project and context.language else ""
+                ]
+                output_sections.append("\n".join([l for l in header_lines if l]))
+
+        # Combine all sections
+        final_output = "\n\n".join(output_sections)
 
         # Track token usage
-        self.session_tokens_used += self._count_tokens(formatted)
+        self.session_tokens_used += self._count_tokens(final_output)
 
-        return formatted
+        return final_output
 
     def inject_query(
         self,
@@ -313,7 +350,8 @@ class ContextInjector:
         self,
         memories: List[RetrievedMemory],
         context: DetectedContext,
-        query: Optional[str] = None
+        query: Optional[str] = None,
+        has_session: bool = False
     ) -> str:
         """
         Format memories as markdown for Claude.
@@ -322,6 +360,7 @@ class ContextInjector:
             memories: List of retrieved memories
             context: Detected context
             query: Optional query string (for on-demand)
+            has_session: Whether session context was already loaded (for status reporting)
 
         Returns:
             Markdown-formatted string
@@ -331,22 +370,9 @@ class ContextInjector:
 
         lines = []
 
-        # Header
-        if query:
-            lines.append(f"## Memory Context (Query: \"{query}\")")
-        else:
-            lines.append("## Memory Context")
-
-        # Context info
-        context_parts = []
-        if context.project:
-            context_parts.append(f"Project: {context.project}")
-        if context.language:
-            context_parts.append(f"Language: {context.language}")
-
-        if context_parts:
-            lines.append(f"*{' | '.join(context_parts)}*")
-
+        # Minimal header - AI Format
+        lines.append("## Memory Context")
+        lines.append(f"*Project: {context.project} | Language: {context.language}*" if context.project and context.language else "")
         lines.append("")
 
         # Group by category
@@ -368,24 +394,34 @@ class ContextInjector:
             "correction": "Corrections"
         }
 
+        # NO HEADERS. NO PROSE. AI Format only (like session codes)
         for category in ["preference", "rule", "decision", "correction"]:
             items = by_category[category]
             if not items:
                 continue
 
-            lines.append(f"### {category_labels[category]}")
             for memory in items:
-                # Format: - Content (scope badge if not universal)
-                scope_badge = ""
+                # Format: category:content[scope]
+                # NO PROSE. NO MARKDOWN. Pure data.
+                scope_suffix = ""
                 if memory.scope != "universal":
                     if memory.scope.startswith("language:"):
                         lang = memory.scope.split(":", 1)[1]
-                        scope_badge = f" `[{lang}]`"
+                        scope_suffix = f"[{lang}]"
                     elif memory.scope.startswith("project:"):
                         proj = memory.scope.split(":", 1)[1]
-                        scope_badge = f" `[{proj}]`"
+                        scope_suffix = f"[{proj}]"
 
-                lines.append(f"- {memory.content}{scope_badge}")
+                # Map category to prefix
+                prefix_map = {
+                    "preference": "pref",
+                    "rule": "rule",
+                    "decision": "decision",
+                    "correction": "correction"
+                }
+                prefix = prefix_map.get(category, category)
+
+                lines.append(f"{prefix}:{memory.content}{scope_suffix}")
 
                 # Phase 14: Add code example if anchored
                 if self.enable_anchoring and self._anchor_engine and hasattr(memory, 'anchor_file') and memory.anchor_file:
@@ -410,12 +446,7 @@ class ContextInjector:
                         # Skip anchor if reading fails
                         pass
 
-            lines.append("")
-
-        # Footer
-        lines.append(f"*{len(memories)} memories loaded*")
-
-        return "\n".join(lines)
+        return "\n".join([l for l in lines if l])
 
     def _count_tokens(self, text: str) -> int:
         """

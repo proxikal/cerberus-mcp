@@ -188,101 +188,18 @@ def _generate_session_id() -> str:
 
 
 # ============================================================================
-# Session Tracking
+# Session Tracking (SQLite-based via session_lifecycle module)
 # ============================================================================
-
-SESSION_FILE = ".cerberus-session.json"
-
-
-def start_session(context: Optional[HookContext] = None) -> HookContext:
-    """
-    Initialize session state at session start.
-
-    CRITICAL: This is called internally during MCP initialization.
-    The MCP tool memory_context() handles startup injection.
-    There is NO bash hook for session start.
-
-    Args:
-        context: Optional pre-detected context (auto-detect if None)
-
-    Returns:
-        HookContext for the new session
-    """
-    if context is None:
-        context = detect_context()
-
-    state = {
-        "session_id": context.session_id,
-        "started_at": context.timestamp.isoformat(),
-        "working_directory": context.working_directory,
-        "project_name": context.project_name,
-        "language": context.language,
-        "git_repo": context.git_repo,
-        "turn_count": 0,
-        "corrections": []
-    }
-
-    session_file = Path(context.working_directory) / SESSION_FILE
-
-    with open(session_file, "w") as f:
-        json.dump(state, f, indent=2)
-
-    return context
-
-
-def end_session(working_dir: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Load and cleanup session state at session end.
-
-    Note: Session data is already in global DB (~/.cerberus/memory.db).
-    This just cleans up the temporary runtime file.
-
-    Args:
-        working_dir: Working directory (defaults to cwd)
-
-    Returns:
-        Session state dictionary (empty dict if not found)
-    """
-    if working_dir is None:
-        working_dir = os.getcwd()
-
-    session_file = Path(working_dir) / SESSION_FILE
-
-    try:
-        with open(session_file, "r") as f:
-            state = json.load(f)
-    except FileNotFoundError:
-        return {}
-
-    # Delete temp runtime file
-    try:
-        session_file.unlink()
-    except OSError:
-        pass  # Ignore if already deleted
-
-    return state
-
-
-def get_session_state(working_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """
-    Get current session state without ending it.
-
-    Args:
-        working_dir: Working directory (defaults to cwd)
-
-    Returns:
-        Session state dictionary, or None if not found
-    """
-    if working_dir is None:
-        working_dir = os.getcwd()
-
-    session_file = Path(working_dir) / SESSION_FILE
-
-    try:
-        with open(session_file, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return None
+#
+# CRITICAL: Session tracking now uses SQLite exclusively via:
+# - session_lifecycle.py: start_session(), end_session(), update_session_activity()
+# - session_continuity.py: SessionContextCapture (writes to ~/.cerberus/memory.db)
+#
+# NO file-based tracking (.cerberus-session.json) - all data in memory.db
+#
+# For session operations, use:
+#   from cerberus.memory.session_lifecycle import start_session, end_session
+#
 
 
 # ============================================================================
@@ -317,9 +234,13 @@ def propose_hook(interactive: bool = True, batch_threshold: float = 0.9) -> Prop
 
     print("\n🧠 Analyzing session for learning opportunities...\n")
 
-    # Phase 1: Detect corrections
-    analyzer = SessionAnalyzer()
-    candidates = analyzer.get_candidates()
+    # Save session context (work summary) to SQLite
+    from cerberus.memory.session_analyzer import save_session_context_to_db
+    save_session_context_to_db()
+
+    # Phase 1: Detect corrections from transcript
+    from cerberus.memory.session_analyzer import analyze_session_from_transcript
+    candidates = analyze_session_from_transcript()
 
     if not candidates:
         print("✓ No corrections detected this session.")
@@ -341,7 +262,8 @@ def propose_hook(interactive: bool = True, batch_threshold: float = 0.9) -> Prop
 
     # Phase 3: Generate proposals
     engine = ProposalEngine()
-    proposals = engine.generate_proposals(clusters)
+    session_summary = engine.generate_proposals(clusters)
+    proposals = session_summary.proposals
 
     print(f"✓ Generated {len(proposals)} proposal(s)\n")
 
@@ -388,12 +310,29 @@ def propose_hook_with_error_handling(interactive: bool = True, batch_threshold: 
     """
     Safe proposal hook with fallback.
 
+    Checks user config before running. If disabled, exits silently.
     If proposal fails, skip silently (don't block session end).
 
     Args:
         interactive: Whether to use interactive CLI approval
         batch_threshold: Auto-approval threshold for batch mode
     """
+    # Check if session hooks are enabled in config
+    try:
+        from cerberus.user_config import get_user_config
+        config = get_user_config()
+
+        if not config.get("session_hooks.enabled", True):
+            # Hooks disabled - exit silently
+            return
+
+        # Override interactive/batch_threshold from config if specified
+        interactive = config.get("session_hooks.interactive", interactive)
+        batch_threshold = config.get("session_hooks.batch_threshold", batch_threshold)
+    except Exception as e:
+        # If config fails to load, proceed with defaults
+        pass
+
     try:
         propose_hook(interactive=interactive, batch_threshold=batch_threshold)
     except KeyboardInterrupt:

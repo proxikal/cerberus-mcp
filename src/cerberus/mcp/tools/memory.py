@@ -2,11 +2,6 @@
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
-from cerberus.memory.store import MemoryStore
-from cerberus.memory.profile import ProfileManager, Profile
-from cerberus.memory.decisions import DecisionManager
-from cerberus.memory.corrections import CorrectionManager
-from cerberus.memory.context import ContextGenerator  # OLD system (kept for backwards compat)
 from cerberus.memory.extract import GitExtractor
 
 # Phase 7: NEW Adaptive Memory System (Context Injection)
@@ -24,48 +19,12 @@ from cerberus.memory.retrieval import MemoryRetrieval
 
 
 def register(mcp):
-    # Lazy singletons to avoid repeated disk I/O
-    _store: Optional[MemoryStore] = None
-    _profile: Optional[ProfileManager] = None
-    _decisions: Optional[DecisionManager] = None
-    _corrections: Optional[CorrectionManager] = None
-    _context: Optional[ContextGenerator] = None
+    # Lazy singleton for GitExtractor
     _extractor: Optional[GitExtractor] = None
-
-    def get_store() -> MemoryStore:
-        nonlocal _store
-        if _store is None:
-            _store = MemoryStore()
-        return _store
-
-    def get_profile() -> ProfileManager:
-        nonlocal _profile
-        if _profile is None:
-            _profile = ProfileManager(get_store())
-        return _profile
-
-    def get_decisions() -> DecisionManager:
-        nonlocal _decisions
-        if _decisions is None:
-            _decisions = DecisionManager(get_store())
-        return _decisions
-
-    def get_corrections() -> CorrectionManager:
-        nonlocal _corrections
-        if _corrections is None:
-            _corrections = CorrectionManager(get_store())
-        return _corrections
-
-    def get_context() -> ContextGenerator:
-        nonlocal _context
-        if _context is None:
-            _context = ContextGenerator(get_store())
-        return _context
 
     def get_extractor() -> GitExtractor:
         nonlocal _extractor
         if _extractor is None:
-            from cerberus.memory.storage import MemoryStorage
             _extractor = GitExtractor(storage=MemoryStorage())
         return _extractor
 

@@ -48,12 +48,13 @@ CREATE INDEX IF NOT EXISTS idx_symbols_parent_class ON symbols(parent_class) WHE
 CREATE INDEX IF NOT EXISTS idx_symbols_file_range ON symbols(file_path, start_line, end_line);
 
 -- Phase 7: FTS5 virtual table for zero-RAM keyword search
--- Indexes symbol name, type, and signature using SQLite's full-text search engine
+-- Indexes symbol name, type, signature, and file_path using SQLite's full-text search engine
+-- file_path is now indexed to support filename searches (e.g., "cli.py", "main.go")
 CREATE VIRTUAL TABLE IF NOT EXISTS symbols_fts USING fts5(
     name,
     type,
     signature,
-    file_path UNINDEXED,
+    file_path,
     start_line UNINDEXED,
     end_line UNINDEXED,
     content='symbols',
@@ -216,7 +217,7 @@ CREATE INDEX IF NOT EXISTS idx_blueprint_cache_file ON blueprint_cache(file_path
 CREATE INDEX IF NOT EXISTS idx_blueprint_cache_expires ON blueprint_cache(expires_at);
 
 -- Initialize schema version
-INSERT OR IGNORE INTO metadata (key, value) VALUES ('schema_version', '1.1.0');
+INSERT OR IGNORE INTO metadata (key, value) VALUES ('schema_version', '1.3.0');
 INSERT OR IGNORE INTO metadata (key, value) VALUES ('created_at', strftime('%s', 'now'));
 """
 
@@ -245,6 +246,7 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     Run forward-only schema/data migrations.
 
     - 1.2.0: purge duplicate symbols and enforce uniqueness.
+    - 1.3.0: rebuild FTS5 table with file_path indexed for filename searches.
     """
     # Fetch current version (default to 1.1.0 if unset)
     cur = conn.execute("SELECT value FROM metadata WHERE key = 'schema_version'")
@@ -275,3 +277,65 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
             "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', '1.2.0')"
         )
         conn.commit()
+
+    # Migration to 1.3.0: rebuild FTS5 table with file_path indexed
+    if current_version < "1.3.0":
+        logger.info("Migrating to schema 1.3.0: rebuilding FTS5 with searchable file_path")
+
+        # Drop old FTS5 table and triggers
+        conn.execute("DROP TRIGGER IF EXISTS symbols_ai")
+        conn.execute("DROP TRIGGER IF EXISTS symbols_ad")
+        conn.execute("DROP TRIGGER IF EXISTS symbols_au")
+        conn.execute("DROP TABLE IF EXISTS symbols_fts")
+
+        # Create new FTS5 table with file_path indexed
+        conn.execute("""
+            CREATE VIRTUAL TABLE symbols_fts USING fts5(
+                name,
+                type,
+                signature,
+                file_path,
+                start_line UNINDEXED,
+                end_line UNINDEXED,
+                content='symbols',
+                content_rowid='id'
+            )
+        """)
+
+        # Recreate triggers
+        conn.execute("""
+            CREATE TRIGGER symbols_ai AFTER INSERT ON symbols BEGIN
+                INSERT INTO symbols_fts(rowid, name, type, signature, file_path, start_line, end_line)
+                VALUES (new.id, new.name, new.type, COALESCE(new.signature, ''), new.file_path, new.start_line, new.end_line);
+            END
+        """)
+
+        conn.execute("""
+            CREATE TRIGGER symbols_ad AFTER DELETE ON symbols BEGIN
+                INSERT INTO symbols_fts(symbols_fts, rowid, name, type, signature, file_path, start_line, end_line)
+                VALUES ('delete', old.id, old.name, old.type, COALESCE(old.signature, ''), old.file_path, old.start_line, old.end_line);
+            END
+        """)
+
+        conn.execute("""
+            CREATE TRIGGER symbols_au AFTER UPDATE ON symbols BEGIN
+                INSERT INTO symbols_fts(symbols_fts, rowid, name, type, signature, file_path, start_line, end_line)
+                VALUES ('delete', old.id, old.name, old.type, COALESCE(old.signature, ''), old.file_path, old.start_line, old.end_line);
+                INSERT INTO symbols_fts(rowid, name, type, signature, file_path, start_line, end_line)
+                VALUES (new.id, new.name, new.type, COALESCE(new.signature, ''), new.file_path, new.start_line, new.end_line);
+            END
+        """)
+
+        # Repopulate FTS5 table from existing symbols
+        conn.execute("""
+            INSERT INTO symbols_fts(rowid, name, type, signature, file_path, start_line, end_line)
+            SELECT id, name, type, COALESCE(signature, ''), file_path, start_line, end_line
+            FROM symbols
+        """)
+
+        conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', '1.3.0')"
+        )
+        conn.commit()
+
+        logger.info("Migration to 1.3.0 complete: file_path is now searchable in FTS5")

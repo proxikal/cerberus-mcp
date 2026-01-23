@@ -1,6 +1,7 @@
 """Search tool - hybrid keyword + semantic search."""
-from typing import Dict, Any
+from typing import Dict, Any, List
 from pathlib import Path
+import re
 
 from cerberus.retrieval import hybrid_search
 
@@ -9,6 +10,82 @@ from cerberus.mcp.tools.token_utils import (
     add_warning,
     estimate_json_tokens,
 )
+
+
+# Common words to ignore when extracting keywords
+STOP_WORDS = {
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "should",
+    "could", "may", "might", "can", "this", "that", "these", "those",
+    "where", "what", "when", "how", "why", "find", "get", "show", "list",
+    "all", "any", "some", "for", "with", "from", "to", "of", "in", "on", "at"
+}
+
+
+def extract_keywords(query: str) -> List[str]:
+    """
+    Extract meaningful keywords from a natural language query.
+
+    Args:
+        query: Search query
+
+    Returns:
+        List of keywords (excluding stop words)
+    """
+    # Lowercase and split on non-word characters
+    words = re.findall(r'\w+', query.lower())
+
+    # Filter out stop words and very short words
+    keywords = [w for w in words if w not in STOP_WORDS and len(w) > 2]
+
+    return keywords
+
+
+def generate_suggestions(query: str, index_path: Path, limit: int = 5) -> List[str]:
+    """
+    Generate query suggestions when search returns empty results.
+
+    Extracts keywords from query and searches for each individually,
+    returning the most relevant filenames and symbols.
+
+    Args:
+        query: Original search query
+        index_path: Path to index
+        limit: Max suggestions to return
+
+    Returns:
+        List of suggested search terms
+    """
+    keywords = extract_keywords(query)
+
+    if not keywords:
+        return []
+
+    # Try searching for each keyword
+    suggestions = set()
+    for keyword in keywords[:3]:  # Limit to first 3 keywords to avoid too many searches
+        try:
+            results = hybrid_search(
+                query=keyword,
+                index_path=index_path,
+                mode="keyword",
+                top_k=3,  # Only need a few results per keyword
+            )
+
+            for r in results[:2]:  # Top 2 results per keyword
+                # Add filename if it looks relevant
+                filename = Path(r.symbol.file_path).name
+                if keyword.lower() in filename.lower():
+                    suggestions.add(filename)
+
+                # Add symbol name if it looks relevant
+                if keyword.lower() in r.symbol.name.lower():
+                    suggestions.add(r.symbol.name)
+        except:
+            # If keyword search fails, skip it
+            pass
+
+    return sorted(list(suggestions))[:limit]
 
 
 def register(mcp):
@@ -86,6 +163,16 @@ def register(mcp):
             })
 
         response = {"result": result_list}
+
+        # If no results, generate query suggestions
+        if not result_list:
+            suggestions = generate_suggestions(query, index_path, limit=5)
+            if suggestions:
+                response["suggestions"] = suggestions
+                add_warning(
+                    response,
+                    f"No results found for '{query}'. Try searching for: {', '.join(suggestions[:3])}"
+                )
 
         # Check if fallback happened (semantic/balanced mode with no embeddings)
         fallback_used = result_list and result_list[0].get("match_type") == "keyword_fallback"

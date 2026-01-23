@@ -284,6 +284,8 @@ class SessionContextInjector:
         """
         Load codes for injection. Return None if no active session.
 
+        CRITICAL: Deletes session after reading (read-once, dispose).
+
         Args:
             scope: Optional scope override. If None, auto-detects.
         """
@@ -297,14 +299,15 @@ class SessionContextInjector:
 
         # Check if idle (configurable threshold)
         if self._is_idle(context, self.idle_days):
-            self._archive_session(context['id'])
+            self._delete_session(context['id'])
             return None
 
-        # Update last_accessed
-        self._touch_session(context['id'])
-
+        # Format codes before deleting
         codes = self._format_codes(context)
         token_count = self._count_tokens(codes)
+
+        # Delete session after reading (read-once, dispose)
+        self._delete_session(context['id'])
 
         return InjectionPackage(
             codes=codes,
@@ -343,26 +346,15 @@ class SessionContextInjector:
         except (ValueError, TypeError):
             return True
 
-    def _archive_session(self, session_id: str):
-        """Archive idle session."""
-        conn = sqlite3.connect(self.db_path)
-        conn.execute("""
-            UPDATE sessions
-            SET status = 'archived'
-            WHERE id = ?
-        """, (session_id,))
-        conn.commit()
-        conn.close()
+    def _delete_session(self, session_id: str):
+        """
+        Delete session after reading (read-once, dispose).
 
-    def _touch_session(self, session_id: str):
-        """Update last_accessed timestamp."""
-        from datetime import datetime
+        This prevents database bloat from accumulating sessions.
+        """
         conn = sqlite3.connect(self.db_path)
-        conn.execute("""
-            UPDATE sessions
-            SET last_accessed = ?
-            WHERE id = ?
-        """, (datetime.now().isoformat(), session_id))
+        conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+        conn.execute("DELETE FROM session_activity WHERE session_id = ?", (session_id,))
         conn.commit()
         conn.close()
 
@@ -370,6 +362,8 @@ class SessionContextInjector:
         """
         Format codes for injection.
         NO PROSE. NO MARKDOWN. Pure data.
+
+        Order: scope → work_streams → files → decisions → blockers → next_actions → completed
         """
         data = json.loads(session['context_data'])
 
@@ -378,18 +372,29 @@ class SessionContextInjector:
         if session['phase']:
             lines.append(f"phase:{session['phase']}")
 
+        # Major work streams first (big picture)
+        for item in data.get("work_streams", []):
+            lines.append(item)
+
+        # Files modified (with context)
         for item in data.get("files", []):
             lines.append(item)
-        for item in data.get("functions", []):
-            lines.append(item)
+
+        # Decisions
         for item in data.get("decisions", []):
             lines.append(item)
+
+        # Blockers
         for item in data.get("blockers", []):
             lines.append(item)
+
+        # Next actions
         for item in data.get("next_actions", []):
             lines.append(item)
+
+        # Completions (already have "done:" prefix)
         for item in data.get("completed", []):
-            lines.append(f"done:{item}")
+            lines.append(item)
 
         return "\n".join(lines)
 
@@ -398,16 +403,23 @@ class SessionContextInjector:
         return int(len(text.split()) * 1.3)
 
     def mark_complete(self, scope: Optional[str] = None):
-        """Mark session as completed (archived)."""
+        """Mark session as completed (delete it)."""
         if scope is None:
             scope, _ = detect_session_scope()
 
         conn = sqlite3.connect(self.db_path)
-        conn.execute("""
-            UPDATE sessions
-            SET status = 'archived'
+
+        # Get session ID first
+        row = conn.execute("""
+            SELECT id FROM sessions
             WHERE scope = ? AND status = 'active'
-        """, (scope,))
+        """, (scope,)).fetchone()
+
+        if row:
+            session_id = row[0]
+            conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            conn.execute("DELETE FROM session_activity WHERE session_id = ?", (session_id,))
+
         conn.commit()
         conn.close()
 

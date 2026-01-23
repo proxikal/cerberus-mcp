@@ -92,12 +92,45 @@ def main():
         help="CLI tool to test hooks for"
     )
 
+    # Config command group
+    config_parser = subparsers.add_parser("config", help="Configuration management")
+    config_subparsers = config_parser.add_subparsers(dest="config_command")
+
+    # cerberus config get
+    get_parser = config_subparsers.add_parser(
+        "get",
+        help="Get a config value"
+    )
+    get_parser.add_argument("key", help="Config key (e.g., 'session_hooks.enabled')")
+
+    # cerberus config set
+    set_parser = config_subparsers.add_parser(
+        "set",
+        help="Set a config value"
+    )
+    set_parser.add_argument("key", help="Config key (e.g., 'session_hooks.enabled')")
+    set_parser.add_argument("value", help="Config value")
+    set_parser.add_argument(
+        "--global",
+        dest="is_global",
+        action="store_true",
+        help="Set in global config (~/.cerberus/config.json)"
+    )
+
+    # cerberus config list
+    list_parser = config_subparsers.add_parser(
+        "list",
+        help="Show all config values"
+    )
+
     # Parse arguments
     args = parser.parse_args()
 
     # Route to appropriate handler
     if args.command == "memory":
         handle_memory_command(args)
+    elif args.command == "config":
+        handle_config_command(args)
     else:
         parser.print_help()
         sys.exit(1)
@@ -109,7 +142,7 @@ def handle_memory_command(args):
         propose_hook_with_error_handling,
         install_hooks,
         uninstall_hooks,
-        test_hooks
+        verify_hooks
     )
     from cerberus.memory.session_lifecycle import (
         start_session,
@@ -140,7 +173,7 @@ def handle_memory_command(args):
 
     elif args.memory_command == "test-hooks":
         # Test hook installation
-        success = test_hooks(args.cli)
+        success = verify_hooks(args.cli)
         sys.exit(0 if success else 1)
 
     elif args.memory_command == "session-start":
@@ -207,6 +240,62 @@ def handle_memory_command(args):
 
     else:
         print(f"Unknown memory command: {args.memory_command}")
+        sys.exit(1)
+
+
+def handle_config_command(args):
+    """Handle config subcommands."""
+    from cerberus.user_config import get_user_config
+    import json
+
+    config = get_user_config()
+
+    if args.config_command == "get":
+        # Get a config value
+        value = config.get(args.key)
+        if value is not None:
+            if isinstance(value, (dict, list)):
+                print(json.dumps(value, indent=2))
+            else:
+                print(value)
+        else:
+            print(f"Config key '{args.key}' not found")
+            sys.exit(1)
+
+    elif args.config_command == "set":
+        # Set a config value
+        # Try to parse value as JSON first, fallback to string
+        try:
+            parsed_value = json.loads(args.value)
+        except json.JSONDecodeError:
+            # Not JSON - treat as string
+            # Handle booleans
+            if args.value.lower() in ("true", "false"):
+                parsed_value = args.value.lower() == "true"
+            else:
+                parsed_value = args.value
+
+        is_global = getattr(args, "is_global", False)
+        if is_global:
+            success = config.set_global(args.key, parsed_value)
+            scope = "global"
+        else:
+            success = config.set_local(args.key, parsed_value)
+            scope = "local"
+
+        if success:
+            print(f"✓ Set {scope} config: {args.key} = {parsed_value}")
+        else:
+            print(f"✗ Failed to set {scope} config")
+            sys.exit(1)
+
+    elif args.config_command == "list":
+        # List all config
+        all_config = config.get_all()
+        print(json.dumps(all_config, indent=2))
+
+    else:
+        print(f"Unknown config command: {args.config_command}")
         sys.exit(1)
 
 
