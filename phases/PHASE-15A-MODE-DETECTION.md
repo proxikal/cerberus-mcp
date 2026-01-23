@@ -119,7 +119,7 @@ MODES = {
         "rigor": "low",
         "indicators": [
             "review", "audit", "analyze", "understand", "explain",
-            "how does", "what does", "show me"
+            "how does", "what does", "walk me through"
         ],
         "scope_indicators": ["read-only", "no changes"],
         "time_indicators": [],

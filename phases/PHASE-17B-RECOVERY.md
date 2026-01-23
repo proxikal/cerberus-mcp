@@ -1,3 +1,15 @@
+# PHASE 17B: RECOVERY
+
+**Rollout Phase:** Epsilon (Weeks 9-10)
+**Status:** Implement after Phase 17A
+
+## Prerequisites
+
+- ✅ Phase 17A complete (session lifecycle working)
+- ✅ Phase 16 complete (integration hooks working)
+
+---
+
 ## Crash Detection & Recovery
 
 ### Crash Detection
@@ -8,13 +20,14 @@ def detect_crash() -> Optional[SessionState]:
     Detect if previous session crashed.
 
     Strategy:
-    1. Check for .cerberus/session_active.json
+    1. Check for .cerberus-session.json (temp runtime file)
     2. If exists and last_activity > 5 minutes ago, assume crash
+    3. Session data will be updated in global DB (~/.cerberus/memory.db)
 
     Returns:
         Crashed SessionState if detected, None otherwise
     """
-    session_file = Path(".cerberus/session_active.json")
+    session_file = Path(".cerberus-session.json")
 
     if not session_file.exists():
         return None
@@ -119,22 +132,22 @@ def recover_crashed_session(session_id: str, discard: bool = False) -> None:
         session_id: Crashed session ID
         discard: If True, discard without processing
     """
-    archive_file = Path(f".cerberus/sessions/crashed/{session_id}.json")
+    db_path = Path.home() / ".cerberus" / "memory.db"
 
-    if not archive_file.exists():
+    # Query crashed session from global DB
+    # SELECT * FROM sessions WHERE session_id=? AND status='crashed'
+
+    if not session_found:
         print(f"No crashed session found: {session_id}")
         return
 
     if discard:
-        archive_file.unlink()
+        # DELETE FROM sessions WHERE session_id=?
         print(f"Discarded crashed session: {session_id}")
         return
 
-    # Load state
-    with open(archive_file, "r") as f:
-        state_data = json.load(f)
-
-    state = SessionState(**state_data)
+    # Load state from DB
+    state = SessionState(**session_data)
 
     # Run proposal pipeline
     from cerberus.memory.hooks import propose_hook
@@ -164,7 +177,7 @@ def _write_session_state(state: SessionState, file_path: Optional[Path] = None) 
     import fcntl
 
     if file_path is None:
-        file_path = Path(".cerberus/session_active.json")
+        file_path = Path(".cerberus-session.json")
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -182,7 +195,7 @@ def _load_session_state(file_path: Optional[Path] = None) -> SessionState:
     import fcntl
 
     if file_path is None:
-        file_path = Path(".cerberus/session_active.json")
+        file_path = Path(".cerberus-session.json")
 
     with open(file_path, "r") as f:
         fcntl.flock(f.fileno(), fcntl.LOCK_SH)
@@ -205,31 +218,27 @@ def _load_session_state(file_path: Optional[Path] = None) -> SessionState:
 ```python
 def get_session_history(days: int = 7) -> List[Dict[str, Any]]:
     """
-    Get session history for last N days.
+    Get session history for last N days from global DB.
 
     Returns:
         List of session summaries
     """
-    archive_dir = Path(".cerberus/sessions/ended")
-
-    if not archive_dir.exists():
-        return []
-
+    db_path = Path.home() / ".cerberus" / "memory.db"
     cutoff = datetime.now() - timedelta(days=days)
+
+    # Query from global DB:
+    # SELECT * FROM sessions
+    # WHERE started_at > ?
+    # AND status IN ('completed', 'crashed')
+    # ORDER BY started_at DESC
+
     sessions = []
-
-    for file in archive_dir.glob("*.json"):
-        with open(file, "r") as f:
-            session = json.load(f)
-
-        started = datetime.fromisoformat(session["started_at"])
-
-        if started > cutoff:
-            sessions.append({
-                "session_id": session["session_id"],
-                "started_at": session["started_at"],
-                "ended_at": session.get("ended_at"),
-                "duration_minutes": _calculate_duration(session),
+    for session_row in db_results:
+        sessions.append({
+            "session_id": session_row["session_id"],
+            "started_at": session_row["started_at"],
+            "ended_at": session_row.get("ended_at"),
+            "duration_minutes": _calculate_duration(session_row),
                 "correction_count": len(session["corrections"]),
                 "tool_count": len(session["tools_used"]),
                 "modified_files": len(session["modified_files"]),

@@ -1,3 +1,16 @@
+# PHASE 15B: MODE INTEGRATION
+
+**Rollout Phase:** Delta (Weeks 7-8)
+**Status:** Implement after Phase 15A
+
+## Prerequisites
+
+- ✅ Phase 15A complete (mode detection algorithm working)
+- ✅ Phase 7 complete (context injection working)
+- ✅ Phase 5 complete (storage working)
+
+---
+
 ## Memory Tagging
 
 ### Manual Tagging (CLI)

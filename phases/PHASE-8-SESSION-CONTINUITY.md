@@ -43,8 +43,8 @@ Capture session context during work, inject at next session start. Zero re-expla
 class SessionContext:
     """Active session context."""
     id: str  # UUID
-    scope: str  # "global" or "project:{name}"
-    project_path: Optional[str]  # Full path to project root (NULL for global)
+    scope: str  # "universal" or "project:{name}"
+    project_path: Optional[str]  # Full path to project root (NULL for universal)
     phase: Optional[str]  # "PHASE-2-SEMANTIC", "feature-auth", etc.
     completed: List[str]  # ["impl:semantic_analyzer.py", "test:clustering"]
     next_actions: List[str]  # ["test:deduplication", "integrate:phase3"]
@@ -67,11 +67,24 @@ class InjectionPackage:
     scope: str
 ```
 
+### Session Cleanup Configuration
+
+```python
+# Configurable archive/cleanup thresholds
+SESSION_ARCHIVE_THRESHOLDS = {
+    "idle_days": 7,  # Days before archiving idle sessions (default)
+}
+```
+
+**Purpose:**
+- **idle_days** (7 days): Archive sessions with no activity for N days
+- Configurable per invocation in cleanup functions
+
 ---
 
 ## Storage Schema (SQLite)
 
-**Database:** `~/.cerberus/memory.db` (unified with Phase 12)
+**Database:** `~/.cerberus/memory.db` (single global SQLite database, unified with Phase 12)
 
 **Schema location:** Phase 12 (PHASE-12-MEMORY-INDEXING.md)
 
@@ -81,7 +94,7 @@ Phase 12 contains the complete sessions schema including:
 - Indexes: scope+status, last_accessed, project_path (conditional)
 
 **Key schema details:**
-- `scope`: "global" or "project:{name}" (multi-tier sessions)
+- `scope`: "universal" or "project:{name}" (multi-tier sessions)
 - `status`: "active", "idle", "archived"
 - `context_data`: JSON blob with {files, functions, decisions, blockers, next_actions}
 - Constraint: Only ONE active session per scope (UNIQUE constraint)
@@ -97,17 +110,17 @@ Phase 12 handles migration via `MemoryIndexManager.migrate_sessions_from_json()`
 ```python
 def detect_session_scope() -> tuple[str, Optional[str]]:
     """
-    Detect session scope (global vs project).
+    Detect session scope (universal vs project).
 
     Strategy:
     1. Check if in git repo (walk up to find .git)
     2. If in git repo → project scope (use repo name + path)
-    3. If not in git repo → global scope
+    3. If not in git repo → universal scope
 
     Returns:
         (scope, project_path)
         Examples:
-            ("global", None)
+            ("universal", None)
             ("project:cerberus", "/Users/user/dev/cerberus")
     """
     from pathlib import Path
@@ -123,8 +136,8 @@ def detect_session_scope() -> tuple[str, Optional[str]]:
             return f"project:{project_name}", str(current)
         current = current.parent
 
-    # Not in git repo → global scope
-    return "global", None
+    # Not in git repo → universal scope
+    return "universal", None
 ```
 
 ---
@@ -311,8 +324,13 @@ class SessionContextInjector:
     NO LLM. NO PROSE. Pure data injection.
     """
 
-    def __init__(self, db_path: Path = Path.home() / ".cerberus" / "memory.db"):
+    def __init__(
+        self,
+        db_path: Path = Path.home() / ".cerberus" / "memory.db",
+        idle_days: int = 7
+    ):
         self.db_path = db_path
+        self.idle_days = idle_days  # Configurable archive threshold
 
     def inject(self, scope: Optional[str] = None) -> Optional[InjectionPackage]:
         """
@@ -329,8 +347,8 @@ class SessionContextInjector:
         if not context:
             return None
 
-        # Check if idle (>7 days since last access)
-        if self._is_idle(context):
+        # Check if idle (configurable threshold)
+        if self._is_idle(context, self.idle_days):
             self._archive_session(context['id'])
             return None
 
@@ -366,11 +384,16 @@ class SessionContextInjector:
 
         return dict(row)
 
-    def _is_idle(self, session: Dict) -> bool:
-        """Check if session idle (>7 days since last access)."""
+    def _is_idle(self, session: Dict, idle_days: int = 7) -> bool:
+        """Check if session idle (>N days since last access).
+
+        Args:
+            session: Session dict with last_accessed timestamp
+            idle_days: Days threshold for considering session idle (default 7)
+        """
         try:
             last_accessed = datetime.fromisoformat(session['last_accessed'])
-            return (datetime.now() - last_accessed).days > 7
+            return (datetime.now() - last_accessed).days > idle_days
         except (ValueError, TypeError):
             return True
 
@@ -607,7 +630,7 @@ def memory_context(scope: Optional[str] = None) -> str:
     """
     Load memories + active session for current scope.
 
-    Auto-detects scope (global vs project) if not specified.
+    Auto-detects scope (universal vs project) if not specified.
     """
     return inject_all(scope)
 
@@ -680,24 +703,24 @@ def session_resume(session_id: str) -> str:
 
 ## Token Budget Allocation
 
-**Session context budget: 1000-1500 tokens**
+**Session context budget: 800 tokens (AI-native codes)**
 
 ```
-Files:          300-500 tokens (ALL files modified)
-Functions:      200-400 tokens (ALL functions touched)
-Decisions:      200-300 tokens (ALL decisions made)
-Blockers:       100-200 tokens (ALL blockers)
-Next actions:   100-200 tokens (ALL next actions)
-Metadata:        50-100 tokens (scope, phase)
+impl: (completed work)      300 tokens (~15 items)
+dec: (decisions)            200 tokens (~10 items)
+block: (blockers)           150 tokens (~7 items)
+next: (next actions)        150 tokens (~7 items)
 ────────────────────────────────────────────────────
-Total:         1000-1500 tokens (comprehensive)
+Total:                      800 tokens (~40 items total)
 ```
 
-**Why generous budget:**
+**Why AI-native codes are efficient:**
+- `impl:proxy.go` = 3 tokens vs "I implemented proxy.go" = 5 tokens
+- 3x more dense than prose = more info per token
 - Goal is ZERO re-explanation
-- Worth extra tokens to maintain momentum
 - No LLM cost (pure data)
 - Persistent across sessions (not temporary)
+- Part of 3000 token total (800 session + 1200 memories + 1000 on-demand)
 
 ---
 
@@ -742,7 +765,7 @@ done:test:unit-tests
 **User workflow:**
 1. Working on `project:cerberus` (session A active)
 2. Switch to `project:hydra` (session B active, A remains)
-3. Switch to `/tmp/brainstorm` (global session C active, A+B remain)
+3. Switch to `/tmp/brainstorm` (universal session C active, A+B remain)
 4. Back to `project:cerberus` (resume session A)
 
 **Storage:**
@@ -751,7 +774,7 @@ sessions table:
 id          | scope              | status  | last_accessed
 session-abc | project:cerberus   | active  | 2026-01-22 14:00
 session-def | project:hydra      | active  | 2026-01-22 14:15
-session-ghi | global             | active  | 2026-01-22 14:30
+session-ghi | universal          | active  | 2026-01-22 14:30
 ```
 
 **No data loss. All sessions preserved.**
@@ -766,7 +789,7 @@ session-ghi | global             | active  | 2026-01-22 14:30
 ✓ AutoCapture integration working
 ✓ SessionContextInjector using SQLite
 ✓ SessionCleanupManager using SQLite
-✓ Scope detection (global vs project) working
+✓ Scope detection (universal vs project) working
 ✓ Concurrent sessions working (multiple projects)
 ✓ Save/load from SQLite working
 ✓ Idle detection (7 days) working
@@ -791,7 +814,7 @@ session: implemented 3 functions, modified 2 files
 # Scenario 2: Global scope
 cd /tmp/notes
 session: brainstorming ideas
-→ expect: context with scope="global"
+→ expect: context with scope="universal"
 
 # Scenario 3: Save and load (same project)
 cd ~/projects/hydra
@@ -811,7 +834,7 @@ session: last_accessed 8 days ago
 → expect: archived, not returned
 
 # Scenario 6: Multiple scopes
-sessions: global, project:cerberus, project:hydra
+sessions: universal, project:cerberus, project:hydra
 → load project:cerberus
 → expect: only cerberus codes returned
 

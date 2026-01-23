@@ -123,12 +123,13 @@ def detect_conflicts(
                     memory_a=mem_a,
                     memory_b=mem_b,
                     similarity=similarity,
-                    severity="low",
+                    severity=_calculate_severity(mem_a, mem_b, ConflictType.REDUNDANCY),
                     auto_resolvable=True,
                     recommended_resolution="keep_newer"
                 ))
 
     # Obsolescence detection (separate pass)
+    # NOTE: _detect_obsolescence() must use _calculate_severity() for consistency
     obsolete_conflicts = _detect_obsolescence(memories)
     conflicts.extend(obsolete_conflicts)
 
@@ -189,38 +190,52 @@ def _calculate_severity(
     conflict_type: ConflictType
 ) -> str:
     """
-    Calculate conflict severity.
+    Calculate conflict severity based on standardized scoring.
 
-    Factors:
-    - Scope (universal conflicts more severe)
-    - Recency (recent conflicts more severe)
-    - Confidence (high-confidence conflicts more severe)
+    Scoring factors:
+    - Scope (+3): Universal conflicts more severe than project-specific
+    - Recency (+2): Both memories recent (< 7 days) increases urgency
+    - Confidence (+2): High confidence (> 0.9) increases severity
+    - Type (+2/+1/+0): Conflict type inherent severity
+      - CONTRADICTION: +2 (opposing rules)
+      - OBSOLESCENCE: +1 (superseded rules)
+      - REDUNDANCY: +0 (duplicates, least severe)
+
+    Severity mapping:
+    - score >= 7: critical
+    - score >= 5: high
+    - score >= 3: medium
+    - score < 3: low
 
     Returns:
         "low", "medium", "high", or "critical"
     """
     score = 0
 
-    # Scope factor
+    # Scope factor (+3)
     if mem_a.scope == "universal" or mem_b.scope == "universal":
         score += 3
 
-    # Recency factor (both within 7 days)
+    # Recency factor (+2)
     age_a_days = (datetime.now() - mem_a.created_at).days
     age_b_days = (datetime.now() - mem_b.created_at).days
 
     if age_a_days < 7 and age_b_days < 7:
         score += 2
 
-    # Confidence factor
+    # Confidence factor (+2)
     if mem_a.confidence > 0.9 or mem_b.confidence > 0.9:
         score += 2
 
-    # Contradiction type is inherently severe
+    # Conflict type severity (+2/+1/+0)
     if conflict_type == ConflictType.CONTRADICTION:
-        score += 2
+        score += 2  # Most severe
+    elif conflict_type == ConflictType.OBSOLESCENCE:
+        score += 1  # Medium severity
+    elif conflict_type == ConflictType.REDUNDANCY:
+        score += 0  # Least severe
 
-    # Map score to severity
+    # Map score to severity level
     if score >= 7:
         return "critical"
     elif score >= 5:

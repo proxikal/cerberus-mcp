@@ -1,5 +1,15 @@
 # PHASE 3: SESSION PROPOSAL
 
+**Rollout Phase:** Alpha (Weeks 1-2)
+**Status:** Implement after Phase 2
+
+## Prerequisites
+
+- ✅ Phase 1 complete (correction detection)
+- ✅ Phase 2 complete (semantic clustering)
+
+---
+
 ## Objective
 Generate memory proposals from session corrections using template-based rules.
 

@@ -1,4 +1,14 @@
-# PHASE 6: MAINTENANCE & HEALTH
+# PHASE 11: MAINTENANCE & HEALTH
+
+**Rollout Phase:** Gamma (Weeks 5-6)
+**Status:** Implement after Phase Beta and Phase 8
+
+## Prerequisites
+
+- ✅ Phase Beta complete (SQLite with access tracking)
+- ✅ Phase 8 complete (session cleanup needed)
+
+---
 
 ## Objective
 Auto-maintain memory health: archive stale rules, detect conflicts, promote patterns.

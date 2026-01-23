@@ -40,21 +40,26 @@ Define concrete integration mechanism between memory system and Claude Code CLI.
 │                 SESSION STARTS                                │
 │                          ↓                                    │
 │              ┌───────────────────────┐                        │
-│              │  SessionStart Hook    │                        │
+│              │  MCP Server Running   │                        │
 │              └───────────────────────┘                        │
 │                          ↓                                    │
 │    ┌─────────────────────────────────────────────┐           │
-│    │  Auto-call: memory_context()                │           │
-│    │  (ONE-TIME at session start)                │           │
+│    │  Auto-call MCP tool: memory_context()       │           │
+│    │  (ONE-TIME at session start - no bash hook) │           │
 │    └─────────────────────────────────────────────┘           │
 │                          ↓                                    │
-│    Phase 7: Context-aware memory injection                    │
-│    (1500 tokens: universal + language + project)             │
+│    Phase 7 + 8: Startup auto-injection (2000 tokens)         │
+│    ├─ Phase 7 Memories: 1200 tokens                          │
+│    │   ├─ Universal preferences: 300 tokens                  │
+│    │   ├─ Language rules: 300 tokens                         │
+│    │   ├─ Project decisions: 400 tokens                      │
+│    │   └─ Reserve: 200 tokens                                │
+│    └─ Phase 8 Session codes: 800 tokens                      │
+│        ├─ impl: 300 tokens                                   │
+│        ├─ dec: 200 tokens                                    │
+│        └─ block: + next: 300 tokens                          │
 │                          ↓                                    │
-│    Phase 8: Active session injection                          │
-│    (1000-1500 tokens: files, decisions, blockers)            │
-│                          ↓                                    │
-│         Returns: 2500-3000 tokens (relevant only)             │
+│         Returns: ~2000 tokens (AI-native format)              │
 │                          ↓                                    │
 │              Claude has full context                          │
 │                          ↓                                    │
@@ -63,11 +68,13 @@ Define concrete integration mechanism between memory system and Claude Code CLI.
 │                          ↓                                    │
 │              ┌───────────────────────┐                        │
 │              │  Session End Hook     │                        │
+│              │  (bash - MCP shutting │                        │
+│              │   down, must use CLI) │                        │
 │              └───────────────────────┘                        │
 │                          ↓                                    │
 │    ┌─────────────────────────────────────────────┐           │
 │    │  cerberus memory propose                    │           │
-│    │  (Python subprocess or MCP call)            │           │
+│    │  (CLI command via bash hook)                │           │
 │    └─────────────────────────────────────────────┘           │
 │                          ↓                                    │
 │         Phases 1-4: Detect, cluster, propose, approve         │
@@ -77,32 +84,33 @@ Define concrete integration mechanism between memory system and Claude Code CLI.
 ```
 
 **Key Integration Points:**
-- SessionStart hook: Auto-calls memory_context() (2500-3000 tokens ONE-TIME)
-- Context-aware injection: Tiered filtering ensures relevance (Phase 7 + 8)
-- Session-end hook: Captures session codes + runs proposal pipeline
-- Zero tokens after startup (all context injected once at start)
+- Session start: MCP tool `memory_context()` auto-called (2000 tokens ONE-TIME, no bash hook)
+- Startup injection: Memories (1200 tokens) + Session codes (800 tokens)
+- On-demand queries: `memory_context(query)` MCP tool available during work (500 tokens per query, max 2)
+- Total cap: 3000 tokens per session (2000 startup + 1000 on-demand max)
+- Session end: Bash hook calls CLI (MCP shutting down, can't use MCP tools)
 
 ---
 
 ## Integration Methods
 
-### Method 1: SessionStart + SessionEnd Hooks (Recommended)
+### Method 1: MCP Session Start + Bash Session End (Recommended)
 
-**Claude Code hooks:**
+**Session START (MCP tool - no bash hook needed):**
+- Claude Code auto-calls `memory_context()` MCP tool at session start
+- MCP server is already running, tool returns startup injection (2000 tokens)
+- No bash script needed - MCP handles this directly
+
+**Session END (bash hook required):**
 ```bash
-# ~/.claude/hooks/session-start.sh
-#!/bin/bash
-# Auto-calls memory_context() via MCP (built-in, no manual call needed)
-
 # ~/.claude/hooks/session-end.sh
 #!/bin/bash
+# Must use CLI because MCP is shutting down
 cerberus memory propose --interactive
 ```
 
 **Implementation in `src/cerberus/memory/hooks.py`:**
 ```python
-# SessionStart handled by MCP auto-call to memory_context() (Phase 7 + 8)
-
 def propose_hook() -> None:
     """
     CLI entrypoint for session end hook.
@@ -152,7 +160,7 @@ cerberus memory propose --interactive
 cerberus memory propose --batch --threshold 0.85
 ```
 
-**Note:** SessionStart hook auto-calls memory_context() - zero manual intervention
+**Note:** Session start uses MCP tool `memory_context()` - Claude Code auto-calls this when session starts. No bash hook needed. On-demand `memory_context(query)` available during work if Claude needs additional context.
 
 ---
 
@@ -297,9 +305,11 @@ LANGUAGE_EXTENSIONS = {
 
 ### Session State File
 
-**Location:** `.cerberus/session_active.json`
+**Location:** `.cerberus-session.json` (project root, temporary runtime state)
 
 **Purpose:** Track active session for correction detection
+
+**Note:** This is the ONLY local project file. All persistent data (memories, sessions, history) is stored in `~/.cerberus/memory.db` global database.
 
 **Schema:**
 ```json
@@ -328,28 +338,21 @@ def start_session(context: HookContext) -> None:
         "corrections": []
     }
 
-    with open(".cerberus/session_active.json", "w") as f:
+    with open(".cerberus-session.json", "w") as f:
         json.dump(state, f, indent=2)
 
 
 def end_session() -> Dict[str, Any]:
     """Load and cleanup session state at session end."""
     try:
-        with open(".cerberus/session_active.json", "r") as f:
+        with open(".cerberus-session.json", "r") as f:
             state = json.load(f)
     except FileNotFoundError:
         return {}
 
-    # Archive session state
-    session_id = state["session_id"]
-    archive_path = f".cerberus/sessions/archive/{session_id}.json"
-    os.makedirs(os.path.dirname(archive_path), exist_ok=True)
-
-    with open(archive_path, "w") as f:
-        json.dump(state, f, indent=2)
-
-    # Remove active state
-    os.remove(".cerberus/session_active.json")
+    # Session data is already in global DB (~/.cerberus/memory.db)
+    # Just delete the temp runtime file
+    os.remove(".cerberus-session.json")
 
     return state
 ```
@@ -373,9 +376,10 @@ cerberus memory install-hooks --cli gemini-cli
 ```python
 def install_hooks(cli_name: str) -> None:
     """
-    Install session hooks for CLI tool.
+    Install session end hook for CLI tool.
 
-    Creates hook scripts in CLI's hook directory.
+    Note: Session START uses MCP tool (no bash hook needed).
+    Only session END needs bash hook (MCP shutting down).
     """
 
     # Hook directory mapping
@@ -388,23 +392,16 @@ def install_hooks(cli_name: str) -> None:
     hook_dir = Path(HOOK_DIRS[cli_name]).expanduser()
     hook_dir.mkdir(parents=True, exist_ok=True)
 
-    # Session start hook
-    start_hook = hook_dir / "session-start.sh"
-    start_hook.write_text("""#!/bin/bash
-# Cerberus memory injection hook
-cerberus memory inject --format markdown
-""")
-    start_hook.chmod(0o755)
-
-    # Session end hook
+    # Session end hook (only hook needed)
     end_hook = hook_dir / "session-end.sh"
     end_hook.write_text("""#!/bin/bash
 # Cerberus memory proposal hook
+# Runs after Claude exits (MCP shutting down)
 cerberus memory propose --interactive
 """)
     end_hook.chmod(0o755)
 
-    print(f"Installed hooks for {cli_name} in {hook_dir}")
+    print(f"Installed session-end hook for {cli_name} in {hook_dir}")
 ```
 
 ---
@@ -412,22 +409,6 @@ cerberus memory propose --interactive
 ## Error Handling
 
 ```python
-def inject_hook_with_error_handling() -> str:
-    """
-    Safe injection hook with fallback.
-
-    If injection fails, return empty string (session continues without memories).
-    """
-    try:
-        return inject_hook()
-    except Exception as e:
-        # Log error
-        log_error(f"Memory injection failed: {e}")
-
-        # Return empty (session continues)
-        return ""
-
-
 def propose_hook_with_error_handling() -> None:
     """
     Safe proposal hook with fallback.
@@ -449,17 +430,12 @@ def propose_hook_with_error_handling() -> None:
 ## CLI Commands
 
 ```bash
-# Inject memories (session start)
-cerberus memory inject
-cerberus memory inject --format markdown
-cerberus memory inject --format json
-
-# Propose memories (session end)
+# Session end (propose memories)
 cerberus memory propose
 cerberus memory propose --interactive
 cerberus memory propose --batch --threshold 0.85
 
-# Install hooks
+# Install session-end hook
 cerberus memory install-hooks --cli claude-code
 cerberus memory install-hooks --cli codex-cli
 
@@ -467,14 +443,29 @@ cerberus memory install-hooks --cli codex-cli
 cerberus memory test-hooks
 ```
 
+**Note:** No CLI command for session start - handled by MCP tool `memory_context()` automatically.
+
 ---
 
 ## Token Costs
 
-**Injection (session start):**
-- Context detection: 0 tokens (Python)
-- Phase 7 injection: 1500 tokens max
-- Total: 1500 tokens
+**Session start (MCP tool - automatic):**
+- MCP tool `memory_context()` returns: 2000 tokens (AI-native format)
+  - Phase 7 Memories: 1200 tokens
+    - Universal preferences: 300 tokens
+    - Language rules: 300 tokens
+    - Project decisions: 400 tokens
+    - Reserve: 200 tokens
+  - Phase 8 Session codes: 800 tokens
+    - impl: 300 tokens
+    - dec: 200 tokens
+    - block: + next: 300 tokens
+
+**On-demand queries (during work - optional):**
+- memory_context(query): 500 tokens per query
+- Max 2 queries per session: 1000 tokens total
+
+**Total per session:** 2000-3000 tokens (2000 startup + 0-1000 on-demand)
 
 **Proposal (session end):**
 - Phase 1-2: 0 tokens (TF-IDF)
@@ -490,17 +481,17 @@ cerberus memory test-hooks
 ## Validation Gates
 
 **Phase 16 complete when:**
-- ✅ Hooks install successfully
-- ✅ Injection works (memories appear in Claude's context)
-- ✅ Proposal works (corrections detected and stored)
-- ✅ Error handling works (failures don't break session)
+- ✅ Session-end hook installs successfully
+- ✅ MCP tool startup injection works (memories appear in Claude's context at session start)
+- ✅ Proposal works (corrections detected and stored via bash hook at session end)
+- ✅ Error handling works (proposal failures don't block session end)
 - ✅ Works with 3+ CLI tools (Claude Code, Codex, Gemini)
 - ✅ 5+ real sessions tested
 
 **Testing:**
-- Manual: Run `cerberus memory install-hooks`, start session, verify injection
-- Automated: Mock hook execution, verify output format
-- Integration: Full session with corrections → verify storage
+- Manual: Install session-end hook, start session, verify MCP injection at startup, make corrections, end session, verify proposal
+- Automated: Mock MCP tool call + bash hook execution, verify output formats
+- Integration: Full session with corrections → verify startup injection + end hook storage
 
 ---
 
@@ -522,19 +513,18 @@ cerberus memory test-hooks
 ## Implementation Checklist
 
 - [ ] Write `src/cerberus/memory/hooks.py`
-- [ ] Implement `inject_hook()` function
-- [ ] Implement `propose_hook()` function
-- [ ] Write `src/cerberus/memory/ipc.py` (if needed for IPC)
+- [ ] Implement `propose_hook()` function (session end CLI entrypoint)
+- [ ] Ensure MCP tool `memory_context()` implements startup injection (Phase 7)
 - [ ] Implement context detection (`detect_context()`)
 - [ ] Implement session tracking (start/end session state)
-- [ ] Add CLI commands (`cerberus memory inject`, `propose`, `install-hooks`)
-- [ ] Write hook installation script
-- [ ] Add error handling (fallback to empty on failure)
-- [ ] Write unit tests (context detection, hook execution)
-- [ ] Write integration tests (full session with hooks)
+- [ ] Add CLI commands (`cerberus memory propose`, `install-hooks`)
+- [ ] Write session-end hook installation script
+- [ ] Add error handling for propose hook (fallback on failure)
+- [ ] Write unit tests (context detection, propose hook execution)
+- [ ] Write integration tests (full session: MCP start + bash end)
 - [ ] Test with Claude Code
 - [ ] Test with other CLIs (Codex, Gemini if available)
-- [ ] Document hook setup in user guide
+- [ ] Document hook setup in user guide (MCP auto-start, bash end hook)
 
 ---
 

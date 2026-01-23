@@ -49,6 +49,22 @@ SESSION_END_TRIGGERS = [
 ]
 ```
 
+### Session Timeout Configuration
+
+```python
+# Configurable timeout values (can be overridden via environment or config)
+SESSION_TIMEOUTS = {
+    "stale_detection_seconds": 300,   # 5 minutes - crashed session detection
+    "idle_timeout_minutes": 30,       # 30 minutes - active session timeout
+    "check_interval_seconds": 60      # 60 seconds - daemon check frequency
+}
+```
+
+**Timeout Purposes:**
+- **stale_detection** (5 min): Detect crashed sessions on startup (session file exists but old)
+- **idle_timeout** (30 min): Auto-end active sessions with no activity
+- **check_interval** (60 sec): How often daemon checks for idle timeout
+
 ---
 
 ## Data Structures
@@ -91,10 +107,13 @@ def start_session(context: HookContext) -> SessionState:
     Initialize new session.
 
     Strategy:
-    1. Check for crashed session (stale .cerberus/session_active.json)
-    2. If crashed, attempt recovery
+    1. Check for crashed session (stale .cerberus-session.json)
+    2. If crashed: Mark in global DB (~/.cerberus/memory.db), delete temp file
     3. Initialize new session state
-    4. Write to .cerberus/session_active.json
+    4. Write to .cerberus-session.json (temp runtime)
+    5. Create session record in global DB
+
+    Note: All persistent session data stored in ~/.cerberus/memory.db
 
     Returns:
         SessionState object
@@ -103,7 +122,7 @@ def start_session(context: HookContext) -> SessionState:
     from pathlib import Path
 
     # Check for existing session
-    session_file = Path(".cerberus/session_active.json")
+    session_file = Path(".cerberus-session.json")
 
     if session_file.exists():
         # Previous session didn't end cleanly
@@ -111,8 +130,9 @@ def start_session(context: HookContext) -> SessionState:
 
         # Check if it's actually stale (not a race condition)
         age_seconds = (datetime.now() - old_state.last_activity).total_seconds()
+        stale_threshold = SESSION_TIMEOUTS["stale_detection_seconds"]
 
-        if age_seconds > 300:  # 5 minutes = definitely stale
+        if age_seconds > stale_threshold:  # Default 5 minutes
             # Crashed session detected
             _handle_crashed_session(old_state)
 
@@ -142,25 +162,23 @@ def _handle_crashed_session(old_state: SessionState) -> None:
     Handle crashed session recovery.
 
     Strategy:
-    1. If corrections exist: Archive for manual review
-    2. If no corrections: Discard
-    3. Log crash event
+    1. Update session in global DB: status='crashed', ended_at=now
+    2. If corrections exist: Keep in DB for recovery
+    3. Delete temp .cerberus-session.json file
+    4. Log crash event
+
+    All data is in ~/.cerberus/memory.db, not local files.
     """
+    db_path = Path.home() / ".cerberus" / "memory.db"
+
+    # Update session status in global DB
+    # UPDATE sessions SET status='crashed', ended_at=? WHERE session_id=?
+
     if old_state.corrections:
-        # Archive for recovery
-        archive_dir = Path(".cerberus/sessions/crashed")
-        archive_dir.mkdir(parents=True, exist_ok=True)
-
-        archive_file = archive_dir / f"{old_state.session_id}.json"
-        with open(archive_file, "w") as f:
-            json.dump(asdict(old_state), f, indent=2, default=str)
-
         print(f"Recovered crashed session: {old_state.session_id}")
         print(f"Found {len(old_state.corrections)} corrections.")
-        print(f"Archived to: {archive_file}")
-        print("Run `cerberus memory recover` to process.")
+        print("Session data saved to global DB. Run `cerberus memory recover` to process.")
     else:
-        # No data to recover, just log
         print(f"Cleaned up stale session: {old_state.session_id}")
 ```
 
@@ -224,25 +242,21 @@ def end_session(trigger: str) -> SessionState:
     """
     state = _load_session_state()
 
-    # Mark ended
-    state.status = "ended"
+    # Update session in global DB
+    db_path = Path.home() / ".cerberus" / "memory.db"
     ended_at = datetime.now()
 
-    # Archive session
-    archive_dir = Path(".cerberus/sessions/ended")
-    archive_dir.mkdir(parents=True, exist_ok=True)
+    # UPDATE sessions SET
+    #   status='completed',
+    #   ended_at=?,
+    #   end_trigger=?,
+    #   turn_count=?
+    # WHERE session_id=?
 
-    archive_file = archive_dir / f"{state.session_id}.json"
-    session_data = asdict(state)
-    session_data["ended_at"] = ended_at.isoformat()
-    session_data["end_trigger"] = trigger
+    # Delete temp runtime file
+    Path(".cerberus-session.json").unlink(missing_ok=True)
 
-    with open(archive_file, "w") as f:
-        json.dump(session_data, f, indent=2, default=str)
-
-    # Remove active state
-    Path(".cerberus/session_active.json").unlink(missing_ok=True)
-
+    # All session history is in ~/.cerberus/memory.db
     return state
 ```
 

@@ -1,3 +1,16 @@
+# PHASE 20B: ANALYSIS
+
+**Rollout Phase:** Epsilon (Weeks 9-10)
+**Status:** Implement after Phase 20A
+
+## Prerequisites
+
+- ✅ Phase 20A complete (silent divergence tracking working)
+- ✅ Phase 17 complete (session activity tracking)
+- ✅ Phase 1 complete (correction detection for comparison)
+
+---
+
 ## Diff Analysis
 
 ```python

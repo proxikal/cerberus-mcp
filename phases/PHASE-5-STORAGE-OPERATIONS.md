@@ -3,20 +3,59 @@
 **Rollout Phase:** Alpha (JSON) → Beta (SQLite)
 **Status:** Implemented in 2 stages
 
+## Prerequisites
+
+- ✅ Phase 4 complete (approval system working)
+- ✅ Phase 3 complete (proposals formatted for storage)
+
+---
+
 ## Objective
 Write approved proposals to hierarchical storage: Universal → Language → Project → Task.
 
-## Implementation Strategy
+## Implementation Strategy & Storage Evolution Timeline
 
-**Phase Alpha (Weeks 1-2):**
-- Implement JSON storage ONLY
-- Validate learning pipeline works
-- Simple, proven, easy to debug
+**IMPORTANT: This file documents BOTH versions. Phase 5 gets rewritten in Beta.**
 
-**Phase Beta (Weeks 3-4):**
-- Update to SQLite FTS5 writes
-- Triggered after Phase 12 migration complete
-- Keep JSON for backward compatibility
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    STORAGE EVOLUTION TIMELINE                    │
+└─────────────────────────────────────────────────────────────────┘
+
+PHASE ALPHA (Weeks 1-2):
+  ┌─────────────────────────────────────┐
+  │  Phase 5: JSON Storage (Version 1)  │
+  │  - Write to ~/.cerberus/memory.db   │
+  │  - (JSON for Alpha, migrated Beta)  │
+  │  - Simple, proven, easy to debug    │
+  └─────────────────────────────────────┘
+                    ↓
+  Validation Gates (70%+ approval, 90%+ accuracy)
+                    ↓
+PHASE BETA (Weeks 3-4):
+  ┌─────────────────────────────────────┐
+  │ Phase 12: SQLite Migration          │
+  │ - Create memory.db schema           │
+  │ - Migrate existing JSON → SQLite    │
+  │ - Keep JSON as backup               │
+  └─────────────────────────────────────┘
+                    ↓
+  ┌─────────────────────────────────────┐
+  │ Phase 13: Rewrite Phase 5 & 6       │
+  │ - Phase 5: NOW writes to SQLite     │
+  │ - Phase 6: NOW reads from SQLite    │
+  │ - JSON becomes read-only backup     │
+  └─────────────────────────────────────┘
+
+RESULT:
+  Phase 5 code exists in TWO versions:
+  - Version 1 (Alpha): JSON writes (this file, below)
+  - Version 2 (Beta):  SQLite writes (PHASE-13B-INTEGRATION.md)
+```
+
+**Implementation versions:**
+- **Phase Alpha:** Use code in this file (JSON storage)
+- **Phase Beta:** Replace with code from PHASE-13B-INTEGRATION.md (SQLite storage)
 
 ---
 
@@ -268,7 +307,8 @@ class MetadataManager:
 ```python
 def on_session_end():
     # Proposals approved (Phase 4)
-    approved_ids = tui.run(user_proposals, agent_proposals)
+    cli = ApprovalCLI()
+    approved_ids = cli.run(user_proposals, agent_proposals)
 
     # Filter approved
     all_proposals = user_proposals + agent_proposals

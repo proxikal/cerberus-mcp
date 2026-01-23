@@ -1,5 +1,14 @@
 # PHASE 2: SEMANTIC DEDUPLICATION
 
+**Rollout Phase:** Alpha (Weeks 1-2)
+**Status:** Implement after Phase 1
+
+## Prerequisites
+
+- ✅ Phase 1 complete (correction detection producing candidates)
+
+---
+
 ## Objective
 Group similar corrections semantically to prevent duplicates and extract canonical form.
 
@@ -352,7 +361,7 @@ store_clusters(analyzed.clusters)
 
 ## Storage
 
-**File:** `.cerberus/clustered_corrections.json`
+**In-Memory:** Clusters exist only in memory during session, not written to disk
 
 ```json
 {

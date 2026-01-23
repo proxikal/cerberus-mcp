@@ -13,14 +13,19 @@
 - ✅ Database stable (no corruption, backups work)
 
 ## Objective
-FTS5 search queries, update Phase 5-6 to use SQLite, add MCP `memory_search()` tool.
+FTS5 search queries, **replace** Phase 5-6 code with SQLite versions, add MCP `memory_search()` tool.
 
 **What this phase does:**
-1. Updates Phase 5 (storage.py) to write to SQLite
-2. Updates Phase 6 (retrieval.py) to query SQLite FTS5
-3. Adds FTS5 search engine (search.py)
+1. **Replaces Phase 5** (storage.py): JSON writes → SQLite writes (Version 2 code in PHASE-13B)
+2. **Replaces Phase 6** (retrieval.py): JSON reads → SQLite FTS5 queries (Version 2 code in PHASE-13B)
+3. Adds FTS5 search engine (search.py): New functionality
 4. Adds new MCP tool: `memory_search()`
 5. Measures actual token savings (target: 80%+)
+
+**IMPORTANT: This phase REWRITES Phase 5 & 6, not updates them.**
+- Phase 5/6 Alpha code (JSON) is replaced entirely
+- New Beta code (SQLite) is in PHASE-13B-INTEGRATION.md
+- JSON becomes read-only backup (fallback if SQLite fails)
 
 ---
 

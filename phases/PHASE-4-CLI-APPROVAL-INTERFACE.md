@@ -1,5 +1,14 @@
 # PHASE 4: APPROVAL INTERFACE
 
+**Rollout Phase:** Alpha (Weeks 1-2)
+**Status:** Implement after Phase 3
+
+## Prerequisites
+
+- ✅ Phase 3 complete (proposals generated)
+
+---
+
 ## Objective
 Simple CLI interface for proposal approval. No special dependencies, works everywhere.
 
@@ -168,9 +177,13 @@ class BatchApproval:
 ## Integration with Phase 3
 
 ```python
-def on_session_end(interactive: bool = True):
+def on_session_end(interactive: bool = True, auto_approve_threshold: float = 0.9):
     """
     End of session approval flow.
+
+    Args:
+        interactive: If True, show CLI for user approval. If False, auto-approve.
+        auto_approve_threshold: Confidence threshold for auto-approval (0.0-1.0, default 0.9)
     """
     # Generate proposals (Phase 3)
     user_proposals = generate_user_proposals()
@@ -191,7 +204,7 @@ def on_session_end(interactive: bool = True):
         batch = BatchApproval()
         approved_ids = batch.auto_approve_high_confidence(
             all_proposals,
-            threshold=0.9
+            threshold=auto_approve_threshold
         )
 
     # Storage (Phase 5)

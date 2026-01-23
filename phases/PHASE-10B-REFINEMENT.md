@@ -1,3 +1,14 @@
+# PHASE 10B: REFINEMENT
+
+**Rollout Phase:** Gamma (Weeks 5-6)
+**Status:** Implement after Phase 10A
+
+## Prerequisites
+
+- ✅ Phase 10A complete (detection patterns implemented)
+
+---
+
 ## Proposal Refinement
 
 ```python
@@ -185,7 +196,7 @@ def on_session_end(use_llm: bool = False):
 
 ## Storage Format (AI-Native)
 
-**File:** `.cerberus/agent_observations.json`
+**In-Memory:** Agent observations buffered during session, written to global DB at end
 
 ```json
 {

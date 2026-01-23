@@ -1,3 +1,15 @@
+# PHASE 13B: INTEGRATION
+
+**Rollout Phase:** Beta (Weeks 3-4)
+**Status:** Implement after Phase 13A
+
+## Prerequisites
+
+- ✅ Phase 13A complete (FTS5 search engine working)
+- ✅ Phase 12 complete (SQLite stable)
+
+---
+
 ## Phase 5 Integration (Storage)
 
 ```python

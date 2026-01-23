@@ -1,7 +1,22 @@
-# PHASE 7: CONTEXT-AWARE RETRIEVAL
+# PHASE 7: CONTEXT-AWARE INJECTION
+
+**Rollout Phase:** Alpha (Weeks 1-2)
+**Status:** Implement after Phase 6
+
+## Prerequisites
+
+- ✅ Phase 6 complete (retrieval working)
+- ✅ Phases 1-5 tested (end-to-end pipeline validated)
+
+---
 
 ## Objective
-Provide MCP tool for on-demand memory retrieval based on current context. Zero startup cost.
+Hybrid memory injection: Auto-inject high-relevance memories at session start (preferences, project context, session continuity), provide on-demand MCP tool for additional context during work.
+
+**Injection Strategy:**
+- **Session Start (Auto):** Load critical context immediately (1200 tokens: memories + 800 tokens: session codes = 2000 tokens total)
+- **During Work (On-Demand):** MCP tool `memory_context(query)` for specific topics (500 tokens per query, max 2 queries)
+- **Total Budget:** 3000 tokens per session (2000 startup + 1000 on-demand max)
 
 ---
 
@@ -36,6 +51,85 @@ class InjectionResult:
     budget_used: float  # percentage
     truncated: bool
 ```
+
+---
+
+## Injection Modes
+
+### Mode 1: Session Start Auto-Injection
+
+**When:** SessionStart hook (Phase 16 integration)
+
+**What gets auto-loaded:**
+
+**Phase 7 Memories (1200 tokens):**
+- Universal preferences (always relevant) → 300 tokens
+- Language-specific rules (if language detected) → 300 tokens
+- Project-specific decisions (if in project directory) → 400 tokens
+- Reserve buffer → 200 tokens
+
+**Phase 8 Session Codes (800 tokens):**
+- impl: completed work → 300 tokens
+- dec: architectural decisions → 200 tokens
+- block: blockers + next: actions → 300 tokens
+
+**Total:** 2000 tokens (AI-native format, extremely dense)
+
+**Selection criteria:**
+- Relevance score > 0.7 (high-relevance only)
+- Scope match (project + language + universal)
+- Recency (recent corrections prioritized)
+
+**Format:** Markdown list injected at session start
+
+---
+
+### Mode 2: On-Demand Query (During Work)
+
+**When:** Claude calls `memory_context(query="topic")` MCP tool
+
+**What gets loaded:**
+- Query-specific memories matching topic
+- Examples: `memory_context(query="error handling")`, `memory_context(query="testing")`
+
+**Per-query budget:** ~500 tokens
+
+**Max queries per session:** 2 (to stay under 2000 token total cap)
+
+**Selection criteria:**
+- Relevance score > 0.5 (broader threshold)
+- Query text match (keyword or semantic)
+- Scope match (same as Mode 1)
+
+**Format:** Markdown list with query context
+
+---
+
+## Token Budget Breakdown
+
+```
+Session Start (Auto):         2000 tokens
+  ├─ Phase 7 Memories:        1200 tokens
+  │   ├─ Universal preferences: 300 tokens
+  │   ├─ Language rules:        300 tokens
+  │   ├─ Project decisions:     400 tokens
+  │   └─ Reserve:               200 tokens
+  └─ Phase 8 Session codes:    800 tokens
+      ├─ impl: (completed)      300 tokens
+      ├─ dec: (decisions)       200 tokens
+      └─ block: + next:         300 tokens
+
+On-Demand Queries:            1000 tokens max
+  ├─ Query 1:                  500 tokens
+  └─ Query 2:                  500 tokens
+
+Total Cap:                    3000 tokens per session
+```
+
+**Enforcement:**
+- Hard cap at 2000 tokens total
+- If on-demand query would exceed cap, truncate to fit
+- Startup injection never skipped (always runs)
 
 ---
 
@@ -120,6 +214,7 @@ class RelevanceScorer:
     def _score_recency(self, memory: Dict) -> float:
         """
         Recent corrections more relevant.
+        Standardized decay curve (matches Phase 6).
         """
         last_occurred = memory.get("last_occurred")
         if not last_occurred:
@@ -129,15 +224,17 @@ class RelevanceScorer:
             last_date = datetime.fromisoformat(last_occurred)
             days_ago = (datetime.now() - last_date).days
 
-            # Decay function: recent=1.0, 30days=0.5, 90days=0.1
+            # Standardized decay curve
             if days_ago < 7:
                 return 1.0
             elif days_ago < 30:
-                return 0.7
+                return 0.8
             elif days_ago < 90:
+                return 0.6
+            elif days_ago < 180:
                 return 0.4
             else:
-                return 0.1
+                return 0.2
         except:
             return 0.5
 
@@ -173,16 +270,36 @@ class RelevanceScorer:
 class TokenBudgetEnforcer:
     """
     Enforce strict token limits for injected context.
+
+    Two modes:
+    - Startup injection: 2000 tokens (1200 memories + 800 session codes)
+    - On-demand query: 500 tokens (per query, max 2 queries)
+
+    Total cap: 3000 tokens per session
     """
 
-    # Budget allocation (total: 1500 tokens)
-    BUDGET = {
-        "universal": 700,   # Cross-project rules
-        "language": 500,    # Language-specific rules
-        "project": 300,     # Project-specific rules
+    # Session start auto-injection budget (total: 2000 tokens)
+    # Phase 7 memories: 1200 tokens
+    MEMORY_BUDGET = {
+        "universal": 300,   # Universal preferences
+        "language": 300,    # Language-specific rules
+        "project": 400,     # Project-specific decisions
+        "reserve": 200,     # Reserve buffer
     }
 
-    TOTAL_BUDGET = 1500
+    # Phase 8 session codes: 800 tokens (handled by Phase 8)
+    SESSION_CODES_BUDGET = 800
+
+    # On-demand query budget (per query: 500 tokens)
+    QUERY_BUDGET = {
+        "universal": 150,
+        "language": 150,
+        "project": 200,
+    }
+
+    STARTUP_TOTAL = 2000  # 1200 + 800
+    QUERY_TOTAL = 500
+    SESSION_CAP = 3000  # Hard cap per session
 
     def __init__(self):
         self.tokenizer = TokenCounter()
@@ -488,27 +605,58 @@ class ContextDetector:
 
 ---
 
-## MCP Tool Integration (On-Demand Retrieval)
+## Integration Points (Hybrid Model)
+
+### 1. Session Start Auto-Injection
+
+**Called by:** SessionStart hook (Phase 16)
+
+```python
+def inject_session_start() -> str:
+    """
+    Auto-inject high-relevance memories at session start.
+
+    Called by SessionStart hook, runs before first user message.
+
+    Returns:
+        Markdown-formatted memories (~1000 tokens)
+    """
+    # Detect context
+    detector = ContextDetector()
+    context = detector.detect()
+
+    # Retrieve high-relevance only (score > 0.7)
+    injector = ContextInjector(get_memory_store())
+    return injector.inject_startup(context, budget=STARTUP_BUDGET)
+```
+
+**Budget:** 1000 tokens (200 universal + 200 language + 300 project + 300 session)
+
+---
+
+### 2. On-Demand Query (MCP Tool)
+
+**Called by:** Claude during work (when needs additional context)
 
 ```python
 @mcp_tool
 def memory_context(
+    query: Optional[str] = None,
     scope: Optional[str] = None,
-    category: Optional[str] = None,
-    limit: int = 20
+    category: Optional[str] = None
 ) -> str:
     """
-    MCP tool: Retrieve memories on-demand (like cerberus search).
+    MCP tool: Retrieve memories on-demand during work.
 
-    Zero startup cost. Claude calls this when needed.
+    Claude calls this when needs specific context not in startup injection.
 
     Args:
+        query: Optional text query (e.g., "error handling", "testing")
         scope: Filter by scope (universal, language:X, project:Y)
         category: Filter by category (preference, rule, correction)
-        limit: Max memories to return
 
     Returns:
-        Markdown-formatted memories
+        Markdown-formatted memories (~500 tokens)
     """
     # Detect context
     detector = ContextDetector()
@@ -521,16 +669,23 @@ def memory_context(
         elif scope.startswith("project:"):
             context.project = scope.split(":")[1]
 
-    # Retrieve memories
+    # Add query filter
+    context.query = query
+
+    # Retrieve memories (broader threshold: score > 0.5)
     injector = ContextInjector(get_memory_store())
-    return injector.inject(context, limit=limit)
+    return injector.inject_query(context, budget=QUERY_BUDGET)
 ```
 
-**Architecture (Same as Cerberus Indexing):**
-- Database: `.cerberus/memory.db`
-- Zero startup cost (no auto-injection)
-- Claude calls `memory_context()` when needed
-- On-demand retrieval only
+**Budget:** 500 tokens per query, max 2 queries per session
+
+---
+
+**Architecture (Hybrid Model):**
+- Database: `~/.cerberus/memory.db` (global SQLite database)
+- Startup cost: 1000 tokens (auto-injected at session start)
+- On-demand cost: 0-1000 tokens (if Claude calls tool 1-2 times)
+- Total cap: 2000 tokens per session
 
 **Example Usage:**
 ```python
@@ -548,13 +703,49 @@ result = memory_context(scope="project:myapp")
 
 ```
 ✓ RelevanceScorer class implemented
-✓ TokenBudgetEnforcer class implemented
-✓ ContextInjector class implemented
+✓ TokenBudgetEnforcer class implemented (with MEMORY_BUDGET, SESSION_CODES_BUDGET, and QUERY_BUDGET)
+✓ ContextInjector class implemented (inject_startup and inject_query methods)
 ✓ ContextDetector class implemented
-✓ MCP tool: memory_context() registered
-✓ Zero startup cost (no auto-injection)
-✓ Tests: 10 scenarios with expected memories
+✓ SessionStart auto-injection working (2000 tokens: 1200 memories + 800 session codes)
+✓ MCP tool: memory_context(query) registered for on-demand queries (500 tokens)
+✓ Total cap enforcement (3000 tokens per session)
+✓ Phase 8 integration: Session codes injected with memories at startup
+✓ Phase 16 integration: SessionStart hook calls inject_session_start()
+✓ Tests: 15 scenarios (startup injection + on-demand queries)
 ```
+
+---
+
+## Token Budget Summary
+
+**Hybrid Model:**
+
+```
+Session Start (Auto):              2000 tokens
+  ├─ Phase 7 Memories:             1200 tokens
+  │   ├─ Universal preferences:     300 tokens  (score > 0.7)
+  │   ├─ Language rules:            300 tokens  (score > 0.7)
+  │   ├─ Project decisions:         400 tokens  (score > 0.7)
+  │   └─ Reserve:                   200 tokens
+  └─ Phase 8 Session codes:         800 tokens  (AI-native format)
+      ├─ impl: completed work       300 tokens
+      ├─ dec: decisions             200 tokens
+      └─ block: + next:             300 tokens
+
+On-Demand Queries (Optional):      0-1000 tokens
+  ├─ Query 1: memory_context():     500 tokens  (score > 0.5)
+  └─ Query 2: memory_context():     500 tokens  (score > 0.5)
+
+Total Per Session:                 2000-3000 tokens
+```
+
+**Benefits:**
+- Critical context available immediately (no wasted turns)
+- AI-native codes = 3x more dense than prose (800 tokens = ~40 items)
+- Additional context available when needed (flexibility)
+- Token efficient (only loads what's relevant)
+- Hard cap prevents runaway costs (3000 tokens max)
+- Cost: ~$0.003 per session with Sonnet 4.5
 
 ---
 

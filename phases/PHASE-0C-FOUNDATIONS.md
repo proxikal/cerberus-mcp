@@ -1,3 +1,4 @@
+# PHASE 0C: FOUNDATIONS
 
 ## Implementation Strategy: Phased Rollout
 
@@ -42,10 +43,36 @@ Phase 1 (Detection) → Phase 2 (Deduplication) → Phase 3 (Proposals)
 ### **PHASE BETA: SQLite Migration (Weeks 3-4)**
 **Goal:** Scale to thousands of memories, 80% token savings.
 
+**STORAGE EVOLUTION TIMELINE:**
 ```
-Phase 12 (Indexing) → SQLite FTS5 schema + auto-migration
+┌─────────────────────────────────────────────────────────────┐
+│  ALPHA → BETA: JSON Storage Replaced with SQLite            │
+└─────────────────────────────────────────────────────────────┘
+
+ALPHA (Weeks 1-2):
+  Phase 5 (Version 1): Write to JSON files
+  Phase 6 (Version 1): Read from JSON files
+  Data: ~/.cerberus/memory.db (single global SQLite database)
+
+         ↓ VALIDATION GATES PASS ↓
+
+BETA (Weeks 3-4):
+  Phase 12: Create SQLite schema + Migrate JSON → SQLite
+            Data now in BOTH places (JSON backup)
          ↓
-Phase 5 (UPDATED: write to SQLite)
+  Phase 13: REPLACE Phase 5 & 6 code
+    Phase 5 (Version 2): NOW writes to SQLite
+    Phase 6 (Version 2): NOW reads from SQLite FTS5
+  Data: ~/.cerberus/memory.db (SQLite FTS5)
+```
+
+**Beta Implementation:**
+```
+Phase 12 (Indexing) → SQLite FTS5 schema + auto-migration from JSON
+         ↓
+Phase 13 (Integration) → REPLACE Phase 5 & 6 code
+         ↓
+Phase 5 (Version 2: SQLite writes)
          ↓
 Phase 6 (UPDATED: query SQLite FTS5)
          ↓
@@ -203,7 +230,7 @@ Phase 20 (Silent Divergence) ────→ Extends Phase 1
 
 **Storage format for MVP:**
 ```
-~/.cerberus/memory/
+~/.cerberus/memory.db (global SQLite database)
 ├── profile.json              # Universal preferences
 ├── corrections.json          # Universal corrections
 ├── languages/
@@ -309,25 +336,44 @@ Phase 20 (Silent Divergence) ────→ Extends Phase 1
 
 ## Technical Constraints
 
-**Token Budget ($0.10 session cap = ~6666 tokens @ Sonnet rates):**
+**AUTHORITATIVE TOKEN BUDGET (Single Source of Truth)**
 
-*Session Start:*
-- Memory injection: 1500 tokens max (Phase 7)
-  - Universal: 700 tokens
-  - Language: 500 tokens
-  - Project: 300 tokens
-- Session code injection: 1000-1500 tokens (Phase 8)
-  - Files: 300-500 tokens (ALL files)
-  - Functions: 200-400 tokens (ALL functions)
-  - Decisions: 200-300 tokens (ALL decisions)
-  - Blockers: 100-200 tokens (ALL blockers)
-  - Next actions: 100-200 tokens (ALL actions)
-- Total start: 2500-3000 tokens
+**Total Cap:** 3000 tokens per session (~$0.003 with Sonnet 4.5)
 
-*Session End:*
-- User correction proposals: 2000 tokens (10 proposals, Phase 3)
-- Agent learning proposals: 2000 tokens (10 proposals, Phase 10)
-- Session code save: 0 tokens (no LLM, direct save)
+```
+┌─────────────────────────────────────────────────────────┐
+│           SESSION TOKEN BUDGET BREAKDOWN                 │
+└─────────────────────────────────────────────────────────┘
+
+SESSION START (Auto-Injection):                2000 tokens
+├─ Phase 7: Memory Injection                   1200 tokens
+│   ├─ Universal preferences                    300 tokens
+│   ├─ Language rules                           300 tokens
+│   ├─ Project decisions                        400 tokens
+│   └─ Reserve buffer                           200 tokens
+└─ Phase 8: Session Codes (AI-native)           800 tokens
+    ├─ impl: (completed work)                   300 tokens
+    ├─ dec: (decisions)                         200 tokens
+    └─ block: + next: (blockers/actions)        300 tokens
+
+ON-DEMAND QUERIES (Optional):                  0-1000 tokens
+├─ Query 1: memory_context(query)               500 tokens
+└─ Query 2: memory_context(query)               500 tokens
+
+TOTAL PER SESSION:                           2000-3000 tokens
+```
+
+**Why 3000 tokens works:**
+- AI-native codes = 3x more dense than prose
+- 800 tokens of codes = ~40 items (comprehensive context)
+- 1200 tokens of memories = ~60 rules (covers patterns)
+- Cost: $0.003 per session (negligible)
+- Prevents wasted turns and re-explanation
+
+**Session End:**
+- User correction proposals: 0-500 tokens (Phase 3, template-based)
+- Agent learning proposals: 0-500 tokens (Phase 10, template-based)
+- Session code save: 0 tokens (no LLM, direct save to SQLite)
 - Total end: 4000 tokens
 
 *Total per session: ~6500-7000 tokens (~$0.098-$0.105)*
@@ -367,7 +413,7 @@ def on_session_start():
     context = ContextDetector().detect()
     memory_context = ContextInjector().inject(context)
 
-    # Session context injection (Phase 9)
+    # Session context injection (Phase 8)
     session_context = SessionContextInjector().inject(context.project)
 
     # Combine and inject into system prompt
@@ -385,38 +431,34 @@ def on_session_end():
     # Agent learning (Phase 10)
     agent_proposals = AgentLearningEngine().generate_agent_proposals()
 
-    # Session context (Phase 8 → Phase 9)
+    # Session context (Phase 8)
     context = SessionContextCapture().get_context()
     session_summary = SessionSummarizer().generate_summary(context)
 
-    # TUI approval (Phase 4)
-    try:
-        tui = ApprovalTUI()
-        approved_ids = tui.run(user_proposals, agent_proposals)
-    except Exception:
-        # Fallback to CLI
-        cli = CLIApprovalFallback()
-        approved_ids = cli.run(user_proposals, agent_proposals)
+    # CLI approval (Phase 4)
+    cli = ApprovalCLI()
+    approved_ids = cli.run(user_proposals, agent_proposals)
 
     # Storage (Phase 5)
     all_proposals = user_proposals + agent_proposals
     approved = [p for p in all_proposals if p.id in approved_ids]
     MemoryStorage().store_batch(approved)
 
-    # Save session context (Phase 9)
+    # Save session context (Phase 8)
     SessionContextInjector().save_context(session_summary)
 ```
 
-**3. MCP Tool Removal:**
-- Remove `memory_context()` from tools (auto-injected)
-- Keep `memory_show()`, `memory_learn()` (manual override)
-- Keep `memory_forget()`, `memory_stats()` (utilities)
+**3. MCP Tools Available:**
+- `memory_context()` - Auto-called at session start (2000 tokens), available on-demand during work (500 tokens/query)
+- `memory_search()` - FTS5 full-text search (Phase 13)
+- `memory_show()`, `memory_learn()` - Manual override tools
+- `memory_forget()`, `memory_stats()` - Utilities
 
-**4. Skill Update:**
+**4. User Guidance:**
 ```markdown
-Memory is auto-loaded at session start (hook-based).
-No need to call memory_context().
-Use memory_learn() only for explicit storage.
+Memory is auto-loaded at session start via memory_context() MCP tool.
+You can call memory_context(query="topic") during work for additional context.
+Use memory_learn() for explicit storage outside the approval flow.
 ```
 
 ---
@@ -461,7 +503,7 @@ phases/
 ├── PHASE-1-SESSION-CORRECTION-DETECTION.md
 ├── PHASE-2-SEMANTIC-DEDUPLICATION.md
 ├── PHASE-3-SESSION-PROPOSAL.md
-├── PHASE-4-TUI-APPROVAL-INTERFACE.md (CLI approval, no TUI)
+├── PHASE-4-CLI-APPROVAL-INTERFACE.md (CLI approval)
 ├── PHASE-5-STORAGE-OPERATIONS.md
 ├── PHASE-6-RETRIEVAL-OPERATIONS.md
 ├── PHASE-7-CONTEXT-AWARE-INJECTION.md

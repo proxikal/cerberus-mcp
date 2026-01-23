@@ -1,3 +1,16 @@
+# PHASE 14B: ANCHOR INTEGRATION
+
+**Rollout Phase:** Delta (Weeks 7-8)
+**Status:** Implement after Phase 14A
+
+## Prerequisites
+
+- ✅ Phase 14A complete (anchor discovery algorithm working)
+- ✅ Phase 7 complete (context injection working)
+- ✅ Phase 5 complete (storage working)
+
+---
+
 ## Storage Integration
 
 ### SQLite Schema Extension
@@ -218,9 +231,18 @@ class AnchorEngine:
         rule: str,
         scope: str,
         language: Optional[str],
-        project_path: Optional[str]
+        project_path: Optional[str],
+        min_quality: float = 0.7
     ) -> Optional[AnchorCandidate]:
-        """Find best code example for rule."""
+        """Find best code example for rule.
+
+        Args:
+            rule: Abstract rule text
+            scope: Memory scope
+            language: Programming language
+            project_path: Project directory
+            min_quality: Minimum quality threshold (0.0-1.0, default 0.7)
+        """
 
         # Extract keywords
         keywords = self._extract_keywords(rule)
@@ -261,7 +283,7 @@ class AnchorEngine:
 
             quality = (0.6 * relevance + 0.2 * size_score + 0.2 * recency)
 
-            if quality >= 0.7:
+            if quality >= min_quality:
                 scored.append(AnchorCandidate(
                     file_path=candidate['file_path'],
                     symbol_name=candidate.get('symbol_name'),
@@ -389,7 +411,8 @@ class AnchorEngine:
 
 **Anchor Quality:**
 - 80%+ of project-scoped memories should find anchors
-- Anchor quality score >= 0.7 for all stored anchors
+- Anchor quality score >= 0.7 for all stored anchors (default threshold)
+- Threshold is configurable per query if needed
 - User feedback: "Examples help me understand rules"
 
 **Injection Quality:**

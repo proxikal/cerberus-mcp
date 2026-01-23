@@ -1,5 +1,14 @@
 # PHASE 1: SESSION CORRECTION DETECTION
 
+**Rollout Phase:** Alpha (Weeks 1-2)
+**Status:** Foundational - implement first
+
+## Prerequisites
+
+**None** - This is Phase Alpha's foundation. Start here.
+
+---
+
 ## Objective
 Detect user corrections in real-time without manual `memory_learn()` calls.
 
@@ -188,7 +197,9 @@ def handle_message(user_msg: str) -> str:
 
 ## Storage
 
-**File:** `.cerberus/session_corrections.json`
+**In-Memory Buffer:** Corrections buffered during session, written to global DB at session end
+
+**Note:** No local files needed. Use in-memory buffer or temp `.cerberus-session.json` for crash recovery.
 
 ```json
 {
@@ -214,7 +225,7 @@ def handle_message(user_msg: str) -> str:
 ```
 ✓ SessionAnalyzer class implemented
 ✓ 4 detection patterns working
-✓ Candidates stored to .cerberus/session_corrections.json
+✓ Candidates buffered in memory during session (written to global DB at end)
 ✓ Confidence scoring functional
 ✓ Integration hook in place (MCP or Claude Code)
 ✓ Tests: 10 scenarios with expected detections

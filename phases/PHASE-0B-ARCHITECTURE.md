@@ -1,4 +1,247 @@
-## Phase Breakdown (0-13)
+# PHASE 0B: ARCHITECTURE
+
+## MCP Tools Reference
+
+**All MCP tools provided by Cerberus memory system:**
+
+1. **memory_context(query=None, scope=None)** - Phase 7/8
+   - Context retrieval for injection (startup + on-demand)
+   - Session start: auto-called by Claude Code (2000 tokens)
+   - During work: on-demand queries (500 tokens per query, max 2)
+   - Combines Phase 7 memories + Phase 8 session codes
+
+2. **memory_search(query, scope=None, category=None, limit=10)** - Phase 13
+   - FTS5 full-text search across memories
+   - Explicit search queries (not automatic)
+   - Returns ranked results with snippets
+
+3. **memory_learn(content, category, scope=None)** - Phase 3
+   - Manual memory creation (user override)
+   - Bypasses approval flow
+
+4. **memory_show(category=None)** - Phase 6
+   - View stored memories
+   - Debugging and inspection
+
+5. **memory_forget(memory_id)** - Phase 11
+   - Delete specific memory
+   - Conflict resolution
+
+6. **memory_stats()** - Phase 11
+   - Memory system statistics
+   - Health metrics
+
+**Note:** memory_query() does not exist. Use memory_context() for retrieval or memory_search() for FTS5 queries.
+
+---
+
+## Storage Architecture
+
+**Single Global Database Design:**
+
+All persistent data is stored in ONE location: `~/.cerberus/memory.db` (SQLite)
+
+**What's stored in the global DB:**
+- Memories (universal, language-specific, project-specific)
+- Sessions (all projects, multi-tier scopes)
+- Session history (completed, crashed, archived)
+- Access tracking (last_accessed, usage counts)
+- Anchors (Phase 14)
+- Mode tags (Phase 15)
+- Conflict tracking (Phase 19)
+
+**Project-specific filtering:** Use `WHERE project_path = '/path/to/project'` in SQL queries
+
+**Temporary runtime state:** `.cerberus-session.json` (project root, deleted at session end)
+- Current session tracking only
+- Session ID, turn counter, timestamp
+- Deleted automatically on clean exit or stale session detection
+
+**No other local files.** All persistent storage uses the global DB.
+
+**Benefits:**
+- Simple backups (one file)
+- SQL joins work across projects
+- No sync issues
+- No config confusion
+- Easy migrations
+
+---
+
+## Standardized Algorithms
+
+### Recency Scoring (Memory Timestamps)
+
+**Used in:** Phase 6 (retrieval), Phase 7 (context injection)
+
+**Standardized decay curve:**
+```python
+if days_ago < 7:
+    return 1.0
+elif days_ago < 30:
+    return 0.8
+elif days_ago < 90:
+    return 0.6
+elif days_ago < 180:
+    return 0.4
+else:
+    return 0.2
+```
+
+**Rationale:**
+- Gradual decay over 180 days
+- Recent memories (< 7 days) = maximum relevance
+- Old memories (> 180 days) still retain 20% relevance
+- Consistent across retrieval and injection phases
+
+**Note:** Phase 14 (anchor discovery) uses exponential decay for **file modification times** (not memory timestamps), which is a different use case and intentionally different formula.
+
+### Mode Detection Keywords (Phase 15)
+
+**Used in:** Phase 15 (mode-aware context)
+
+**Keyword Disambiguation:**
+- **"show me"** → Exploration mode only (not audit)
+  - Exploration: "show me what files", "show me the API"
+  - Audit: "walk me through", "explain how", "what does"
+- **Rationale:** "show me" implies listing/displaying (exploration action), while audit is about understanding (use "walk me through" instead)
+
+**No overlaps allowed:** Each mode indicator must be unique to prevent ambiguous detection.
+
+### Anchor Quality Scoring (Phase 14)
+
+**Used in:** Phase 14 (anchor discovery for abstract rules)
+
+**Quality Formula:**
+```python
+quality_score = (
+    0.6 * relevance_score +    # TF-IDF similarity to rule text
+    0.2 * size_score +         # Prefer concise examples (1.0 - size/500)
+    0.2 * recency_score        # Exponential decay based on file mtime
+)
+```
+
+**Component Weights:**
+- **Relevance (60%)**: How well the file content matches the rule keywords
+- **Size (20%)**: Smaller files are better examples (normalized to 500 lines max)
+- **Recency (20%)**: Recently modified files reflect current patterns
+
+**Threshold:**
+- **Default**: `min_quality = 0.7` (70% minimum to be considered)
+- **Configurable**: Can be adjusted per query
+- **Range**: 0.0-1.0 (0.7 is balanced between precision and recall)
+
+**Rationale:**
+- Relevance is dominant (60%) because the example must match the rule
+- Size and recency are secondary signals (20% each) for quality
+- 0.7 threshold filters out weak matches while allowing good examples
+
+### Conflict Severity Scoring (Phase 19)
+
+**Used in:** Phase 19 (conflict detection and resolution)
+
+**Severity Formula:**
+```python
+score = 0
+score += 3 if (universal scope)         # Scope factor
+score += 2 if (both recent < 7 days)    # Recency factor
+score += 2 if (confidence > 0.9)        # Confidence factor
+score += 2 if CONTRADICTION             # Type: most severe
+score += 1 if OBSOLESCENCE              # Type: medium severity
+score += 0 if REDUNDANCY                # Type: least severe
+
+# Mapping
+score >= 7: "critical"
+score >= 5: "high"
+score >= 3: "medium"
+score < 3: "low"
+```
+
+**Scoring Factors:**
+- **Scope (+3)**: Universal conflicts affect all projects, highest weight
+- **Recency (+2)**: Both memories recent (< 7 days) = active conflict requiring quick resolution
+- **Confidence (+2)**: High confidence (> 0.9) = well-established rules in conflict
+- **Type (+2/+1/+0)**:
+  - Contradiction (+2): Opposing rules ("use X" vs "avoid X")
+  - Obsolescence (+1): Superseded rules (newer overwrites older)
+  - Redundancy (+0): Duplicates (safe to merge/delete)
+
+**Rationale:**
+- Consistent formula for all conflict types
+- Type severity: Contradiction > Obsolescence > Redundancy
+- Max possible score: 9 (universal + recent + high confidence + contradiction)
+- Min possible score: 0 (project scope + old + low confidence + redundancy)
+
+### Auto-Approval Threshold (Phase 4)
+
+**Used in:** Phase 4 (batch approval mode)
+
+**Default:** `auto_approve_threshold = 0.9` (90% confidence)
+
+**Purpose:**
+When running in non-interactive batch mode, only proposals with confidence >= threshold are auto-approved.
+
+**Configuration:**
+```python
+on_session_end(
+    interactive=False,
+    auto_approve_threshold=0.9  # Configurable, default 0.9
+)
+```
+
+**Threshold Guidelines:**
+- **0.9 (default)**: Conservative, high-quality proposals only
+- **0.8**: Moderate, includes good proposals with some uncertainty
+- **0.7**: Permissive, accepts more proposals (higher recall, lower precision)
+- **1.0**: Only absolutely certain proposals (very strict)
+
+**Rationale:**
+- Default 0.9 balances quality and automation
+- Configurable per invocation for different use cases
+- Interactive mode ignores threshold (user decides)
+
+### Session Timeout Values (Phases 8, 17)
+
+**Used in:** Phase 17 (lifecycle), Phase 8 (continuity)
+
+**Timeout Types:**
+
+| Timeout | Default | Purpose | Phase | Configurable |
+|---------|---------|---------|-------|--------------|
+| **Stale Detection** | 5 min (300 sec) | Detect crashed sessions on startup | 17A | `SESSION_TIMEOUTS["stale_detection_seconds"]` |
+| **Idle Timeout** | 30 min | Auto-end active sessions with no activity | 17A | `check_idle_timeout(timeout_minutes=N)` |
+| **Check Interval** | 60 sec | Daemon frequency for idle checking | 17A | `idle_timeout_daemon(interval_seconds=N)` |
+| **Archive Threshold** | 7 days | Archive completed sessions | 8 | `SessionContextInjector(idle_days=N)` |
+
+**Configuration Examples:**
+```python
+# Phase 17A: Lifecycle timeouts
+SESSION_TIMEOUTS = {
+    "stale_detection_seconds": 300,   # 5 minutes
+    "idle_timeout_minutes": 30,       # 30 minutes
+    "check_interval_seconds": 60      # 60 seconds
+}
+
+# Phase 8: Archive threshold
+injector = SessionContextInjector(
+    db_path=db_path,
+    idle_days=7  # Configurable
+)
+
+# Cleanup function
+cleanup = SessionCleanup()
+cleanup.cleanup_idle(days=7)  # Configurable
+```
+
+**Rationale:**
+- Stale detection (5 min): Short window to catch crashes without false positives
+- Idle timeout (30 min): Balance between auto-cleanup and user convenience
+- Archive threshold (7 days): Keep recent sessions accessible, archive old ones
+- All values configurable for different use cases
+
+---
+
+## Phase Breakdown (0-20)
 
 ### Phase 0: Overview
 **File:** `phases/PHASE-0-OVERVIEW.md` (this file)
@@ -15,7 +258,7 @@
 **Key Features:**
 - 4 detection patterns: direct negation, repetition, post-action, multi-turn
 - Confidence scoring (0.7-1.0)
-- Buffer to `.cerberus/session_corrections.json`
+- In-memory buffer during session (written to global DB at end)
 - Zero token cost (regex + keywords)
 
 **Output:** List of `CorrectionCandidate` objects
@@ -79,19 +322,19 @@
 
 **Objective:** Write approved proposals to hierarchical storage.
 
-**Implementation:**
-- **Phase Alpha (MVP):** JSON storage ONLY
-- **Phase Beta (Migration):** Updated to write to SQLite FTS5
+**Implementation (TWO VERSIONS):**
+- **Phase Alpha (MVP):** JSON storage ONLY (Version 1)
+- **Phase Beta (Migration):** Code REPLACED with SQLite writes (Version 2 in PHASE-13B)
 
 **Key Features:**
 - Hierarchical routing (universal → language → project → task)
 - Batch optimization (group by file, write once)
 - Metadata tracking
-- Directory auto-creation
+- Directory/table auto-creation
 
 **Directory Structure (Phase Alpha - JSON):**
 ```
-~/.cerberus/memory/
+~/.cerberus/memory.db (global SQLite database)
 ├── profile.json              # Universal preferences
 ├── corrections.json          # Universal corrections
 ├── languages/
@@ -107,10 +350,11 @@
     └── active-{session_id}.json
 ```
 
-**Storage Evolution:**
-- Phase Alpha: JSON files (simple, proven)
-- Phase Beta: SQLite FTS5 (scales to 10,000+ memories)
-- Backward compat: Keep JSON for gradual migration
+**Storage Evolution Timeline:**
+- Phase Alpha: Phase 5 writes to JSON files (Version 1 code)
+- Phase 12 (Beta): JSON data migrated to SQLite, JSON becomes backup
+- Phase 13 (Beta): Phase 5 code REPLACED to write to SQLite (Version 2 code)
+- Result: New writes go to SQLite, JSON is read-only backup
 
 **Token Cost:** 0 tokens (pure storage)
 
@@ -121,9 +365,9 @@
 
 **Objective:** Query and filter memories for context-aware injection.
 
-**Implementation:**
-- **Phase Alpha (MVP):** JSON file loading
-- **Phase Beta (Migration):** Updated to query SQLite FTS5 (80% token savings)
+**Implementation (TWO VERSIONS):**
+- **Phase Alpha (MVP):** JSON file loading (Version 1)
+- **Phase Beta (Migration):** Code REPLACED with SQLite FTS5 queries (Version 2 in PHASE-13B)
 
 **Key Features:**
 - Scope-based loading (universal, language, project, task)
@@ -131,10 +375,11 @@
 - Budget-aware retrieval (stop when budget exhausted)
 - Integration with Phase 7 injection
 
-**Retrieval Evolution:**
-- Phase Alpha: Load all JSON, filter in Python (simple, works)
-- Phase Beta: FTS5 search (returns only matches, 80% token savings)
-- Backward compat: JSON fallback if SQLite unavailable
+**Retrieval Evolution Timeline:**
+- Phase Alpha: Phase 6 loads all JSON files, filters in Python (Version 1 code)
+- Phase 12 (Beta): JSON data available in SQLite after migration
+- Phase 13 (Beta): Phase 6 code REPLACED to query SQLite FTS5 (Version 2 code)
+- Result: Queries hit SQLite index (80% token savings), fallback to JSON if SQLite fails
 
 **Token Cost:** 0 tokens (pure retrieval, tokens counted in Phase 7)
 
@@ -142,21 +387,23 @@
 
 ---
 
-### Phase 7: Context-Aware Retrieval
+### Phase 7: Context-Aware Injection
 **File:** `src/cerberus/memory/context_injector.py`
 
-**Objective:** Provide MCP tool for on-demand memory retrieval. Zero startup cost.
+**Objective:** Hybrid memory injection - auto-inject high-relevance memories at session start, provide on-demand tool for additional context during work.
 
 **Key Features:**
-- MCP tool: memory_context() (like cerberus search)
-- On-demand retrieval (Claude calls when needed)
-- Token budget enforcement (per-query limit)
+- Session start auto-injection (1000 tokens: preferences, project context, session continuity)
+- On-demand MCP tool: memory_context(query) for specific topics during work
+- Token budget enforcement (1000 startup + 1000 on-demand max = 2000 cap)
 - Context detection (project, language, task auto-detected)
-- Zero startup cost (no auto-injection)
+- Relevance scoring (high threshold for startup, broader for queries)
 
-**Token Cost:** 0 tokens at startup, ~1500 tokens per query (only when Claude calls it)
+**Token Cost:** 2000 tokens at startup (1200 memories + 800 session codes), 0-1000 tokens on-demand (if Claude calls tool)
 
-**Output:** Markdown string for Claude's use
+**Total Cap:** 3000 tokens per session
+
+**Output:** Markdown-formatted memories for Claude's use
 
 ---
 
@@ -178,21 +425,20 @@
 - Comprehensive capture (ALL files, decisions, blockers)
 - 7-day expiration with archival
 - Session cleanup manager
+- Multi-tier sessions: universal + per-project isolation
+- Storage: Uses `sessions` table in Phase 12's memory.db
 
-**Token Cost:** 1000-1500 tokens per session (injection only, no LLM)
+**Token Cost:** 800 tokens per session (injection only, no LLM, AI-native codes)
 
 **Output:** Raw codes, newline-separated (impl:, dec:, block:, next:)
+
+**Storage:** Phase 12's `sessions` table (schema defined in PHASE-12-MEMORY-INDEXING.md)
 
 **Why Phase Gamma (not Alpha/Beta):**
 - Core memory system must be stable first
 - Session continuity is enhancement, not blocker
 - Can be added incrementally without risk
 - Depends on stable Phase 7 injection
-
----
-
-### Phase 9: (Merged into Phase 8)
-*Session Context Injection merged into Phase 8: Session Continuity*
 
 ---
 
@@ -268,16 +514,18 @@
 - ✅ Real-world testing complete (5+ sessions)
 
 **Key Features:**
-- SQLite schema with FTS5 (full-text search)
+- SQLite schema with FTS5 (full-text search for memories)
+- Sessions table (used by Phase 8 for session continuity)
+- Session activity tracking table
 - Auto-migration from JSON (one-time, transparent)
 - Backward compatibility (keep JSON as fallback)
 - WAL mode for concurrency (same as Cerberus code index)
 - Integrity verification
-- CLI tools (migrate, verify)
+- CLI tools (migrate, verify, migrate-sessions)
 
 **Token Cost:** 0 tokens (one-time migration, no LLM)
 
-**Storage:** `~/.cerberus/memory.db`
+**Storage:** `~/.cerberus/memory.db` (unified database for memories + sessions)
 
 **Why Phase Beta (not Alpha):**
 - Database complexity isolated from learning logic
@@ -292,20 +540,25 @@
 
 **Phase:** Beta (Migration layer)
 
-**Objective:** FTS5 search queries, update Phase 5-6 to use SQLite.
+**Objective:** FTS5 search queries, **replace** Phase 5-6 code with SQLite versions.
 
 **Prerequisites:**
 - ✅ Phase 12 complete (SQLite schema + migration)
 - ✅ Migration validated (100% data integrity)
 
 **Key Features:**
-- FTS5-powered search (text, scope, category filters)
+- FTS5-powered search engine (text, scope, category filters)
 - Relevance scoring from FTS5 rank (BM25 algorithm)
 - Snippet extraction (match context)
-- Phase 5 updates (write to SQLite instead of JSON)
-- Phase 6 updates (query SQLite instead of loading JSON)
+- **Phase 5 code replacement:** JSON writes → SQLite writes (Version 2)
+- **Phase 6 code replacement:** JSON reads → SQLite FTS5 queries (Version 2)
 - New MCP tool: `memory_search(query, scope, category, limit)`
 - Access tracking (last_accessed, count)
+
+**What "replacement" means:**
+- Alpha: Phase 5/6 use JSON file code
+- Beta: Phase 5/6 code completely rewritten to use SQLite
+- Beta versions documented in PHASE-13B-INTEGRATION.md
 
 **Token Cost:** 0 tokens (pure search, no LLM)
 
@@ -398,7 +651,7 @@
 - Hook implementation (session end ONLY - no session start)
 - MCP tool for memory retrieval (memory_context, on-demand)
 - Python subprocess for proposal hook
-- Session state tracking (.cerberus/session_active.json)
+- Session state tracking (.cerberus-session.json temp file, data in global DB)
 - CLI commands (cerberus memory propose, install-hooks)
 - Multi-CLI support (claude-code, codex-cli, gemini-cli)
 - Zero startup cost (no auto-injection)
@@ -425,7 +678,7 @@
 
 **Key Features:**
 - Session start/end detection (CLI process, explicit commands, idle timeout)
-- Crash detection (stale session_active.json > 5 minutes)
+- Crash detection (stale .cerberus-session.json > 5 minutes)
 - Auto-recovery (high-confidence proposals auto-approved)
 - Manual recovery CLI (cerberus memory recover)
 - Idle timeout (30 minutes default)

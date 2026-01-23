@@ -1,3 +1,16 @@
+# PHASE 19B: CONFLICT RESOLUTION
+
+**Rollout Phase:** Epsilon (Weeks 9-10)
+**Status:** Implement after Phase 19A
+
+## Prerequisites
+
+- ✅ Phase 19A complete (extended conflict detection working)
+- ✅ Phase 11 complete (basic conflict detection working)
+- ✅ Phase 5 complete (storage working for resolution)
+
+---
+
 ## Automatic Resolution Algorithms
 
 ### Redundancy Resolution

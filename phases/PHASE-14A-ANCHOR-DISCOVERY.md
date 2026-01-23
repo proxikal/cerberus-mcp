@@ -67,7 +67,7 @@ class AnchorSearchQuery:
 ## Core Algorithm: Anchor Discovery
 
 ```python
-def find_anchor_for_rule(rule: str, scope: str, language: str, project_path: Optional[str]) -> Optional[AnchorCandidate]:
+def find_anchor_for_rule(rule: str, scope: str, language: str, project_path: Optional[str], min_quality: float = 0.7) -> Optional[AnchorCandidate]:
     """
     Find best code example for abstract rule.
 
@@ -82,6 +82,7 @@ def find_anchor_for_rule(rule: str, scope: str, language: str, project_path: Opt
         scope: Memory scope
         language: Programming language
         project_path: Project directory (if project-scoped)
+        min_quality: Minimum quality score (0.0-1.0, default 0.7)
 
     Returns:
         AnchorCandidate if found, None otherwise
@@ -142,7 +143,7 @@ def find_anchor_for_rule(rule: str, scope: str, language: str, project_path: Opt
             0.2 * recency
         )
 
-        if quality >= 0.7:  # Threshold
+        if quality >= min_quality:  # Configurable threshold
             scored.append(AnchorCandidate(
                 file_path=candidate.file_path,
                 symbol_name=candidate.symbol_name,
@@ -208,6 +209,11 @@ def _calculate_recency(file_path: str) -> float:
     Recency score based on last modification time.
 
     Recently modified files are better examples (more likely to be current patterns).
+
+    NOTE: This uses exponential decay for FILE modification times, which is
+    different from the step-function decay used for memory timestamps in
+    Phase 6/7. File recency needs smooth decay because file modification
+    patterns are more continuous, while memory relevance has discrete tiers.
     """
     import os
     from datetime import datetime, timedelta

@@ -1,7 +1,59 @@
 # PHASE 6: RETRIEVAL OPERATIONS
 
+**Rollout Phase:** Alpha (JSON) → Beta (SQLite)
+**Status:** Implemented in 2 stages
+
+## Prerequisites
+
+- ✅ Phase 5 complete (storage working, memories exist to retrieve)
+
+---
+
 ## Objective
 Query and filter memories for context-aware injection. Read operations only.
+
+## Implementation Strategy & Retrieval Evolution Timeline
+
+**IMPORTANT: This file documents BOTH versions. Phase 6 gets rewritten in Beta.**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   RETRIEVAL EVOLUTION TIMELINE                   │
+└─────────────────────────────────────────────────────────────────┘
+
+PHASE ALPHA (Weeks 1-2):
+  ┌─────────────────────────────────────┐
+  │ Phase 6: JSON Retrieval (Version 1) │
+  │ - Read from ~/.cerberus/memory.db   │
+  │ - (JSON for Alpha, SQLite in Beta)  │
+  │ - Simple, works for MVP             │
+  └─────────────────────────────────────┘
+                    ↓
+  Validation Gates (70%+ approval, 90%+ accuracy)
+                    ↓
+PHASE BETA (Weeks 3-4):
+  ┌─────────────────────────────────────┐
+  │ Phase 12: SQLite Migration          │
+  │ - JSON data migrated to memory.db   │
+  │ - FTS5 indexes created              │
+  └─────────────────────────────────────┘
+                    ↓
+  ┌─────────────────────────────────────┐
+  │ Phase 13: Rewrite Phase 6           │
+  │ - Phase 6: NOW queries SQLite FTS5  │
+  │ - 80% token savings (targeted query)│
+  │ - Fallback to JSON if SQLite fails  │
+  └─────────────────────────────────────┘
+
+RESULT:
+  Phase 6 code exists in TWO versions:
+  - Version 1 (Alpha): JSON reads (this file, below)
+  - Version 2 (Beta):  SQLite FTS5 queries (PHASE-13B-INTEGRATION.md)
+```
+
+**Implementation versions:**
+- **Phase Alpha:** Use code in this file (JSON loading)
+- **Phase Beta:** Replace with code from PHASE-13B-INTEGRATION.md (SQLite queries)
 
 ---
 

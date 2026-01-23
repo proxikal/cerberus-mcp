@@ -1,5 +1,15 @@
 # PHASE 10: AGENT SELF-LEARNING
 
+**Rollout Phase:** Gamma (Weeks 5-6)
+**Status:** Implement after Phase Beta complete
+
+## Prerequisites
+
+- ✅ Phase Beta complete (SQLite stable, Phases 12-13 working)
+- ✅ User learning validated (Phases 1-7 proven in production)
+
+---
+
 ## Objective
 Agent detects success/failure patterns and proposes memories proactively.
 

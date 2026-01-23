@@ -11,7 +11,7 @@
 - **PHASE-1**: Session Correction Detection (259 lines)
 - **PHASE-2**: Semantic Deduplication (477 lines)
 - **PHASE-3**: Session Proposal (573 lines)
-- **PHASE-4**: TUI Approval Interface (318 lines)
+- **PHASE-4**: CLI Approval Interface (318 lines)
 - **PHASE-5**: Storage Operations (345 lines)
 - **PHASE-6**: Retrieval Operations (587 lines)
 - **PHASE-7**: Context-Aware Injection (605 lines)
@@ -87,10 +87,10 @@
 | Rollout | Phases | Files |
 |---------|--------|-------|
 | **Alpha** | 1-7 | 7 files (JSON storage) |
-| **Beta** | 12-13, update 5-6 | 4 files (SQLite migration) |
-| **Gamma** | 8, 10, 11 | 5 files (enhancements) |
+| **Beta** | 12-13, update 5-6 | 3 files (SQLite migration) |
+| **Gamma** | 8, 10, 11 | 4 files (enhancements) |
 | **Delta** | 14-15 | 4 files (anchoring + modes) |
-| **Epsilon** | 16-20 | 10 files (critical fixes) |
+| **Epsilon** | 16-20 | 9 files (critical fixes) |
 
 ---
 

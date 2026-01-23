@@ -73,8 +73,8 @@ CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at);
 -- Sessions table (Phase 8)
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,           -- UUID
-    scope TEXT NOT NULL,            -- "global" or "project:{name}"
-    project_path TEXT,              -- Absolute path (null for global)
+    scope TEXT NOT NULL,            -- "universal" or "project:{name}"
+    project_path TEXT,              -- Absolute path (null for universal)
     phase TEXT,                     -- Current phase/feature being worked on
     context_data TEXT,              -- JSON blob: {files, functions, decisions, blockers, next_actions}
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -125,7 +125,7 @@ class IndexedMemory:
 class SessionRecord:
     """Session stored in SQLite (Phase 8)."""
     id: str  # UUID
-    scope: str  # "global" or "project:{name}"
+    scope: str  # "universal" or "project:{name}"
     project_path: Optional[str]
     phase: Optional[str]  # Current phase/feature
     context_data: Dict[str, Any]  # {files, functions, decisions, blockers, next_actions}
@@ -262,8 +262,8 @@ class MemoryIndexManager:
         """
         Migrate session summaries from JSON to SQLite (Phase 8).
 
-        Legacy location: ~/.cerberus/session_summary.json (temporary, global only)
-        New location: SQLite sessions table (multi-tier: global + project)
+        Legacy location: ~/.cerberus/session_summary.json (temporary, universal only)
+        New location: SQLite sessions table (multi-tier: universal + project)
         """
         legacy_path = Path.home() / ".cerberus" / "session_summary.json"
 
@@ -277,7 +277,7 @@ class MemoryIndexManager:
             with open(legacy_path) as f:
                 legacy_data = json.load(f)
 
-            # Legacy format: single global session
+            # Legacy format: single universal session
             session_id = str(uuid.uuid4())
             conn.execute("""
                 INSERT INTO sessions (
@@ -286,7 +286,7 @@ class MemoryIndexManager:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
                 session_id,
-                "global",  # Legacy sessions were global
+                "universal",  # Legacy sessions were universal
                 None,
                 json.dumps(legacy_data),
                 datetime.now().isoformat(),
@@ -614,7 +614,7 @@ JSON: 500 memories
 # Scenario 11: Session migration (Phase 8)
 Legacy session_summary.json exists
 → migrate_sessions_from_json()
-→ expect: 1 session migrated, status="ended", scope="global"
+→ expect: 1 session migrated, status="ended", scope="universal"
 
 # Scenario 12: No legacy sessions
 No session_summary.json
@@ -642,25 +642,51 @@ pip install sqlite3  # Built-in, no install needed
 
 ---
 
-## Migration Strategy
+## Migration Strategy (Alpha → Beta Transition)
 
-**Phase 1: Add indexing (this phase)**
-- SQLite schema
-- Migration tool
-- Backward compatibility
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              COMPLETE STORAGE MIGRATION TIMELINE                 │
+└─────────────────────────────────────────────────────────────────┘
 
-**Phase 2: Update writes (Phase 13)**
-- Phase 5 writes to SQLite
-- Keep JSON for backward compat (deferred removal)
+PHASE ALPHA (Weeks 1-2): JSON-Only Implementation
+  ├─ Phase 1-7: Core pipeline implemented
+  ├─ Phase 5 (Version 1): Writes to JSON files
+  ├─ Phase 6 (Version 1): Reads from JSON files
+  ├─ Data location: ~/.cerberus/memory/*.json
+  └─ Validation: 70%+ approval, 90%+ accuracy, 5+ sessions
 
-**Phase 3: Update reads (Phase 13)**
-- Phase 6 queries SQLite FTS5
-- Fallback to JSON if SQLite fails
+              ↓ MIGRATION TRIGGER ↓
 
-**Phase 4: Deprecate JSON (future)**
-- After 3+ months stability
-- Remove JSON write logic
-- Keep JSON read for recovery
+PHASE BETA (Weeks 3-4): SQLite Migration + Code Replacement
+
+  Step 1: Phase 12 - Create Index & Migrate Data
+    ├─ Create memory.db with FTS5 schema
+    ├─ Auto-migrate: Read all JSON files → Write to SQLite
+    ├─ Verification: 100% data integrity check
+    └─ Result: Data now exists in BOTH JSON and SQLite
+
+  Step 2: Phase 13 - Replace Phase 5 & 6 Code
+    ├─ Phase 5 (Version 2): REPLACE with SQLite write code
+    ├─ Phase 6 (Version 2): REPLACE with SQLite FTS5 queries
+    ├─ Fallback: If SQLite fails, read from JSON (safety)
+    └─ Result: New writes go to SQLite, JSON is read-only backup
+
+              ↓ FINAL STATE ↓
+
+POST-BETA: Dual Storage (Write SQLite, Read SQLite, Backup JSON)
+  ├─ New memories: Written to SQLite only
+  ├─ Queries: SQLite FTS5 (80% token savings)
+  ├─ JSON files: Kept as backup, not updated
+  └─ Recovery: If SQLite corrupted, fallback to JSON
+```
+
+**Key Points:**
+- Phase 5 & 6 get **completely rewritten** in Beta (not just updated)
+- Alpha version code is in PHASE-5/6 files
+- Beta version code is in PHASE-13B-INTEGRATION.md
+- Migration is automatic and transparent
+- JSON is never deleted (kept as backup/recovery)
 
 ---
 
@@ -668,16 +694,16 @@ pip install sqlite3  # Built-in, no install needed
 
 ```
 ~/.cerberus/
-├── memory.db              # Unified SQLite (FTS5 for memories + regular tables for sessions)
+├── memory.db              # Single global SQLite database (ALL persistent data)
 ├── memory.db-wal          # Write-ahead log (SQLite)
 ├── memory.db-shm          # Shared memory (SQLite)
-├── memory/                # Legacy JSON (kept for compat)
-│   ├── profile.json
-│   ├── corrections.json
-│   ├── languages/
-│   └── projects/
-└── session_summary.json   # Legacy sessions (Phase 8 - migrated to DB)
+└── memory/                # Legacy JSON (read-only backup after migration)
+
+Project root (any project):
+└── .cerberus-session.json # Temp runtime state only (deleted at session end)
 ```
+
+**Note:** All memories, sessions, and history for ALL projects are in the single global DB. Project-specific data is filtered with `WHERE project_path = '/path/to/project'` in SQL queries.
 
 ---
 
