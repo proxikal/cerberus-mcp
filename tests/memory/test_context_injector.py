@@ -200,9 +200,10 @@ def test_startup_injection_formats_markdown(temp_storage_with_memories):
     injector = ContextInjector(base_dir=temp_storage_with_memories)
     output = injector.inject_startup(context=context)
 
-    # Should be markdown formatted
+    # Should be markdown formatted with hybrid format (semantic codes)
     assert "## Memory Context" in output
-    assert "### Preferences" in output or "### Rules" in output or "### Corrections" in output
+    # New format uses semantic codes like "pref:", "rule:", "correction:"
+    assert "pref:" in output or "rule:" in output or "correction:" in output
 
 
 def test_startup_injection_respects_budget(temp_storage_with_memories):
@@ -364,10 +365,10 @@ def test_markdown_has_categories(temp_storage_with_memories):
     injector = ContextInjector(base_dir=temp_storage_with_memories)
     output = injector.inject_startup(context=context)
 
-    # Should have category headers
-    has_preferences = "### Preferences" in output
-    has_rules = "### Rules" in output
-    has_corrections = "### Corrections" in output
+    # Should have category prefixes in hybrid format
+    has_preferences = "pref:" in output
+    has_rules = "rule:" in output
+    has_corrections = "correction:" in output
 
     # At least one category should be present
     assert has_preferences or has_rules or has_corrections

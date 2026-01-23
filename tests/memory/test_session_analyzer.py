@@ -5,7 +5,7 @@ Validates 90%+ accuracy on detection patterns.
 """
 
 import pytest
-from src.cerberus.memory.session_analyzer import (
+from cerberus.memory.session_analyzer import (
     SessionAnalyzer,
     CorrectionCandidate,
     analyze_conversation,

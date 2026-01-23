@@ -5,7 +5,7 @@ Validates TF-IDF clustering, canonical extraction, and 60%+ compression ratio.
 """
 
 import pytest
-from src.cerberus.memory.semantic_analyzer import (
+from cerberus.memory.semantic_analyzer import (
     SimilarityEngine,
     CanonicalExtractor,
     SemanticAnalyzer,
@@ -14,7 +14,7 @@ from src.cerberus.memory.semantic_analyzer import (
     cluster_corrections,
     create_test_data
 )
-from src.cerberus.memory.session_analyzer import CorrectionCandidate
+from cerberus.memory.session_analyzer import CorrectionCandidate
 
 
 class TestSimilarityEngine:

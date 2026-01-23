@@ -6,14 +6,14 @@ and content transformation.
 """
 
 import pytest
-from src.cerberus.memory.proposal_engine import (
+from cerberus.memory.proposal_engine import (
     ProposalEngine,
     MemoryProposal,
     SessionSummary,
     generate_proposals,
     create_test_scenarios
 )
-from src.cerberus.memory.semantic_analyzer import CorrectionCluster
+from cerberus.memory.semantic_analyzer import CorrectionCluster
 from datetime import datetime
 
 
