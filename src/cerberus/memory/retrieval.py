@@ -1,18 +1,21 @@
 """
-Phase 6: Retrieval Operations (Version 1 - JSON)
+Phase 6: Retrieval Operations (Version 2 - SQLite FTS5)
 
-Query and filter memories from JSON for context-aware injection.
-This is Phase Alpha implementation - will be replaced with SQLite FTS5 in Phase Beta (Phase 13).
+Query and filter memories from SQLite using FTS5 for context-aware injection.
+This is Phase Beta implementation - replaces JSON loading from Phase Alpha.
 
 Zero token cost (pure retrieval, tokens counted in Phase 7).
 """
 
+import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Set
-from dataclasses import dataclass, field
+from typing import List, Dict, Optional
+from dataclasses import dataclass
 import tiktoken
+
+from .search import MemorySearchEngine, SearchQuery, SearchResult
 
 
 @dataclass
@@ -49,10 +52,12 @@ class RetrievedMemory:
 
 class MemoryRetrieval:
     """
-    JSON-based memory retrieval with relevance scoring.
+    SQLite FTS5-based memory retrieval with relevance scoring.
 
-    Phase Alpha (MVP): JSON file loading
-    Phase Beta: Will be replaced with SQLite FTS5 queries
+    Phase Alpha (MVP): JSON file loading (deprecated)
+    Phase Beta (Current): SQLite FTS5 queries
+
+    Uses Phase 12 schema and Phase 13 search engine.
     """
 
     # Scope factors for relevance scoring
@@ -62,18 +67,20 @@ class MemoryRetrieval:
         "project": 1.0       # Project-specific highly relevant
     }
 
-    def __init__(self, base_dir: Optional[str] = None, encoding: str = "cl100k_base"):
+    def __init__(self, base_dir: Optional[Path] = None, encoding: str = "cl100k_base"):
         """
         Args:
-            base_dir: Base directory for storage (default: ~/.cerberus/memory)
+            base_dir: Base directory for storage (default: ~/.cerberus)
             encoding: Tokenizer encoding for token counting (default: cl100k_base for GPT-4)
         """
         if base_dir is None:
-            base_dir = Path.home() / ".cerberus" / "memory"
-        else:
+            base_dir = Path.home() / ".cerberus"
+        elif isinstance(base_dir, str):
             base_dir = Path(base_dir)
 
         self.base_dir = base_dir
+        self.db_path = base_dir / "memory.db"
+        self.search_engine = MemorySearchEngine(self.db_path)
         self.tokenizer = tiktoken.get_encoding(encoding)
 
     def retrieve(
@@ -99,40 +106,51 @@ class MemoryRetrieval:
         Returns:
             List of RetrievedMemory objects sorted by relevance (high to low)
         """
-        # Load memories from relevant files
-        memories = self._load_relevant_memories(language, project)
-
-        # Apply filters
-        if scope:
-            memories = [m for m in memories if m["scope"] == scope]
-        if category:
-            memories = [m for m in memories if m["category"] == category]
-
-        if not memories:
+        if not self.db_path.exists():
             return []
+
+        # Build scope pattern for filtering
+        scope_pattern = self._build_scope_pattern(language, project, scope)
+
+        # Query database using search engine
+        search_query = SearchQuery(
+            text=None,  # No full-text search, just scope filtering
+            scope=scope_pattern,
+            category=category,
+            min_confidence=0.0,  # Apply min_relevance later after scoring
+            limit=1000,  # Large limit, will be filtered by budget
+            order_by="recency"  # Start with recent memories
+        )
+
+        results = self.search_engine.search(search_query)
 
         # Convert to RetrievedMemory with relevance scoring
         retrieved = []
-        for memory in memories:
+        for result in results:
+            # Calculate relevance score (recency already from DB)
             relevance = self._calculate_relevance(
-                memory, language, project
+                result, language, project
             )
 
             if relevance < min_relevance:
                 continue
 
-            token_count = self._count_tokens(memory["content"])
+            # Count tokens
+            token_count = self._count_tokens(result.content)
+
+            # Extract rationale from metadata
+            rationale = result.metadata.get("rationale", "")
 
             retrieved.append(RetrievedMemory(
-                id=memory["id"],
-                category=memory["category"],
-                scope=memory["scope"],
-                content=memory["content"],
-                rationale=memory["rationale"],
-                confidence=memory["confidence"],
-                timestamp=memory["timestamp"],
-                access_count=memory.get("access_count", 0),
-                last_accessed=memory.get("last_accessed"),
+                id=result.memory_id,
+                category=result.category,
+                scope=result.scope,
+                content=result.content,
+                rationale=rationale,
+                confidence=result.confidence,
+                timestamp=result.created_at,
+                access_count=result.access_count,
+                last_accessed=result.last_accessed,
                 relevance_score=relevance,
                 token_count=token_count
             ))
@@ -145,69 +163,35 @@ class MemoryRetrieval:
 
         return budgeted
 
-    def _load_relevant_memories(
+    def _build_scope_pattern(
         self,
         language: Optional[str],
-        project: Optional[str]
-    ) -> List[Dict]:
+        project: Optional[str],
+        explicit_scope: Optional[str]
+    ) -> Optional[str]:
         """
-        Load memories from relevant files based on context.
+        Build scope pattern for SQL filtering.
 
-        Loads in order: universal → language → project
+        If explicit_scope provided, use it. Otherwise build from context.
 
         Args:
             language: Current language context
             project: Current project context
+            explicit_scope: Explicit scope filter
 
         Returns:
-            List of memory dicts
+            Scope pattern string or None (matches all)
         """
-        memories = []
+        if explicit_scope:
+            return explicit_scope
 
-        # Load universal memories
-        memories.extend(self._load_file(self.base_dir / "profile.json"))
-        memories.extend(self._load_file(self.base_dir / "corrections.json"))
-
-        # Load language-specific memories
-        if language:
-            lang_file = self.base_dir / "languages" / f"{language}.json"
-            memories.extend(self._load_file(lang_file))
-
-        # Load project-specific memories
-        if project:
-            project_file = self.base_dir / "projects" / project / "decisions.json"
-            memories.extend(self._load_file(project_file))
-
-        return memories
-
-    def _load_file(self, file_path: Path) -> List[Dict]:
-        """
-        Load memories from a JSON file.
-
-        Args:
-            file_path: Path to JSON file
-
-        Returns:
-            List of memory dicts (empty if file doesn't exist)
-        """
-        if not file_path.exists():
-            return []
-
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                if isinstance(data, list):
-                    return data
-                elif isinstance(data, dict) and "memories" in data:
-                    return data["memories"]
-                else:
-                    return []
-        except (json.JSONDecodeError, IOError):
-            return []
+        # No explicit scope: match multiple scopes using SQL OR logic
+        # We'll handle this in the search method by running multiple queries
+        return None
 
     def _calculate_relevance(
         self,
-        memory: Dict,
+        result: SearchResult,
         language: Optional[str],
         project: Optional[str]
     ) -> float:
@@ -217,7 +201,7 @@ class MemoryRetrieval:
         Formula: scope_factor * recency_score * confidence_weight
 
         Args:
-            memory: Memory dict
+            result: SearchResult from database
             language: Current language context
             project: Current project context
 
@@ -225,7 +209,7 @@ class MemoryRetrieval:
             Relevance score (0.0-1.0+)
         """
         # Scope factor
-        scope = memory["scope"]
+        scope = result.scope
         if scope == "universal":
             scope_factor = self.SCOPE_FACTORS["universal"]
         elif scope.startswith("language:"):
@@ -249,10 +233,10 @@ class MemoryRetrieval:
             return 0.0
 
         # Recency score (standardized decay curve)
-        recency_score = self._calculate_recency(memory["timestamp"])
+        recency_score = self._calculate_recency(result.created_at)
 
         # Confidence weight
-        confidence = memory.get("confidence", 0.5)
+        confidence = result.confidence
 
         # Final relevance score
         relevance = scope_factor * recency_score * confidence
@@ -347,60 +331,59 @@ class MemoryRetrieval:
 
     def get_stats(self) -> Dict:
         """
-        Get retrieval statistics.
+        Get retrieval statistics from SQLite.
 
         Returns:
-            Dict with memory counts and locations
+            Dict with memory counts and scopes
         """
-        stats = {
-            "total_files": 0,
-            "total_memories": 0,
-            "by_scope": {
+        if not self.db_path.exists():
+            return {
+                "total_memories": 0,
+                "by_scope": {
+                    "universal": 0,
+                    "language": 0,
+                    "project": 0
+                }
+            }
+
+        conn = sqlite3.connect(str(self.db_path))
+        conn.row_factory = sqlite3.Row
+
+        try:
+            # Total memories
+            cursor = conn.execute("SELECT COUNT(*) as count FROM memory_store")
+            total = cursor.fetchone()["count"]
+
+            # By scope type
+            cursor = conn.execute("""
+                SELECT
+                    CASE
+                        WHEN scope = 'universal' THEN 'universal'
+                        WHEN scope LIKE 'language:%' THEN 'language'
+                        WHEN scope LIKE 'project:%' THEN 'project'
+                        ELSE 'other'
+                    END as scope_type,
+                    COUNT(*) as count
+                FROM memory_store
+                GROUP BY scope_type
+            """)
+
+            by_scope = {
                 "universal": 0,
                 "language": 0,
                 "project": 0
             }
-        }
+            for row in cursor:
+                if row["scope_type"] in by_scope:
+                    by_scope[row["scope_type"]] = row["count"]
 
-        # Check all possible files
-        files_to_check = [
-            self.base_dir / "profile.json",
-            self.base_dir / "corrections.json"
-        ]
+            return {
+                "total_memories": total,
+                "by_scope": by_scope
+            }
 
-        # Add language files
-        languages_dir = self.base_dir / "languages"
-        if languages_dir.exists():
-            files_to_check.extend(languages_dir.glob("*.json"))
-
-        # Add project files
-        projects_dir = self.base_dir / "projects"
-        if projects_dir.exists():
-            for project_dir in projects_dir.iterdir():
-                if project_dir.is_dir():
-                    decisions_file = project_dir / "decisions.json"
-                    if decisions_file.exists():
-                        files_to_check.append(decisions_file)
-
-        # Count memories
-        for file_path in files_to_check:
-            if file_path.exists():
-                memories = self._load_file(file_path)
-                if memories:
-                    stats["total_files"] += 1
-                    stats["total_memories"] += len(memories)
-
-                    # Categorize by scope
-                    for memory in memories:
-                        scope = memory.get("scope", "universal")
-                        if scope == "universal":
-                            stats["by_scope"]["universal"] += 1
-                        elif scope.startswith("language:"):
-                            stats["by_scope"]["language"] += 1
-                        elif scope.startswith("project:"):
-                            stats["by_scope"]["project"] += 1
-
-        return stats
+        finally:
+            conn.close()
 
 
 def retrieve_memories(
@@ -409,7 +392,7 @@ def retrieve_memories(
     category: Optional[str] = None,
     token_budget: int = 1200,
     min_relevance: float = 0.0,
-    base_dir: Optional[str] = None
+    base_dir: Optional[Path] = None
 ) -> List[RetrievedMemory]:
     """
     Convenience function to retrieve memories.
@@ -420,7 +403,7 @@ def retrieve_memories(
         category: Optional category filter (preference, rule, correction)
         token_budget: Maximum tokens to retrieve (default: 1200)
         min_relevance: Minimum relevance score (default: 0.0)
-        base_dir: Optional base directory (default: ~/.cerberus/memory)
+        base_dir: Optional base directory (default: ~/.cerberus)
 
     Returns:
         List of RetrievedMemory objects sorted by relevance
@@ -433,48 +416,3 @@ def retrieve_memories(
         token_budget=token_budget,
         min_relevance=min_relevance
     )
-
-
-def create_test_scenarios():
-    """
-    Create test scenarios for validation.
-
-    Returns:
-        List of test scenario dictionaries
-    """
-    return [
-        {
-            "name": "Universal only",
-            "language": None,
-            "project": None,
-            "expected_scopes": ["universal"]
-        },
-        {
-            "name": "Language-specific",
-            "language": "python",
-            "project": None,
-            "expected_scopes": ["universal", "language:python"]
-        },
-        {
-            "name": "Project-specific",
-            "language": None,
-            "project": "cerberus",
-            "expected_scopes": ["universal", "project:cerberus"]
-        },
-        {
-            "name": "Full context",
-            "language": "go",
-            "project": "myapp",
-            "expected_scopes": ["universal", "language:go", "project:myapp"]
-        },
-        {
-            "name": "Token budget enforcement",
-            "token_budget": 100,
-            "expected_behavior": "stops when budget exhausted"
-        },
-        {
-            "name": "Relevance scoring",
-            "recency_test": True,
-            "expected_order": "recent > old, high confidence > low"
-        }
-    ]

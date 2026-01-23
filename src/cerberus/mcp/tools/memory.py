@@ -9,6 +9,9 @@ from cerberus.memory.corrections import CorrectionManager
 from cerberus.memory.context import ContextGenerator
 from cerberus.memory.extract import GitExtractor
 
+# Phase 13: Adaptive Learning Memory System (SQLite FTS5)
+from cerberus.memory.search import MemorySearchEngine, SearchQuery
+
 
 def register(mcp):
     # Lazy singletons to avoid repeated disk I/O
@@ -465,3 +468,70 @@ def register(mcp):
             "merged": merge,
             "counts": imported,
         }
+
+    @mcp.tool()
+    def memory_search(
+        query: str,
+        scope: Optional[str] = None,
+        category: Optional[str] = None,
+        limit: int = 10
+    ) -> dict:
+        """
+        Search memories by text query using FTS5 full-text search.
+
+        Phase 13: Adaptive Learning Memory System
+        Uses SQLite FTS5 for efficient text search across memories.
+
+        Args:
+            query: Text to search for
+            scope: Filter by scope (universal, language:X, project:Y)
+            category: Filter by category (preference, rule, correction, decision)
+            limit: Max results (default 10)
+
+        Returns:
+            Search results with relevance scores
+        """
+        db_path = Path.home() / ".cerberus" / "memory.db"
+
+        if not db_path.exists():
+            return {
+                "status": "error",
+                "message": "Adaptive memory database not found. No memories have been stored yet."
+            }
+
+        search_engine = MemorySearchEngine(db_path)
+
+        search_query = SearchQuery(
+            text=query,
+            scope=scope,
+            category=category,
+            limit=limit,
+            order_by="relevance"
+        )
+
+        try:
+            results = search_engine.search(search_query)
+
+            return {
+                "status": "ok",
+                "query": query,
+                "total_results": len(results),
+                "results": [
+                    {
+                        "content": r.content,
+                        "scope": r.scope,
+                        "category": r.category,
+                        "relevance": round(r.relevance_score, 2),
+                        "snippet": r.match_context,
+                        "confidence": r.confidence,
+                        "created_at": r.created_at,
+                        "access_count": r.access_count
+                    }
+                    for r in results
+                ]
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Search failed: {str(e)}"
+            }
