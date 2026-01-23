@@ -110,14 +110,15 @@ class MemoryStorage:
                 # Phase 15: Auto-tag modes
                 valid_modes, mode_priority = auto_tag_memory(proposal.content)
 
-                # Insert into memory_store (metadata table with anchors + modes)
+                # Insert into memory_store (metadata table with anchors + modes + hybrid format)
                 conn.execute("""
                     INSERT INTO memory_store (
                         id, category, scope, confidence,
                         created_at, last_accessed, access_count, metadata,
                         anchor_file, anchor_symbol, anchor_score, anchor_metadata,
-                        valid_modes, mode_priority
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        valid_modes, mode_priority,
+                        details, relevance_decay_days
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     memory_id,
                     proposal.category,
@@ -132,7 +133,9 @@ class MemoryStorage:
                     anchor_score,
                     anchor_metadata,
                     json.dumps(valid_modes),
-                    json.dumps(mode_priority)
+                    json.dumps(mode_priority),
+                    getattr(proposal, "details", None),
+                    getattr(proposal, "relevance_decay_days", 90)
                 ))
 
                 # Insert into memory_fts (FTS5 search table)

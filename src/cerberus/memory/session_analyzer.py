@@ -1138,11 +1138,155 @@ def extract_session_codes() -> List[str]:
     return unique_codes[:150]
 
 
+def extract_session_details() -> str:
+    """
+    Extract structured details for hybrid session summary.
+
+    Provides why/how/where context to complement semantic codes.
+    Format: Clean structured bullets focusing on explanations.
+    Target: ~500-800 tokens (vs 2500+ prose, 200 codes-only).
+
+    Returns:
+        Structured text with bullets explaining key work
+    """
+    transcript = find_current_transcript()
+    if not transcript:
+        return ""
+
+    conversations = parse_claude_code_transcript(transcript)
+    tool_calls = extract_tool_calls_from_transcript(transcript)
+
+    sections = {
+        'bugs': [],
+        'investigations': [],
+        'files': set()
+    }
+
+    # Track what's been documented
+    seen = set()
+
+    # Helper: Clean and deduplicate line
+    def add_unique(category: str, text: str, max_len: int = 100):
+        """Add text to section if unique and meaningful."""
+        text = text.strip()
+        if not text or len(text) < 10:
+            return
+
+        # Remove markdown and special chars
+        text = re.sub(r'[*_#`]', '', text)
+        text = re.sub(r'\s+', ' ', text)
+        text = text[:max_len]
+
+        # Filter out code-like patterns after cleaning (word:word:word)
+        # These are semantic codes, not explanations
+        code_pattern = re.search(r'[\w-]+:[\w-]+:[\w-]+', text)
+        if code_pattern:
+            # If the code takes up most of the text, skip it
+            code_ratio = len(code_pattern.group(0)) / len(text)
+            if code_ratio > 0.5:
+                return
+
+        # Skip lines that are mostly file paths
+        if text.count('/') > 2 or text.endswith(('.py', '.md', '.txt', '.json')):
+            return
+
+        # Deduplicate
+        normalized = text.lower()
+        if normalized not in seen:
+            sections[category].append(text)
+            seen.add(normalized)
+
+    # Extract bug fixes and their context
+    for user_msg, ai_msg in conversations:
+        combined_lower = (user_msg + ' ' + ai_msg).lower()
+
+        # Only process conversations about bugs/fixes
+        if not any(keyword in combined_lower for keyword in ['bug', 'fix', 'broken', 'issue', 'error', 'fail']):
+            continue
+
+        lines = ai_msg.split('\n')
+        for line in lines:
+            line_clean = line.strip()
+            if not line_clean or len(line_clean) < 15:
+                continue
+
+            line_lower = line_clean.lower()
+
+            # Extract root causes
+            if any(marker in line_lower for marker in ['root cause:', 'why it', 'because', 'the problem']):
+                # Clean up and format
+                text = re.sub(r'^[-*•]\s*', '', line_clean)
+                if not text.lower().startswith('root'):
+                    text = f"Root: {text}"
+                add_unique('bugs', text, 120)
+
+            # Extract solutions/fixes
+            elif any(marker in line_lower for marker in ['fix:', 'solution:', 'added', 'modified']):
+                text = re.sub(r'^[-*•]\s*', '', line_clean)
+                if not text.lower().startswith(('fix', 'solution')):
+                    text = f"Fix: {text}"
+                add_unique('bugs', text, 120)
+
+    # Extract investigation results/conclusions
+    for user_msg, ai_msg in conversations:
+        ai_lower = ai_msg.lower()
+
+        # Look for conclusion patterns
+        if any(marker in ai_lower for marker in ['conclusion:', 'working as designed', 'verified:', 'confirmed:']):
+            lines = ai_msg.split('\n')
+            for line in lines:
+                line_clean = line.strip()
+                if not line_clean or len(line_clean) < 15:
+                    continue
+
+                line_lower = line_clean.lower()
+                if any(marker in line_lower for marker in ['conclusion:', 'working as', 'verified', 'confirmed']):
+                    text = re.sub(r'^[-*•]\s*', '', line_clean)
+                    add_unique('investigations', text, 150)
+
+    # Extract modified files
+    for call in tool_calls:
+        if call.get('name') in ['Edit', 'Write', 'NotebookEdit']:
+            params = call.get('params', {})
+            file_path = params.get('file_path', '')
+            if file_path:
+                # Get just filename
+                filename = file_path.split('/')[-1]
+                sections['files'].add(filename)
+
+    # Format output
+    output = []
+
+    # Bugs/Fixes section
+    if sections['bugs']:
+        output.append("Bugs/Fixes:")
+        for item in sections['bugs'][:8]:  # Limit to 8 items
+            output.append(f"- {item}")
+
+    # Investigations section
+    if sections['investigations']:
+        if output:
+            output.append("")
+        output.append("Investigations:")
+        for item in sections['investigations'][:5]:  # Limit to 5 items
+            output.append(f"- {item}")
+
+    # Files section
+    if sections['files']:
+        if output:
+            output.append("")
+        output.append("Files Modified:")
+        for filename in sorted(sections['files'])[:10]:  # Limit to 10 files
+            output.append(f"- {filename}")
+
+    return '\n'.join(output) if output else ""
+
+
 def save_session_context_to_db():
     """
-    Save session context codes to SQLite sessions table.
+    Save session context codes + structured details to SQLite sessions table.
 
-    Called at session end to persist work summary.
+    Called at session end to persist hybrid work summary.
     """
     from cerberus.memory.session_continuity import detect_session_scope
     import sqlite3
@@ -1164,6 +1308,9 @@ def save_session_context_to_db():
         "next_actions": [c for c in codes if c.startswith("next:")],
     }
 
+    # Extract structured details (hybrid format)
+    details = extract_session_details()
+
     # Store in sessions table
     db_path = Path.home() / ".cerberus" / "memory.db"
     conn = sqlite3.connect(db_path)
@@ -1179,16 +1326,16 @@ def save_session_context_to_db():
             # Update existing session
             conn.execute("""
                 UPDATE sessions
-                SET context_data = ?, last_activity = CURRENT_TIMESTAMP
+                SET context_data = ?, summary_details = ?, last_activity = CURRENT_TIMESTAMP
                 WHERE scope = ? AND status = 'active'
-            """, (json.dumps(context_data), scope))
+            """, (json.dumps(context_data), details, scope))
         else:
             # Create new session
             session_id = f"session-{uuid.uuid4().hex[:12]}"
             conn.execute("""
-                INSERT INTO sessions (id, scope, project_path, status, context_data)
-                VALUES (?, ?, ?, 'active', ?)
-            """, (session_id, scope, project_path, json.dumps(context_data)))
+                INSERT INTO sessions (id, scope, project_path, status, context_data, summary_details)
+                VALUES (?, ?, ?, 'active', ?, ?)
+            """, (session_id, scope, project_path, json.dumps(context_data), details))
 
         conn.commit()
     finally:

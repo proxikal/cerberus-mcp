@@ -360,10 +360,14 @@ class SessionContextInjector:
 
     def _format_codes(self, session: Dict) -> str:
         """
-        Format codes for injection.
-        NO PROSE. NO MARKDOWN. Pure data.
+        Format HYBRID codes + details for injection.
 
-        Order: scope → work_streams → files → decisions → blockers → next_actions → completed
+        Part 1: Semantic codes (compressed skeleton)
+        Part 2: Structured details (why/how/where context)
+
+        NO PROSE. Pure structured data.
+
+        Order: scope → work_streams → files → decisions → blockers → next_actions → completed → details
         """
         data = json.loads(session['context_data'])
 
@@ -395,6 +399,11 @@ class SessionContextInjector:
         # Completions (already have "done:" prefix)
         for item in data.get("completed", []):
             lines.append(item)
+
+        # Add structured details if present (hybrid format)
+        if session.get('summary_details'):
+            lines.append("")  # Blank line separator
+            lines.append(session['summary_details'])
 
         return "\n".join(lines)
 

@@ -34,23 +34,50 @@ def register(mcp):
         content: str,
         project: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        details: Optional[str] = None,
+        relevance_decay_days: int = 90,
     ) -> dict:
         """
-        Teach Session Memory something new.
+        Teach Session Memory something new (hybrid format).
 
         Args:
             category: Type of memory - "preference", "decision", "correction"
-            content: What to remember
+            content: Semantic code (compressed identifier)
             project: Project name (required for decisions, auto-detected if not provided)
             metadata: Additional structured data (topic, rationale, etc.)
+            details: Structured explanations (why/how/where) - optional but recommended
+            relevance_decay_days: Auto-deprioritize after N days (default: 90)
 
         Returns:
             Confirmation with memory ID
+
+        Example:
+            memory_learn(
+                category="decision",
+                content="config_hierarchical_defaults_global_local",
+                details="Root: User needed per-project config override\\nFix: Added .cerberus/ local config\\nFiles: src/cerberus/mcp/config.py:45"
+            )
         """
         import uuid
         from datetime import datetime
 
         metadata = metadata or {}
+
+        # Quality filter: Reject garbage data
+        if len(content) > 500:
+            return {
+                "status": "error",
+                "message": "Content too long (max 500 chars). Use 'details' for explanations."
+            }
+
+        # Quality filter: Reject conversational fragments
+        conversational_markers = ["now i want", "let me know", "can you", "should i"]
+        content_lower = content.lower()
+        if any(marker in content_lower for marker in conversational_markers):
+            return {
+                "status": "error",
+                "message": "Content appears conversational. Memories should be factual decisions/rules/corrections."
+            }
 
         # Determine scope based on category and project
         if category == "preference":
@@ -69,7 +96,7 @@ def register(mcp):
                 "message": f"Unknown category: {category}. Use: preference, decision, correction",
             }
 
-        # Create memory proposal
+        # Create memory proposal (hybrid format)
         memory_id = str(uuid.uuid4())
         proposal = MemoryProposal(
             id=memory_id,
@@ -79,7 +106,9 @@ def register(mcp):
             rationale=metadata.get("rationale", "User-provided memory via memory_learn"),
             source_variants=[],
             confidence=1.0,  # User-provided = maximum confidence
-            priority=1
+            priority=1,
+            details=details,
+            relevance_decay_days=relevance_decay_days
         )
 
         # Store to SQLite
@@ -91,7 +120,9 @@ def register(mcp):
                 "category": category,
                 "scope": scope,
                 "memory_id": memory_id,
-                "content": content
+                "content": content,
+                "details": details,
+                "relevance_decay_days": relevance_decay_days
             }
         except Exception as e:
             return {
@@ -127,7 +158,7 @@ def register(mcp):
 
         try:
             # Build query with filters
-            query = "SELECT id, category, scope, metadata, created_at, last_accessed, access_count FROM memory_store WHERE 1=1"
+            query = "SELECT id, category, scope, metadata, created_at, last_accessed, access_count, details, relevance_decay_days FROM memory_store WHERE 1=1"
             params = []
 
             if category:
@@ -157,6 +188,8 @@ def register(mcp):
                     "category": row["category"],
                     "scope": row["scope"],
                     "content": content_row["content"] if content_row else "",
+                    "details": row["details"],
+                    "relevance_decay_days": row["relevance_decay_days"],
                     "created_at": row["created_at"],
                     "last_accessed": row["last_accessed"],
                     "access_count": row["access_count"]

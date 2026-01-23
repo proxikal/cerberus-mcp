@@ -47,6 +47,9 @@ class SearchResult:
     # Phase 15: Mode fields
     valid_modes: Optional[str] = None  # JSON string of list
     mode_priority: Optional[str] = None  # JSON string of dict
+    # Hybrid format (Phase: Session Continuity)
+    details: Optional[str] = None  # Structured explanations
+    relevance_decay_days: Optional[int] = 90  # Custom decay threshold
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -139,7 +142,10 @@ class MemorySearchEngine:
                 anchor_metadata=row["anchor_metadata"] if "anchor_metadata" in row.keys() else None,
                 # Phase 15: Mode fields
                 valid_modes=row["valid_modes"] if "valid_modes" in row.keys() else None,
-                mode_priority=row["mode_priority"] if "mode_priority" in row.keys() else None
+                mode_priority=row["mode_priority"] if "mode_priority" in row.keys() else None,
+                # Hybrid format (Phase: Session Continuity)
+                details=row["details"] if "details" in row.keys() else None,
+                relevance_decay_days=row["relevance_decay_days"] if "relevance_decay_days" in row.keys() else 90
             ))
 
         conn.close()
@@ -170,6 +176,8 @@ class MemorySearchEngine:
                     s.id, f.content, s.category, s.scope, s.confidence,
                     s.created_at, s.last_accessed, s.access_count, s.metadata,
                     s.anchor_file, s.anchor_symbol, s.anchor_score, s.anchor_metadata,
+                    s.valid_modes, s.mode_priority,
+                    s.details, s.relevance_decay_days,
                     f.rank
                 FROM memory_store s
                 JOIN memory_fts f ON s.id = f.id
@@ -183,6 +191,8 @@ class MemorySearchEngine:
                     s.id, f.content, s.category, s.scope, s.confidence,
                     s.created_at, s.last_accessed, s.access_count, s.metadata,
                     s.anchor_file, s.anchor_symbol, s.anchor_score, s.anchor_metadata,
+                    s.valid_modes, s.mode_priority,
+                    s.details, s.relevance_decay_days,
                     NULL as rank
                 FROM memory_store s
                 JOIN memory_fts f ON s.id = f.id

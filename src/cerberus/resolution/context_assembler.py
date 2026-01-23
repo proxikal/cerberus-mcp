@@ -8,6 +8,7 @@ Automatically assembles relevant context for a symbol including:
 - Related imports and dependencies
 """
 
+import json
 from typing import List, Dict, Optional, Set
 from dataclasses import dataclass
 
@@ -183,7 +184,7 @@ class ContextAssembler:
                     end_line=result[4],
                     signature=result[5],
                     return_type=result[6],
-                    parameters=result[7],
+                    parameters=json.loads(result[7]) if result[7] else None,
                     parent_class=result[8]
                 )
             return None

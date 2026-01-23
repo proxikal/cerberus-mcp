@@ -41,7 +41,11 @@ CREATE TABLE IF NOT EXISTS memory_store (
     anchor_score REAL,
     anchor_metadata TEXT,   -- JSON blob
     valid_modes TEXT,       -- JSON array
-    mode_priority TEXT      -- JSON object
+    mode_priority TEXT,     -- JSON object
+
+    -- Hybrid format (Phase: Session Continuity)
+    details TEXT,           -- Structured explanations (why/how/where)
+    relevance_decay_days INTEGER DEFAULT 90  -- Auto-deprioritize after N days
 );
 
 -- 2. Search Index (FTS5 Virtual Table)
@@ -63,7 +67,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     scope TEXT NOT NULL,
     project_path TEXT,
     phase TEXT,
-    context_data TEXT,      -- JSON blob
+    context_data TEXT,      -- JSON blob (semantic codes categorized)
+    summary_details TEXT,   -- Structured bullets (why/how/where context)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -190,8 +195,41 @@ class MemoryIndexManager:
         # Create schema
         conn.executescript(SCHEMA_SQL)
 
+        # Run migrations for existing databases
+        self._migrate_sessions_table(conn)
+        self._migrate_memory_store_table(conn)
+
         conn.commit()
         conn.close()
+
+    def _migrate_sessions_table(self, conn):
+        """Add summary_details column to existing sessions table if missing."""
+        try:
+            # Check if column exists
+            cursor = conn.execute("PRAGMA table_info(sessions)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if "summary_details" not in columns:
+                conn.execute("ALTER TABLE sessions ADD COLUMN summary_details TEXT")
+        except Exception:
+            # Silently ignore if migration fails (fresh DB or column already exists)
+            pass
+
+    def _migrate_memory_store_table(self, conn):
+        """Add hybrid format columns to existing memory_store table if missing."""
+        try:
+            # Check if columns exist
+            cursor = conn.execute("PRAGMA table_info(memory_store)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            if "details" not in columns:
+                conn.execute("ALTER TABLE memory_store ADD COLUMN details TEXT")
+
+            if "relevance_decay_days" not in columns:
+                conn.execute("ALTER TABLE memory_store ADD COLUMN relevance_decay_days INTEGER DEFAULT 90")
+        except Exception:
+            # Silently ignore if migration fails (fresh DB or column already exists)
+            pass
 
     def _is_migrated(self) -> bool:
         """Check if migration has already been performed."""

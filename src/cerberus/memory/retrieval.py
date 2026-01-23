@@ -260,8 +260,9 @@ class MemoryRetrieval:
         if scope_factor == 0.0:
             return 0.0
 
-        # Recency score (standardized decay curve)
-        recency_score = self._calculate_recency(result.created_at)
+        # Recency score with custom decay threshold
+        decay_days = getattr(result, 'relevance_decay_days', 90)
+        recency_score = self._calculate_recency(result.created_at, decay_days)
 
         # Confidence weight
         confidence = result.confidence
@@ -271,19 +272,25 @@ class MemoryRetrieval:
 
         return relevance
 
-    def _calculate_recency(self, timestamp: str) -> float:
+    def _calculate_recency(self, timestamp: str, decay_days: int = 90) -> float:
         """
-        Calculate recency score using standardized decay curve.
+        Calculate recency score with configurable decay threshold.
 
-        From PHASE-0B-ARCHITECTURE.md:
-        - < 7 days: 1.0
-        - < 30 days: 0.8
-        - < 90 days: 0.6
-        - < 180 days: 0.4
-        - >= 180 days: 0.2
+        Hybrid format enhancement: Each memory has custom relevance_decay_days.
+        - Architectural decisions: decay_days=180 (stay relevant longer)
+        - Bug fixes: decay_days=30 (become stale quickly)
+        - Universal preferences: decay_days=365 (nearly permanent)
+
+        Default decay curve (decay_days=90):
+        - < 7 days: 1.0 (very recent)
+        - < 30 days: 0.8 (recent)
+        - < decay_days: 0.6 (moderate)
+        - < 2*decay_days: 0.4 (old)
+        - >= 2*decay_days: 0.2 (stale)
 
         Args:
             timestamp: ISO format timestamp string
+            decay_days: Custom decay threshold (default: 90)
 
         Returns:
             Recency score (0.2-1.0)
@@ -293,16 +300,17 @@ class MemoryRetrieval:
             now = datetime.now()
             days_ago = (now - created).days
 
+            # Standardized thresholds relative to decay_days
             if days_ago < 7:
-                return 1.0
+                return 1.0  # Always 1.0 for very recent (< 1 week)
             elif days_ago < 30:
-                return 0.8
-            elif days_ago < 90:
-                return 0.6
-            elif days_ago < 180:
-                return 0.4
+                return 0.8  # Always 0.8 for recent (< 1 month)
+            elif days_ago < decay_days:
+                return 0.6  # Moderate (within decay threshold)
+            elif days_ago < (decay_days * 2):
+                return 0.4  # Old (beyond decay threshold)
             else:
-                return 0.2
+                return 0.2  # Stale (way beyond threshold)
         except (ValueError, TypeError):
             # Invalid timestamp - return lowest score
             return 0.2

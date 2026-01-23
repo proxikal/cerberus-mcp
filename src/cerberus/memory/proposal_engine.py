@@ -20,11 +20,15 @@ class MemoryProposal:
     id: str  # "prop-abc123de"
     category: str  # "preference", "rule", "correction"
     scope: str  # "universal", "language:go", "project:cerberus"
-    content: str  # The actual memory text
+    content: str  # The actual memory text (semantic code)
     rationale: str  # Why this should be stored
     source_variants: List[str] = field(default_factory=list)  # Original corrections
     confidence: float = 0.0
     priority: int = 3  # 1=critical, 2=high, 3=medium
+
+    # Hybrid format (Phase: Session Continuity)
+    details: Optional[str] = None  # Structured explanations (why/how/where)
+    relevance_decay_days: int = 90  # Auto-deprioritize after N days
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -36,7 +40,9 @@ class MemoryProposal:
             "rationale": self.rationale,
             "source_variants": self.source_variants,
             "confidence": self.confidence,
-            "priority": self.priority
+            "priority": self.priority,
+            "details": self.details,
+            "relevance_decay_days": self.relevance_decay_days
         }
 
 

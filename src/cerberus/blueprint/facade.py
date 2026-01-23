@@ -191,17 +191,30 @@ class BlueprintGenerator:
         """
         import json as json_lib  # Avoid collision with outer json import
 
+        # Prepare both absolute and relative paths for query
+        # Database may have inconsistent path storage (absolute vs relative)
+        abs_path = Path(file_path).resolve()
+        paths_to_try = [str(abs_path)]
+
         try:
+            rel_path = abs_path.relative_to(self.repo_path)
+            paths_to_try.append(str(rel_path))
+        except ValueError:
+            pass  # Path outside repo, only try absolute
+
+        try:
+            # Try both absolute and relative paths
+            placeholders = ",".join("?" * len(paths_to_try))
             cursor = self.conn.execute(
-                """
+                f"""
                 SELECT
                     name, type, file_path, start_line, end_line,
                     signature, return_type, parameters, parameter_types, parent_class
                 FROM symbols
-                WHERE file_path = ?
+                WHERE file_path IN ({placeholders})
                 ORDER BY start_line ASC, name ASC
                 """,
-                (file_path,)
+                paths_to_try
             )
 
             symbols = []
