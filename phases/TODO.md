@@ -697,3 +697,10 @@ pip install requests  # For Ollama API calls
   - Added CLI commands: session-start, session-end, session-status, recover
   - Comprehensive crash scenario testing (corrupted files, concurrent access)
 - 🎉 **PHASE 17 COMPLETE!** Session lifecycle & crash recovery operational! Total: 459 tests passing!
+- ✅ **INTEGRATION UNIFIED:** Memory system wired to MCP tools
+  - Deleted bloated global code index (391MB → 0, code indexes now project-local only)
+  - Fresh SQLite memory.db (72KB, 0 old memories migrated - clean start)
+  - Updated memory_context() MCP tool to use Phase 7 ContextInjector
+  - Verified: NEW system works (stores/retrieves from SQLite)
+  - Architecture: Code indexes (.cerberus/cerberus.db per-project), Memory (global ~/.cerberus/memory.db)
+  - Note: MCP server restart needed for changes to take effect in live session

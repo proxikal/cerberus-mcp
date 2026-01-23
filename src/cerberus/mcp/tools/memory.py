@@ -6,8 +6,11 @@ from cerberus.memory.store import MemoryStore
 from cerberus.memory.profile import ProfileManager, Profile
 from cerberus.memory.decisions import DecisionManager
 from cerberus.memory.corrections import CorrectionManager
-from cerberus.memory.context import ContextGenerator
+from cerberus.memory.context import ContextGenerator  # OLD system (kept for backwards compat)
 from cerberus.memory.extract import GitExtractor
+
+# Phase 7: NEW Adaptive Memory System (Context Injection)
+from cerberus.memory.context_injector import inject_startup_context, inject_query_context
 
 # Phase 13: Adaptive Learning Memory System (SQLite FTS5)
 from cerberus.memory.search import MemorySearchEngine, SearchQuery
@@ -184,24 +187,49 @@ def register(mcp):
 
     @mcp.tool()
     def memory_context(
+        query: Optional[str] = None,
         project: Optional[str] = None,
         compact: bool = True,
         include_decisions: bool = True,
         include_preferences: bool = True,
         include_corrections: bool = True,
-    ) -> str:
+    ) -> dict:
         """
         Generate context for prompt injection.
+
+        Phase 7: NEW Adaptive Memory System
+        - Auto-injects at session start (1200 tokens)
+        - On-demand queries during work (500 tokens per query)
+
+        Args:
+            query: Optional query string for on-demand retrieval
+            project: Optional project name (auto-detected if None)
+            compact: Compact format (accepted for backwards compat)
+            include_*: Filter flags (accepted for backwards compat)
+
+        Returns:
+            dict with memory context string
         """
-        cg = get_context()
-        dm = get_decisions()
+        from pathlib import Path
 
-        if project is None:
-            project = dm.detect_project_name()
+        # Determine base directory
+        base_dir = Path.home() / ".cerberus"
 
-        # ContextGenerator does not currently support selective exclusion;
-        # the include_* flags are accepted for forward compatibility.
-        return cg.generate_context(project=project, compact=compact)
+        # If query provided, use on-demand injection
+        if query:
+            result = inject_query_context(
+                query=query,
+                base_dir=str(base_dir),
+                min_relevance=0.3
+            )
+        else:
+            # Session start injection
+            result = inject_startup_context(
+                base_dir=str(base_dir),
+                min_relevance=0.5
+            )
+
+        return {"result": result}
 
     @mcp.tool()
     def memory_extract(path: str = ".", lookback_days: int = 30) -> dict:
