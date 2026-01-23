@@ -1,8 +1,8 @@
 # CERBERUS ADAPTIVE MEMORY SYSTEM - IMPLEMENTATION TODO
 
 **Last Updated:** 2026-01-22
-**Current Phase:** Phase Beta (Weeks 3-4)
-**Status:** Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅ | Phase 4 ✅ | Phase 5 ✅ | Phase 6 ✅ | Phase 7 ✅ | Phase 8 ✅ | Phase 10 ✅ | Phase 11 ✅ | Phase 12 ✅ | Phase 13 ✅ | **ALPHA COMPLETE!** | **GAMMA COMPLETE!** | **BETA COMPLETE!**
+**Current Phase:** Phase Delta (Weeks 7-8)
+**Status:** Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅ | Phase 4 ✅ | Phase 5 ✅ | Phase 6 ✅ | Phase 7 ✅ | Phase 8 ✅ | Phase 10 ✅ | Phase 11 ✅ | Phase 12 ✅ | Phase 13 ✅ | Phase 14 ✅ | **ALPHA COMPLETE!** | **GAMMA COMPLETE!** | **BETA COMPLETE!** | **DELTA-14 COMPLETE!**
 
 ---
 
@@ -471,10 +471,48 @@
 
 ## PHASE DELTA: Post-Gamma Enhancements (Weeks 7-8)
 
-**Status:** 🔒 Locked (Gamma gates must pass first)
+**Status:** ✅ Phase 14 COMPLETE
 
-- Phase 14: Dynamic Anchoring
-- Phase 15: Mode-Aware Context
+### Phase 14: Dynamic Anchoring
+**Status:** ✅ COMPLETE
+**File:** `src/cerberus/memory/anchoring.py`
+**Tests:** `tests/memory/test_phase14_anchoring.py`
+**Objective:** Link abstract rules to concrete code examples for precise pattern replication
+
+**Tasks:**
+- [x] Create anchoring.py with AnchorCandidate & AnchoredMemory dataclasses
+- [x] Implement AnchorEngine class with find_anchor() algorithm
+- [x] Integrate with Phase 5 storage (anchor discovery during storage)
+- [x] Integrate with Phase 7 injection (code examples alongside rules)
+- [x] TF-IDF relevance scoring (rule ↔ code similarity)
+- [x] Recency scoring (prefer recently modified files)
+- [x] File size penalty (prefer concise examples < 500 lines)
+- [x] Quality threshold (min 0.7 score)
+- [x] Code snippet extraction (read_anchor_code method)
+- [x] Search via Cerberus index (hybrid_search integration)
+
+**Validation:**
+- [x] 18 unit tests passing (all scenarios + edge cases) ✅
+- [x] Anchor discovery working (keyword extraction, search, scoring) ✅
+- [x] Storage integration (stores anchor_file, anchor_symbol, anchor_score, anchor_metadata) ✅
+- [x] Retrieval integration (anchor data flows through SearchResult → RetrievedMemory) ✅
+- [x] Injection integration (code examples displayed in markdown) ✅
+- [x] End-to-end flow validated ✅
+- [x] Token budget: 40% text rules (480 tokens) + 60% code examples (720 tokens) = 1200 total ✅
+
+**Notes:**
+- Weighted scoring: 60% relevance + 20% size + 20% recency
+- Universal scope memories never anchored (scope-agnostic)
+- Language scope filters by file extension (.py, .go, .ts, etc.)
+- Project scope searches within project directory
+- Code snippets limited to 30 lines max
+- Symbol extraction attempts to find class/function definitions
+- Graceful fallback if anchor discovery fails (continues without anchor)
+- Anchor metadata stored as JSON: {file_size, match_score, recency_score}
+- Phase 12 pre-provisioned columns used (anchor_file, anchor_symbol, anchor_score, anchor_metadata)
+
+### Phase 15: Mode-Aware Context
+**Status:** 🔒 Locked (Phase 14 must stabilize first)
 
 ---
 
@@ -536,3 +574,5 @@ pip install requests  # For Ollama API calls
 - ✅ Phase 12: Memory Indexing (all 25 tests passing)
 - ✅ Phase 13: Indexed Search & Integration (all 13 tests passing)
 - 🎉 **PHASE BETA COMPLETE!** SQLite migration + FTS5 search operational! Total: 276 tests passing!
+- ✅ Phase 14: Dynamic Anchoring (all 18 tests passing)
+- 🎉 **PHASE DELTA-14 COMPLETE!** Code anchor discovery + injection operational! Total: 294 tests passing!

@@ -4,6 +4,8 @@ Phase 5: Storage Operations (Version 2 - SQLite)
 Write approved proposals to SQLite database using Phase 12 infrastructure.
 This is Phase Beta implementation - replaces JSON storage from Phase Alpha.
 
+Phase 14 Integration: Discovers and stores code anchors for memories.
+
 Zero token cost (pure storage).
 """
 
@@ -13,6 +15,9 @@ import uuid
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional, Union
+
+# Phase 14: Dynamic Anchoring
+from .anchoring import AnchorEngine, extract_language_from_scope, extract_project_from_scope
 
 
 class MemoryStorage:
@@ -27,10 +32,11 @@ class MemoryStorage:
     - memory_fts: FTS5 virtual table for full-text search
     """
 
-    def __init__(self, base_dir: Optional[Path] = None):
+    def __init__(self, base_dir: Optional[Path] = None, enable_anchoring: bool = True):
         """
         Args:
             base_dir: Base directory for storage (default: ~/.cerberus)
+            enable_anchoring: Enable Phase 14 anchor discovery (default: True)
         """
         if base_dir is None:
             base_dir = Path.home() / ".cerberus"
@@ -39,6 +45,8 @@ class MemoryStorage:
 
         self.base_dir = base_dir
         self.db_path = base_dir / "memory.db"
+        self.enable_anchoring = enable_anchoring
+        self._anchor_engine = AnchorEngine() if enable_anchoring else None
         self._ensure_database()
 
     def store_batch(self, proposals: List) -> Dict[str, int]:
@@ -72,12 +80,36 @@ class MemoryStorage:
                     "source_variants": getattr(proposal, "source_variants", [])
                 }
 
-                # Insert into memory_store (metadata table)
+                # Phase 14: Discover code anchor
+                anchor = None
+                if self._anchor_engine and proposal.scope != "universal":
+                    try:
+                        anchor = self._anchor_engine.anchor_memory(
+                            memory_id=memory_id,
+                            content=proposal.content,
+                            scope=proposal.scope
+                        )
+                    except Exception:
+                        # Anchor discovery failed - continue without anchor
+                        pass
+
+                # Prepare anchor metadata
+                anchor_file = anchor.file_path if anchor else None
+                anchor_symbol = anchor.symbol_name if anchor else None
+                anchor_score = anchor.quality_score if anchor else None
+                anchor_metadata = json.dumps({
+                    "file_size": anchor.file_size,
+                    "match_score": anchor.match_score,
+                    "recency_score": anchor.recency_score
+                }) if anchor else None
+
+                # Insert into memory_store (metadata table with anchors)
                 conn.execute("""
                     INSERT INTO memory_store (
                         id, category, scope, confidence,
-                        created_at, last_accessed, access_count, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        created_at, last_accessed, access_count, metadata,
+                        anchor_file, anchor_symbol, anchor_score, anchor_metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     memory_id,
                     proposal.category,
@@ -86,7 +118,11 @@ class MemoryStorage:
                     now,
                     now,
                     0,
-                    json.dumps(metadata)
+                    json.dumps(metadata),
+                    anchor_file,
+                    anchor_symbol,
+                    anchor_score,
+                    anchor_metadata
                 ))
 
                 # Insert into memory_fts (FTS5 search table)

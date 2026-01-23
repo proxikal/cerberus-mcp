@@ -39,6 +39,11 @@ class SearchResult:
     metadata: Dict[str, Any]
     relevance_score: float  # 0.0-1.0 from FTS5 rank
     match_context: str  # Snippet showing match
+    # Phase 14: Anchor fields
+    anchor_file: Optional[str] = None
+    anchor_symbol: Optional[str] = None
+    anchor_score: Optional[float] = None
+    anchor_metadata: Optional[str] = None  # JSON string
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -53,7 +58,11 @@ class SearchResult:
             "access_count": self.access_count,
             "metadata": self.metadata,
             "relevance_score": self.relevance_score,
-            "match_context": self.match_context
+            "match_context": self.match_context,
+            "anchor_file": self.anchor_file,
+            "anchor_symbol": self.anchor_symbol,
+            "anchor_score": self.anchor_score,
+            "anchor_metadata": self.anchor_metadata
         }
 
 
@@ -117,7 +126,12 @@ class MemorySearchEngine:
                 access_count=row["access_count"],
                 metadata=json.loads(row["metadata"]) if row["metadata"] else {},
                 relevance_score=relevance,
-                match_context=match_context
+                match_context=match_context,
+                # Phase 14: Anchor fields (sqlite3.Row uses bracket access)
+                anchor_file=row["anchor_file"] if "anchor_file" in row.keys() else None,
+                anchor_symbol=row["anchor_symbol"] if "anchor_symbol" in row.keys() else None,
+                anchor_score=row["anchor_score"] if "anchor_score" in row.keys() else None,
+                anchor_metadata=row["anchor_metadata"] if "anchor_metadata" in row.keys() else None
             ))
 
         conn.close()
@@ -147,6 +161,7 @@ class MemorySearchEngine:
                 SELECT
                     s.id, f.content, s.category, s.scope, s.confidence,
                     s.created_at, s.last_accessed, s.access_count, s.metadata,
+                    s.anchor_file, s.anchor_symbol, s.anchor_score, s.anchor_metadata,
                     f.rank
                 FROM memory_store s
                 JOIN memory_fts f ON s.id = f.id
@@ -159,6 +174,7 @@ class MemorySearchEngine:
                 SELECT
                     s.id, f.content, s.category, s.scope, s.confidence,
                     s.created_at, s.last_accessed, s.access_count, s.metadata,
+                    s.anchor_file, s.anchor_symbol, s.anchor_score, s.anchor_metadata,
                     NULL as rank
                 FROM memory_store s
                 JOIN memory_fts f ON s.id = f.id

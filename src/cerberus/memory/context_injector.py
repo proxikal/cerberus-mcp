@@ -4,8 +4,12 @@ Phase 7: Context-Aware Injection
 Hybrid memory injection - auto-inject at session start, on-demand during work.
 Uses Phase 6 retrieval to load memories and formats for Claude.
 
+Phase 14 Integration: Includes code examples from anchored memories.
+
 Token budget:
 - Session start: 1200 tokens (auto-injection)
+  - 40% text rules (480 tokens)
+  - 60% code examples (720 tokens)
 - On-demand queries: 500 tokens each (max 2 queries = 1000 tokens)
 - Total cap: 2200 tokens per session
 """
@@ -18,6 +22,9 @@ from dataclasses import dataclass
 import tiktoken
 
 from cerberus.memory.retrieval import MemoryRetrieval, RetrievedMemory
+
+# Phase 14: Dynamic Anchoring
+from cerberus.memory.anchoring import AnchorEngine
 
 
 @dataclass
@@ -166,16 +173,19 @@ class ContextInjector:
     MAX_ONDEMAND_QUERIES = 2   # Maximum on-demand queries
     TOTAL_CAP = 2200          # Total per session (1200 + 1000)
 
-    def __init__(self, base_dir: Optional[str] = None, encoding: str = "cl100k_base"):
+    def __init__(self, base_dir: Optional[str] = None, encoding: str = "cl100k_base", enable_anchoring: bool = True):
         """
         Args:
             base_dir: Base directory for storage (default: ~/.cerberus/memory)
             encoding: Tokenizer encoding (default: cl100k_base for GPT-4)
+            enable_anchoring: Enable Phase 14 code examples (default: True)
         """
         self.retrieval = MemoryRetrieval(base_dir=base_dir, encoding=encoding)
         self.tokenizer = tiktoken.get_encoding(encoding)
         self.session_tokens_used = 0
         self.ondemand_queries_count = 0
+        self.enable_anchoring = enable_anchoring
+        self._anchor_engine = AnchorEngine() if enable_anchoring else None
 
     def inject_startup(
         self,
@@ -349,6 +359,29 @@ class ContextInjector:
                         scope_badge = f" `[{proj}]`"
 
                 lines.append(f"- {memory.content}{scope_badge}")
+
+                # Phase 14: Add code example if anchored
+                if self.enable_anchoring and self._anchor_engine and hasattr(memory, 'anchor_file') and memory.anchor_file:
+                    try:
+                        # Read anchor code
+                        code_snippet = self._anchor_engine.read_anchor_code(
+                            file_path=memory.anchor_file,
+                            symbol_name=getattr(memory, 'anchor_symbol', None),
+                            max_lines=30
+                        )
+
+                        # Detect language from file extension
+                        file_ext = Path(memory.anchor_file).suffix.lstrip('.')
+                        lang_tag = file_ext if file_ext else ""
+
+                        # Format code example
+                        lines.append(f"  Example: `{memory.anchor_file}`")
+                        lines.append(f"  ```{lang_tag}")
+                        lines.append(f"  {code_snippet.strip()}")
+                        lines.append(f"  ```")
+                    except Exception:
+                        # Skip anchor if reading fails
+                        pass
 
             lines.append("")
 

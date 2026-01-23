@@ -32,6 +32,11 @@ class RetrievedMemory:
     last_accessed: Optional[str]
     relevance_score: float = 0.0
     token_count: int = 0
+    # Phase 14: Anchor fields
+    anchor_file: Optional[str] = None
+    anchor_symbol: Optional[str] = None
+    anchor_score: Optional[float] = None
+    anchor_metadata: Optional[Dict] = None
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -46,7 +51,11 @@ class RetrievedMemory:
             "access_count": self.access_count,
             "last_accessed": self.last_accessed,
             "relevance_score": self.relevance_score,
-            "token_count": self.token_count
+            "token_count": self.token_count,
+            "anchor_file": self.anchor_file,
+            "anchor_symbol": self.anchor_symbol,
+            "anchor_score": self.anchor_score,
+            "anchor_metadata": self.anchor_metadata
         }
 
 
@@ -141,6 +150,14 @@ class MemoryRetrieval:
             # Extract rationale from metadata
             rationale = result.metadata.get("rationale", "")
 
+            # Parse anchor metadata if present
+            anchor_metadata = None
+            if result.anchor_metadata:
+                try:
+                    anchor_metadata = json.loads(result.anchor_metadata)
+                except (json.JSONDecodeError, TypeError):
+                    anchor_metadata = None
+
             retrieved.append(RetrievedMemory(
                 id=result.memory_id,
                 category=result.category,
@@ -152,7 +169,11 @@ class MemoryRetrieval:
                 access_count=result.access_count,
                 last_accessed=result.last_accessed,
                 relevance_score=relevance,
-                token_count=token_count
+                token_count=token_count,
+                anchor_file=result.anchor_file,
+                anchor_symbol=result.anchor_symbol,
+                anchor_score=result.anchor_score,
+                anchor_metadata=anchor_metadata
             ))
 
         # Sort by relevance (highest first)
