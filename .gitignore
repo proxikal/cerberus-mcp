@@ -82,7 +82,7 @@ benchmarks/
 .handoff-archive/
 project-templates/
 hooks/
-tools/
+/tools/
 wiki-content/
 cerberus-mcp.wiki/
 WIKI-PUBLISH.md
