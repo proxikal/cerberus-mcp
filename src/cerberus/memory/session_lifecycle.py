@@ -63,6 +63,7 @@ class SessionState:
     corrections: List[CorrectionCandidate] = field(default_factory=list)
     tools_used: List[str] = field(default_factory=list)
     modified_files: List[str] = field(default_factory=list)
+    tool_usage_events: List[Any] = field(default_factory=list)  # Phase 20: ToolUsageEvent objects
     status: str = "active"  # "active", "idle", "crashed", "ended"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,8 +72,17 @@ class SessionState:
         # Convert datetime objects
         data["started_at"] = self.started_at.isoformat()
         data["last_activity"] = self.last_activity.isoformat()
-        # Convert CorrectionCandidate objects
-        data["corrections"] = [asdict(c) for c in self.corrections]
+        # Convert CorrectionCandidate objects (handle both dataclasses and dicts)
+        corrections = []
+        for c in self.corrections:
+            if isinstance(c, dict):
+                corrections.append(c)
+            elif hasattr(c, '__dataclass_fields__'):
+                corrections.append(asdict(c))
+            else:
+                # Mock or other object - try to convert to dict
+                corrections.append(c.to_dict() if hasattr(c, 'to_dict') else {})
+        data["corrections"] = corrections
         return data
 
     @classmethod

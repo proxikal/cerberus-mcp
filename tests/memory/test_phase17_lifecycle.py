@@ -69,10 +69,12 @@ def mock_session_state():
 def mock_correction_candidate():
     """Create a mock CorrectionCandidate."""
     return CorrectionCandidate(
-        content="Don't use global variables",
+        turn_number=3,
+        user_message="Don't use global variables",
+        ai_response="Generated code with globals",
+        correction_type="rule",
         confidence=0.9,
-        source_turn=3,
-        pattern="direct_command"
+        context_before=[]
     )
 
 
@@ -281,7 +283,7 @@ def test_update_session_activity_correction(temp_dir, mock_correction_candidate,
     # Load and check
     state = _load_session_state(Path(str(temp_dir)) / SESSION_FILE)
     assert len(state.corrections) == 1
-    assert state.corrections[0].content == "Don't use global variables"
+    assert state.corrections[0].user_message == "Don't use global variables"
 
 
 def test_update_session_activity_tool_use(temp_dir, monkeypatch):
@@ -389,7 +391,7 @@ def test_detect_crash_no_session_file(temp_dir):
 
 @patch("cerberus.memory.session_lifecycle.SemanticAnalyzer")
 @patch("cerberus.memory.session_lifecycle.ProposalEngine")
-@patch("cerberus.memory.session_lifecycle.MemoryStorage")
+@patch("cerberus.memory.storage.MemoryStorage")
 def test_auto_recover_crash_with_corrections(
     mock_storage,
     mock_engine,

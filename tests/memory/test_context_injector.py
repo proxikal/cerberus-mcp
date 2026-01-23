@@ -14,6 +14,8 @@ import pytest
 import json
 import tempfile
 import shutil
+import sqlite3
+import uuid
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -25,6 +27,7 @@ from cerberus.memory.context_injector import (
     inject_query_context,
     detect_context
 )
+from cerberus.memory.indexing import MemoryIndexManager
 
 
 # Test fixtures
@@ -52,93 +55,95 @@ def temp_project_dir():
 
 @pytest.fixture
 def temp_storage_with_memories():
-    """Create temporary storage with test memories."""
-    temp_dir = tempfile.mkdtemp()
+    """Create temporary storage with test memories in SQLite."""
+    temp_dir = Path(tempfile.mkdtemp())
+    db_path = temp_dir / "memory.db"
 
-    # Create memories
-    universal_pref = [
+    # Create schema using MemoryIndexManager
+    manager = MemoryIndexManager(temp_dir)
+
+    # Insert test memories directly into SQLite
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.cursor()
+
+    test_memories = [
+        # Universal preferences
         {
             "id": "mem-001",
+            "content": "Keep output concise",
             "category": "preference",
             "scope": "universal",
-            "content": "Keep output concise",
-            "rationale": "User preference",
             "confidence": 0.95,
-            "timestamp": (datetime.now() - timedelta(days=5)).isoformat(),
-            "access_count": 0,
-            "last_accessed": None
+            "created_at": (datetime.now() - timedelta(days=5)).isoformat(),
+            "metadata": json.dumps({"rationale": "User preference"})
         },
         {
             "id": "mem-002",
+            "content": "Use early returns",
             "category": "preference",
             "scope": "universal",
-            "content": "Use early returns",
-            "rationale": "Style preference",
             "confidence": 0.85,
-            "timestamp": (datetime.now() - timedelta(days=10)).isoformat(),
-            "access_count": 0,
-            "last_accessed": None
-        }
-    ]
-
-    universal_corr = [
+            "created_at": (datetime.now() - timedelta(days=10)).isoformat(),
+            "metadata": json.dumps({"rationale": "Style preference"})
+        },
+        # Universal correction
         {
             "id": "mem-003",
+            "content": "Never use eval",
             "category": "correction",
             "scope": "universal",
-            "content": "Never use eval",
-            "rationale": "Security rule",
             "confidence": 0.98,
-            "timestamp": (datetime.now() - timedelta(days=3)).isoformat(),
-            "access_count": 0,
-            "last_accessed": None
-        }
-    ]
-
-    python_rules = [
+            "created_at": (datetime.now() - timedelta(days=3)).isoformat(),
+            "metadata": json.dumps({"rationale": "Security rule"})
+        },
+        # Python rule
         {
             "id": "mem-004",
+            "content": "Use async/await for I/O",
             "category": "rule",
             "scope": "language:python",
-            "content": "Use async/await for I/O",
-            "rationale": "Python pattern",
             "confidence": 0.90,
-            "timestamp": (datetime.now() - timedelta(days=7)).isoformat(),
-            "access_count": 0,
-            "last_accessed": None
-        }
-    ]
-
-    project_decisions = [
+            "created_at": (datetime.now() - timedelta(days=7)).isoformat(),
+            "metadata": json.dumps({"rationale": "Python pattern"})
+        },
+        # Project decision
         {
             "id": "mem-005",
+            "content": "Use golden egg docs",
             "category": "rule",
             "scope": "project:myproject",
-            "content": "Use golden egg docs",
-            "rationale": "Project decision",
             "confidence": 0.88,
-            "timestamp": (datetime.now() - timedelta(days=2)).isoformat(),
-            "access_count": 0,
-            "last_accessed": None
+            "created_at": (datetime.now() - timedelta(days=2)).isoformat(),
+            "metadata": json.dumps({"rationale": "Project decision"})
         }
     ]
 
-    # Write files
-    Path(temp_dir).mkdir(exist_ok=True)
+    for memory in test_memories:
+        # Insert into memory_store (metadata only, no content column)
+        cursor.execute("""
+            INSERT INTO memory_store
+            (id, category, scope, confidence, created_at, metadata)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            memory["id"],
+            memory["category"],
+            memory["scope"],
+            memory["confidence"],
+            memory["created_at"],
+            memory["metadata"]
+        ))
 
-    with open(Path(temp_dir) / "profile.json", 'w') as f:
-        json.dump(universal_pref, f)
+        # Insert into FTS5 table (content goes here)
+        cursor.execute("""
+            INSERT INTO memory_fts (id, content)
+            VALUES (?, ?)
+        """, (
+            memory["id"],
+            memory["content"]
+        ))
 
-    with open(Path(temp_dir) / "corrections.json", 'w') as f:
-        json.dump(universal_corr, f)
-
-    Path(temp_dir, "languages").mkdir(exist_ok=True)
-    with open(Path(temp_dir) / "languages" / "python.json", 'w') as f:
-        json.dump(python_rules, f)
-
-    Path(temp_dir, "projects", "myproject").mkdir(parents=True, exist_ok=True)
-    with open(Path(temp_dir) / "projects" / "myproject" / "decisions.json", 'w') as f:
-        json.dump(project_decisions, f)
+    conn.commit()
+    conn.close()
 
     yield temp_dir
 

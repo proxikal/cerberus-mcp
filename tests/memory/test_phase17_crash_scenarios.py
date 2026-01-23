@@ -82,10 +82,12 @@ def test_full_session_lifecycle(project_dir, monkeypatch):
     )
 
     candidate = CorrectionCandidate(
-        content="Always use type hints",
+        turn_number=3,
+        user_message="Always use type hints",
+        ai_response="Generated code",
+        correction_type="rule",
         confidence=0.9,
-        source_turn=3,
-        pattern="direct_command"
+        context_before=[]
     )
 
     update_session_activity(
@@ -202,17 +204,21 @@ def test_auto_recovery_workflow(
         turn_count=10,
         corrections=[
             CorrectionCandidate(
-                content="Always use const",
-                confidence=0.95,
-                source_turn=3,
-                pattern="direct_command"
-            ),
+        turn_number=3,
+        user_message="Always use const",
+        ai_response="Generated code",
+        correction_type="rule",
+        confidence=0.95,
+        context_before=[]
+    ),
             CorrectionCandidate(
-                content="Prefer arrow functions",
-                confidence=0.85,
-                source_turn=7,
-                pattern="direct_command"
-            )
+        turn_number=7,
+        user_message="Prefer arrow functions",
+        ai_response="Generated code",
+        correction_type="rule",
+        confidence=0.85,
+        context_before=[]
+    )
         ],
         status="active"
     )
@@ -311,11 +317,13 @@ def test_manual_recovery_workflow(project_dir, monkeypatch):
         turn_count=5,
         corrections=[
             CorrectionCandidate(
-                content="Test correction",
-                confidence=0.9,
-                source_turn=2,
-                pattern="direct_command"
-            )
+        turn_number=2,
+        user_message="Test correction",
+        ai_response="Generated code",
+        correction_type="rule",
+        confidence=0.9,
+        context_before=[]
+    )
         ],
         status="active"
     )
@@ -398,11 +406,13 @@ def test_discard_crashed_session(project_dir, monkeypatch):
         turn_count=2,
         corrections=[
             CorrectionCandidate(
-                content="Test",
-                confidence=0.8,
-                source_turn=1,
-                pattern="direct_command"
-            )
+        turn_number=1,
+        user_message="Test",
+        ai_response="Generated code",
+        correction_type="rule",
+        confidence=0.8,
+        context_before=[]
+    )
         ],
         status="active"
     )
@@ -520,11 +530,13 @@ def test_recovery_failure_handling(project_dir, monkeypatch):
         turn_count=3,
         corrections=[
             CorrectionCandidate(
-                content="Test",
-                confidence=0.9,
-                source_turn=1,
-                pattern="direct_command"
-            )
+        turn_number=1,
+        user_message="Test",
+        ai_response="Generated code",
+        correction_type="rule",
+        confidence=0.9,
+        context_before=[]
+    )
         ],
         status="active"
     )

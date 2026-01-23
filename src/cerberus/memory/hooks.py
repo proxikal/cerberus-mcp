@@ -505,9 +505,9 @@ def uninstall_hooks(cli_name: str, verbose: bool = True) -> bool:
         return False
 
 
-def test_hooks(cli_name: str) -> bool:
+def verify_hooks(cli_name: str) -> bool:
     """
-    Test hook installation for CLI tool.
+    Verify hook installation for CLI tool.
 
     Args:
         cli_name: CLI tool name ("claude-code", "codex-cli", "gemini-cli")

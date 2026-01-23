@@ -20,7 +20,7 @@ from cerberus.memory.hooks import (
     propose_hook,
     detect_context,
     install_hooks,
-    test_hooks,
+    verify_hooks,
     SESSION_FILE,
 )
 
@@ -110,17 +110,21 @@ def test_propose_hook_integration(
     # Mock Phase 1: Detection
     candidates = [
         CorrectionCandidate(
-            content="Don't use global variables",
-            confidence=0.9,
-            source_turn=5,
-            pattern="direct_command"
-        ),
+        turn_number=5,
+        user_message="Don't use global variables",
+        ai_response="Generated code",
+        correction_type="rule",
+        confidence=0.9,
+        context_before=[]
+    ),
         CorrectionCandidate(
-            content="Never use global state",
-            confidence=0.85,
-            source_turn=12,
-            pattern="direct_command"
-        )
+        turn_number=12,
+        user_message="Never use global state",
+        ai_response="Generated code",
+        correction_type="rule",
+        confidence=0.85,
+        context_before=[]
+    )
     ]
 
     mock_analyzer_instance = MagicMock()
@@ -206,7 +210,7 @@ def test_hook_installation_workflow(tmp_path, monkeypatch):
     assert success
 
     # 2. Test
-    success = test_hooks("claude-code")
+    success = verify_hooks("claude-code")
     assert success
 
     # 3. Verify content
@@ -288,10 +292,12 @@ def test_session_with_agent_proposals(
 
     # Mock user corrections
     user_candidate = CorrectionCandidate(
-        content="Always use type hints",
+        turn_number=3,
+        user_message="Always use type hints",
+        ai_response="Generated code",
+        correction_type="rule",
         confidence=0.9,
-        source_turn=3,
-        pattern="direct_command"
+        context_before=[]
     )
 
     mock_analyzer_instance = MagicMock()

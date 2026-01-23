@@ -29,7 +29,7 @@ from cerberus.memory.hooks import (
     propose_hook_with_error_handling,
     install_hooks,
     uninstall_hooks,
-    test_hooks,
+    verify_hooks,
     SESSION_FILE,
     LANGUAGE_EXTENSIONS,
     HOOK_DIRS,
@@ -441,7 +441,7 @@ def test_uninstall_hooks_no_hook(temp_dir, monkeypatch):
     assert success  # No error
 
 
-def test_test_hooks_success(temp_dir, monkeypatch):
+def test_verify_hooks_success(temp_dir, monkeypatch):
     """Test hook testing when properly installed."""
     # Mock hook directory with valid hook
     hook_dir = temp_dir / "hooks"
@@ -452,18 +452,18 @@ def test_test_hooks_success(temp_dir, monkeypatch):
 
     monkeypatch.setitem(HOOK_DIRS, "claude-code", str(hook_dir))
 
-    success = test_hooks("claude-code")
+    success = verify_hooks("claude-code")
 
     assert success
 
 
-def test_test_hooks_no_hook(temp_dir, monkeypatch):
+def test_verify_hooks_no_hook(temp_dir, monkeypatch):
     """Test hook testing when hook not installed."""
     hook_dir = temp_dir / "hooks"
     hook_dir.mkdir()
     monkeypatch.setitem(HOOK_DIRS, "claude-code", str(hook_dir))
 
-    success = test_hooks("claude-code")
+    success = verify_hooks("claude-code")
 
     assert not success
 

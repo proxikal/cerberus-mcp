@@ -1,0 +1,6 @@
+{
+  "serverCommand": "/Users/proxikal/dev/projects/cerberus/.venv/bin/cerberus-mcp",
+  "serverArgs": [],
+  "watchPattern": ["src/**/*.py"],
+  "debounceMs": 300
+}
