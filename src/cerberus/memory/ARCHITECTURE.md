@@ -22,14 +22,22 @@ cerberus memory propose --interactive  # Runs automatically
 4. ✅ **Delayed corrections** - Catches corrections 2-3 turns after AI action
 5. ✅ **More accurate** - Can analyze relationships between messages
 
-**Process:**
-1. Reads entire transcript file (Claude Code conversation history)
-2. Extracts semantic codes (done:, next:, impl:, etc.)
-3. Detects correction patterns ("don't do X", "never Y")
-4. Clusters similar corrections
-5. Generates memory proposals
-6. User approves/rejects via CLI
-7. Stores to SQLite
+**Process (Two-Part System):**
+
+**Part 1: Session Summary** (saved to `sessions` table)
+1. Reads entire transcript file
+2. Extracts semantic codes (done:, next:, impl:, fix:, etc.)
+3. Extracts structured details (bugs/fixes, investigations, files modified)
+4. Saves to SQLite for session continuity
+
+**Part 2: Memory Proposals** (saved to `memory_store` table)
+5. Detects correction patterns ("don't do X", "never Y")
+6. Clusters similar corrections
+7. Generates memory proposals
+8. User approves/rejects via CLI
+9. Stores approved memories
+
+**Both parts always run together** - session context + memory proposals.
 
 **Manual Trigger:**
 You can also trigger this manually during a session via MCP tool:

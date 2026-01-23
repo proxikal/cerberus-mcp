@@ -614,14 +614,20 @@ def register(mcp):
         """
         Propose and store memories from current session (manual trigger).
 
-        Runs the full memory collection pipeline:
-        1. Reads entire transcript
-        2. Extracts semantic codes (done:, next:, impl:)
-        3. Detects correction patterns ("don't do X")
-        4. Clusters similar corrections
-        5. Generates memory proposals
-        6. CLI approval (interactive or batch)
-        7. Stores approved memories
+        Runs the COMPLETE memory collection pipeline:
+
+        STEP 1: Save Session Summary
+        - Reads entire transcript
+        - Extracts semantic codes (done:, next:, impl:, fix:, etc.)
+        - Extracts structured details (bugs fixed, investigations, files modified)
+        - Saves to SQLite sessions table for session continuity
+
+        STEP 2: Detect & Store Corrections (Memory Proposals)
+        - Detects correction patterns ("don't do X", "never Y")
+        - Clusters similar corrections
+        - Generates memory proposals
+        - CLI approval (interactive or batch)
+        - Stores approved memories to memory_store table
 
         This is the SAME process that runs automatically at session end via hook.
         Use this to:
@@ -636,7 +642,8 @@ def register(mcp):
         Returns:
             dict with:
             - status: "completed" or "error"
-            - proposals_generated: Number of proposals created
+            - session_summary_saved: Whether session context was saved
+            - proposals_generated: Number of memory proposals created
             - proposals_approved: Number approved by user
             - stored_count: Number stored to database
             - session_stats: Candidate/cluster/proposal counts
@@ -651,18 +658,22 @@ def register(mcp):
         from cerberus.memory.hooks import propose_hook
 
         try:
+            # This calls save_session_context_to_db() FIRST, then does corrections
             result = propose_hook(interactive=interactive, batch_threshold=batch_threshold)
 
             return {
                 "status": "completed",
+                "session_summary_saved": True,  # Always saved by propose_hook
                 "proposals_generated": len(result.proposals),
                 "proposals_approved": len(result.approved_ids),
                 "stored_count": result.stored_count,
-                "session_stats": result.session_stats
+                "session_stats": result.session_stats,
+                "note": "Session summary (semantic codes + details) saved to sessions table"
             }
         except Exception as e:
             return {
                 "status": "error",
+                "session_summary_saved": False,
                 "message": str(e)
             }
 
