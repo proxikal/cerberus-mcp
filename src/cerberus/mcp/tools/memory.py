@@ -15,6 +15,13 @@ from cerberus.memory.context_injector import inject_startup_context, inject_quer
 # Phase 13: Adaptive Learning Memory System (SQLite FTS5)
 from cerberus.memory.search import MemorySearchEngine, SearchQuery
 
+# Phase 5 (Version 2): SQLite Storage
+from cerberus.memory.storage import MemoryStorage
+from cerberus.memory.proposal_engine import MemoryProposal
+
+# Phase 6 (Version 2): SQLite Retrieval
+from cerberus.memory.retrieval import MemoryRetrieval
+
 
 def register(mcp):
     # Lazy singletons to avoid repeated disk I/O
@@ -80,69 +87,57 @@ def register(mcp):
         Returns:
             Confirmation with memory ID
         """
+        import uuid
+        from datetime import datetime
+
         metadata = metadata or {}
 
+        # Determine scope based on category and project
         if category == "preference":
-            # Prefer the ProfileManager's parser to keep consistency
-            result = get_profile().learn(content)
-            if result.get("success"):
-                return {"status": "learned", "category": "preference", **result}
-
-            # Fallback: append to general list if parsing failed
-            profile = get_profile().load_profile()
-            if not profile.general:
-                profile.general = []
-            profile.general.append(content)
-            get_profile().save_profile(profile)
-            return {"status": "learned", "category": "preference", "content": content}
-
-        if category == "decision":
-            dm = get_decisions()
+            scope = "universal"
+        elif category == "decision":
             if project is None:
-                project = dm.detect_project_name()
-            if project is None:
-                return {
-                    "status": "error",
-                    "message": "Could not detect project name. Provide 'project' parameter.",
-                }
+                # Auto-detect project from cwd
+                from pathlib import Path
+                project = Path.cwd().name
+            scope = f"project:{project}"
+        elif category == "correction":
+            scope = "universal"
+        else:
+            return {
+                "status": "error",
+                "message": f"Unknown category: {category}. Use: preference, decision, correction",
+            }
 
-            # If topic provided, prepend for clearer parsing
-            decision_text = (
-                f"{metadata.get('topic')}: {content}"
-                if metadata.get("topic")
-                else content
-            )
-            result = dm.learn_decision(
-                decision_text,
-                project=project,
-                rationale=metadata.get("rationale", ""),
-            )
-            if result.get("success"):
-                return {
-                    "status": "learned",
-                    "category": "decision",
-                    "project": project,
-                    "decision": result.get("decision"),
-                }
-            return {"status": "error", "message": result.get("message", "Unknown error")}
+        # Create memory proposal
+        memory_id = str(uuid.uuid4())
+        proposal = MemoryProposal(
+            id=memory_id,
+            category=category,
+            scope=scope,
+            content=content,
+            rationale=metadata.get("rationale", "User-provided memory via memory_learn"),
+            source_variants=[],
+            confidence=1.0,  # User-provided = maximum confidence
+            priority=1
+        )
 
-        if category == "correction":
-            cm = get_corrections()
-            text = metadata.get("context", content) if metadata else content
-            note = metadata.get("note") if metadata else None
-            result = cm.learn_correction(text, note=note)
-            if result.get("success"):
-                return {
-                    "status": "learned",
-                    "category": "correction",
-                    "correction": result.get("correction"),
-                }
-            return {"status": "error", "message": result.get("message", "Unknown error")}
-
-        return {
-            "status": "error",
-            "message": f"Unknown category: {category}. Use: preference, decision, correction",
-        }
+        # Store to SQLite
+        try:
+            storage = MemoryStorage()
+            storage.store(proposal)
+            return {
+                "status": "learned",
+                "category": category,
+                "scope": scope,
+                "memory_id": memory_id,
+                "content": content
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to store memory: {str(e)}"
+            }
 
     @mcp.tool()
     def memory_show(
@@ -153,37 +148,68 @@ def register(mcp):
         Display stored memory.
 
         Args:
-            category: Filter by type - "preferences", "decisions", "corrections", or None for all
+            category: Filter by type - "preference", "decision", "correction", or None for all
             project: Project name for decisions (auto-detected if not provided)
 
         Returns:
-            Stored memory contents
+            Stored memory contents from SQLite
         """
-        result: Dict[str, Any] = {}
+        import sqlite3
+        from pathlib import Path
 
-        if category is None or category == "preferences":
-            profile = get_profile().load_profile()
-            result["preferences"] = profile.to_dict()
+        db_path = Path.home() / ".cerberus" / "memory.db"
 
-        if category is None or category == "decisions":
-            dm = get_decisions()
-            if project is None:
-                project = dm.detect_project_name()
+        if not db_path.exists():
+            return {"status": "empty", "message": "No memories stored yet"}
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+
+        try:
+            # Build query with filters
+            query = "SELECT id, category, scope, metadata, created_at, last_accessed, access_count FROM memory_store WHERE 1=1"
+            params = []
+
+            if category:
+                query += " AND category = ?"
+                params.append(category)
+
             if project:
-                decisions = dm.load_decisions(project)
-                result["decisions"] = {
-                    "project": project,
-                    "items": [d.to_dict() for d in decisions.decisions],
-                }
-            else:
-                result["decisions"] = {"projects": dm.list_projects()}
+                query += " AND scope LIKE ?"
+                params.append(f"project:{project}%")
 
-        if category is None or category == "corrections":
-            cm = get_corrections()
-            corrections = cm.load_corrections()
-            result["corrections"] = [c.to_dict() for c in corrections.corrections]
+            query += " ORDER BY created_at DESC"
 
-        return result
+            cursor = conn.execute(query, params)
+            rows = cursor.fetchall()
+
+            # Also get content from FTS table
+            memories = []
+            for row in rows:
+                content_cursor = conn.execute(
+                    "SELECT content FROM memory_fts WHERE id = ?",
+                    (row["id"],)
+                )
+                content_row = content_cursor.fetchone()
+
+                memories.append({
+                    "id": row["id"],
+                    "category": row["category"],
+                    "scope": row["scope"],
+                    "content": content_row["content"] if content_row else "",
+                    "created_at": row["created_at"],
+                    "last_accessed": row["last_accessed"],
+                    "access_count": row["access_count"]
+                })
+
+            return {
+                "status": "ok",
+                "total": len(memories),
+                "memories": memories
+            }
+
+        finally:
+            conn.close()
 
     @mcp.tool()
     def memory_context(
@@ -246,20 +272,12 @@ def register(mcp):
         Returns:
             dict with extraction results including learned patterns and statistics
         """
-        extractor = get_extractor()
-        since = f"{lookback_days} days ago"
-        target = Path(path).resolve()
-        if not target.exists():
-            return {"success": False, "message": f"Path not found: {path}"}
-
-        prev_cwd = Path.cwd()
-        try:
-            import os
-
-            os.chdir(target)
-            return extractor.extract_from_git(since=since)
-        finally:
-            os.chdir(prev_cwd)
+        # TODO: GitExtractor needs refactoring to use SQLite instead of JSON
+        # Currently disabled until GitExtractor is updated to work with MemoryStorage
+        return {
+            "success": False,
+            "message": "memory_extract is temporarily disabled - GitExtractor needs SQLite migration"
+        }
 
     @mcp.tool()
     def memory_forget(
@@ -275,7 +293,7 @@ def register(mcp):
 
         Args:
             category: Type of memory - "preference", "decision", or "correction"
-            identifier: The content or ID of the entry to remove
+            identifier: The content or ID of the entry to remove (can be memory ID or content text)
             project: Project name (required for decisions, auto-detected if not provided)
 
         Returns:
@@ -284,37 +302,56 @@ def register(mcp):
             - category: The category that was searched
             - message: Description of result
         """
-        if category == "preference":
-            profile = get_profile().load_profile()
-            if profile.general and identifier in profile.general:
-                profile.general.remove(identifier)
-                get_profile().save_profile(profile)
-                return {"status": "forgotten", "category": "preference"}
-            return {"status": "not_found", "category": "preference"}
+        try:
+            storage = MemoryStorage()
 
-        if category == "decision":
-            dm = get_decisions()
-            if project is None:
-                project = dm.detect_project_name()
-            if project:
-                result = dm.forget_decision(identifier, project=project)
+            # Try to delete by ID first
+            if storage.delete_memory(identifier):
                 return {
-                    "status": "forgotten" if result.get("success") else "not_found",
-                    "category": "decision",
-                    "message": result.get("message"),
+                    "status": "forgotten",
+                    "category": category,
+                    "memory_id": identifier,
+                    "message": "Memory deleted successfully"
                 }
-            return {"status": "error", "message": "Project not specified"}
 
-        if category == "correction":
-            cm = get_corrections()
-            result = cm.forget_correction(identifier)
+            # If not found by ID, search by content
+            import sqlite3
+            from pathlib import Path
+
+            db_path = Path.home() / ".cerberus" / "memory.db"
+            conn = sqlite3.connect(str(db_path))
+
+            # Search for memory by content
+            cursor = conn.execute(
+                """SELECT m.id FROM memory_store m
+                   JOIN memory_fts f ON m.id = f.id
+                   WHERE m.category = ? AND f.content LIKE ?""",
+                (category, f"%{identifier}%")
+            )
+            row = cursor.fetchone()
+            conn.close()
+
+            if row:
+                memory_id = row[0]
+                if storage.delete_memory(memory_id):
+                    return {
+                        "status": "forgotten",
+                        "category": category,
+                        "memory_id": memory_id,
+                        "message": "Memory deleted successfully"
+                    }
+
             return {
-                "status": "forgotten" if result.get("success") else "not_found",
-                "category": "correction",
-                "message": result.get("message"),
+                "status": "not_found",
+                "category": category,
+                "message": f"No {category} memory found matching '{identifier}'"
             }
 
-        return {"status": "error", "message": f"Unknown category: {category}"}
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to delete memory: {str(e)}"
+            }
 
     @mcp.tool()
     def memory_stats() -> dict:
@@ -331,43 +368,52 @@ def register(mcp):
             - decision_projects: Number of projects with decisions
             - corrections: Count of stored corrections
             - total_entries: Total memory entries
-            - paths: Storage file paths for each category
+            - database_path: Path to SQLite database
+            - database_size_kb: Size of database file
         """
-        store = get_store()
-        profile = get_profile().load_profile()
-        dm = get_decisions()
-        cm = get_corrections()
+        import sqlite3
+        from pathlib import Path
 
-        pref_count = 0
-        if profile.coding_style:
-            pref_count += len(profile.coding_style)
-        if profile.naming_conventions:
-            pref_count += len(profile.naming_conventions)
-        if profile.anti_patterns:
-            pref_count += len(profile.anti_patterns)
-        if profile.general:
-            pref_count += len(profile.general)
+        db_path = Path.home() / ".cerberus" / "memory.db"
 
-        projects = dm.list_projects()
-        decision_count = 0
-        for proj in projects:
-            decisions = dm.load_decisions(proj)
-            decision_count += len(decisions.decisions)
+        if not db_path.exists():
+            return {
+                "preferences": 0,
+                "decisions": 0,
+                "decision_projects": 0,
+                "corrections": 0,
+                "total_entries": 0,
+                "database_path": str(db_path),
+                "database_size_kb": 0
+            }
 
-        corrections = cm.load_corrections()
-        correction_count = len(corrections.corrections)
+        conn = sqlite3.connect(str(db_path))
+
+        # Count by category
+        cursor = conn.execute("SELECT category, COUNT(*) FROM memory_store GROUP BY category")
+        counts = dict(cursor.fetchall())
+
+        # Count unique projects
+        cursor = conn.execute("SELECT COUNT(DISTINCT scope) FROM memory_store WHERE scope LIKE 'project:%'")
+        project_count = cursor.fetchone()[0]
+
+        # Total count
+        cursor = conn.execute("SELECT COUNT(*) FROM memory_store")
+        total = cursor.fetchone()[0]
+
+        conn.close()
+
+        # Get database file size
+        db_size_kb = db_path.stat().st_size / 1024
 
         return {
-            "preferences": pref_count,
-            "decisions": decision_count,
-            "decision_projects": len(projects),
-            "corrections": correction_count,
-            "total_entries": pref_count + decision_count + correction_count,
-            "paths": {
-                "profile": str(store.profile_path),
-                "corrections": str(store.corrections_path),
-                "projects": [str(store.project_path(p)) for p in projects],
-            },
+            "preferences": counts.get("preference", 0),
+            "decisions": counts.get("decision", 0),
+            "decision_projects": project_count,
+            "corrections": counts.get("correction", 0),
+            "total_entries": total,
+            "database_path": str(db_path),
+            "database_size_kb": round(db_size_kb, 2)
         }
 
     @mcp.tool()
@@ -375,8 +421,8 @@ def register(mcp):
         """
         Export all memory for backup or sharing.
 
-        Creates a JSON file containing all preferences, decisions, and
-        corrections. Useful for backup or sharing between machines.
+        Creates a JSON file containing all memories from SQLite database.
+        Useful for backup or sharing between machines.
 
         Args:
             output_path: Path for export file (default: cerberus-memory-export-YYYYMMDD.json)
@@ -385,27 +431,63 @@ def register(mcp):
             dict with:
             - status: "exported" on success
             - path: Path where export was saved
-            - entries: Counts of exported {profile, decisions, corrections}
+            - entries: Count of exported memories by category
         """
         import json
+        import sqlite3
         from datetime import datetime
+        from pathlib import Path
 
         if output_path is None:
             output_path = f"cerberus-memory-export-{datetime.now().strftime('%Y%m%d')}.json"
 
-        profile = get_profile().load_profile()
-        dm = get_decisions()
-        cm = get_corrections()
+        db_path = Path.home() / ".cerberus" / "memory.db"
+
+        if not db_path.exists():
+            return {
+                "status": "error",
+                "message": "No memory database found"
+            }
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+
+        # Export all memories
+        cursor = conn.execute("""
+            SELECT m.id, m.category, m.scope, m.confidence, m.created_at,
+                   m.last_accessed, m.access_count, m.metadata,
+                   f.content
+            FROM memory_store m
+            JOIN memory_fts f ON m.id = f.id
+            ORDER BY m.created_at
+        """)
+
+        memories = []
+        counts = {"preference": 0, "decision": 0, "correction": 0}
+
+        for row in cursor.fetchall():
+            memory = {
+                "id": row["id"],
+                "category": row["category"],
+                "scope": row["scope"],
+                "content": row["content"],
+                "confidence": row["confidence"],
+                "created_at": row["created_at"],
+                "last_accessed": row["last_accessed"],
+                "access_count": row["access_count"],
+                "metadata": json.loads(row["metadata"]) if row["metadata"] else {}
+            }
+            memories.append(memory)
+            counts[row["category"]] = counts.get(row["category"], 0) + 1
+
+        conn.close()
 
         export_data = {
             "exported_at": datetime.now().isoformat(),
-            "profile": profile.to_dict(),
-            "decisions": {},
-            "corrections": cm.load_corrections().to_dict(),
+            "version": "2.0",
+            "source": "cerberus-memory-sqlite",
+            "memories": memories
         }
-
-        for proj in dm.list_projects():
-            export_data["decisions"][proj] = dm.load_decisions(proj).to_dict()
 
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2)
@@ -413,11 +495,8 @@ def register(mcp):
         return {
             "status": "exported",
             "path": output_path,
-            "entries": {
-                "profile": 1,
-                "decisions": len(export_data["decisions"]),
-                "corrections": len(export_data["corrections"].get("corrections", [])),
-            },
+            "entries": counts,
+            "total": len(memories)
         }
 
     @mcp.tool()
@@ -425,8 +504,8 @@ def register(mcp):
         """
         Import memory from backup.
 
-        Restores previously exported memory. Can either merge with existing
-        memory or replace it entirely.
+        Restores previously exported memory into SQLite database.
+        Can either merge with existing memory or replace it entirely.
 
         Args:
             input_path: Path to the export JSON file to import
@@ -436,66 +515,80 @@ def register(mcp):
             dict with:
             - status: "imported" on success
             - merged: Whether merge mode was used
-            - counts: Number of imported {profile, decisions, corrections}
+            - counts: Number of imported memories by category
         """
         import json
+        import sqlite3
+        from pathlib import Path
 
         with open(input_path, "r", encoding="utf-8") as f:
             import_data = json.load(f)
 
-        imported = {"profile": 0, "decisions": 0, "corrections": 0}
+        if "memories" not in import_data:
+            return {
+                "status": "error",
+                "message": "Invalid export format - missing 'memories' field"
+            }
 
-        # Import profile
-        if "profile" in import_data:
-            imported_profile = Profile.from_dict(import_data["profile"])
-            if merge:
-                existing = get_profile().load_profile()
-                # Merge general preferences
-                if imported_profile.general:
-                    existing.general = list(
-                        {*(existing.general or []), *imported_profile.general}
-                    )
-                # Merge coding style, naming, anti-patterns, languages shallowly
-                existing.coding_style.update(imported_profile.coding_style)
-                existing.naming_conventions.update(imported_profile.naming_conventions)
-                existing.anti_patterns = list(
-                    {*(existing.anti_patterns or []), *imported_profile.anti_patterns}
-                )
-                existing.languages.update(imported_profile.languages)
-                get_profile().save_profile(existing)
-            else:
-                get_profile().save_profile(imported_profile)
-            imported["profile"] = 1
+        db_path = Path.home() / ".cerberus" / "memory.db"
+        conn = sqlite3.connect(str(db_path))
 
-        # Import decisions
-        if "decisions" in import_data:
-            dm = get_decisions()
-            for proj, proj_data in import_data["decisions"].items():
-                for decision in proj_data.get("decisions", []):
-                    dm.learn_decision(
-                        decision.get("decision", ""),
-                        project=proj,
-                        rationale=decision.get("rationale", ""),
-                    )
-                    imported["decisions"] += 1
+        try:
+            if not merge:
+                # Clear existing memories
+                conn.execute("DELETE FROM memory_store")
+                conn.execute("DELETE FROM memory_fts")
 
-        # Import corrections
-        if "corrections" in import_data:
-            cm = get_corrections()
-            for correction in import_data["corrections"].get("corrections", []):
-                cm.learn_correction(
-                    correction.get("correction", "")
-                    or correction.get("pattern", "")
-                    or "",
-                    note=correction.get("note", ""),
-                )
-                imported["corrections"] += 1
+            counts = {"preference": 0, "decision": 0, "correction": 0}
 
-        return {
-            "status": "imported",
-            "merged": merge,
-            "counts": imported,
-        }
+            for memory in import_data["memories"]:
+                # Skip if already exists (based on ID) when merging
+                if merge:
+                    cursor = conn.execute("SELECT id FROM memory_store WHERE id = ?", (memory["id"],))
+                    if cursor.fetchone():
+                        continue
+
+                # Insert into memory_store
+                conn.execute("""
+                    INSERT INTO memory_store
+                    (id, category, scope, confidence, created_at, last_accessed, access_count, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    memory["id"],
+                    memory["category"],
+                    memory["scope"],
+                    memory["confidence"],
+                    memory["created_at"],
+                    memory.get("last_accessed", memory["created_at"]),
+                    memory.get("access_count", 0),
+                    json.dumps(memory.get("metadata", {}))
+                ))
+
+                # Insert into FTS table
+                conn.execute("""
+                    INSERT INTO memory_fts (id, content)
+                    VALUES (?, ?)
+                """, (memory["id"], memory["content"]))
+
+                counts[memory["category"]] = counts.get(memory["category"], 0) + 1
+
+            conn.commit()
+
+            return {
+                "status": "imported",
+                "merged": merge,
+                "counts": counts,
+                "total": sum(counts.values())
+            }
+
+        except Exception as e:
+            conn.rollback()
+            return {
+                "status": "error",
+                "message": f"Import failed: {str(e)}"
+            }
+        finally:
+            conn.close()
 
     @mcp.tool()
     def memory_search(
