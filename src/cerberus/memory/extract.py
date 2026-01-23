@@ -16,9 +16,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 
-from cerberus.memory.store import MemoryStore
-from cerberus.memory.decisions import DecisionManager
-from cerberus.memory.corrections import CorrectionManager
 from cerberus.logging_config import logger
 
 
@@ -64,16 +61,42 @@ class GitExtractor:
         r"^\d+\.\d+",  # Version numbers
     ]
 
-    def __init__(self, store: Optional[MemoryStore] = None):
+    def __init__(self, storage: Optional['MemoryStorage'] = None):
         """
         Initialize the git extractor.
 
         Args:
-            store: MemoryStore instance (creates default if not provided)
+            storage: MemoryStorage instance (creates default if not provided)
         """
-        self.store = store or MemoryStore()
-        self.decision_manager = DecisionManager(self.store)
-        self.correction_manager = CorrectionManager(self.store)
+        from cerberus.memory.storage import MemoryStorage
+        from cerberus.memory.proposal_engine import MemoryProposal
+
+        self.storage = storage or MemoryStorage()
+        self._MemoryProposal = MemoryProposal
+
+    def _detect_project_name(self) -> Optional[str]:
+        """
+        Detect project name from git repository or current directory.
+
+        Returns:
+            Project name or None if not in a git repo
+        """
+        try:
+            # Try to get git repo name
+            result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                from pathlib import Path
+                repo_path = Path(result.stdout.strip())
+                return repo_path.name
+        except Exception:
+            pass
+
+        return None
 
     def extract_from_git(
         self,
@@ -94,7 +117,7 @@ class GitExtractor:
         """
         # Get project name
         if project is None:
-            project = self.decision_manager.detect_project_name()
+            project = self._detect_project_name()
             if project is None:
                 return {
                     "success": False,
@@ -152,7 +175,7 @@ class GitExtractor:
         dry_run: bool = False,
     ) -> Dict[str, Any]:
         """
-        Extract patterns and learn them into Session Memory.
+        Extract patterns and learn them into Session Memory using SQLite.
 
         Args:
             since: Git date string (e.g., "1 week ago")
@@ -163,6 +186,8 @@ class GitExtractor:
         Returns:
             Dict with learned items and summary
         """
+        import uuid
+
         extraction = self.extract_from_git(since, max_commits, project)
         if not extraction["success"]:
             return extraction
@@ -171,29 +196,47 @@ class GitExtractor:
         learned_decisions = []
         learned_corrections = []
 
-        # Learn decisions
+        # Learn decisions using new SQLite storage
         for pattern in extraction["decisions"]:
             if dry_run:
                 learned_decisions.append(pattern)
             else:
-                result = self.decision_manager.learn_decision(
-                    pattern["content"],
-                    project=project,
-                )
-                if result["success"]:
+                try:
+                    proposal = self._MemoryProposal(
+                        id=str(uuid.uuid4()),
+                        category="decision",
+                        scope=f"project:{project}",
+                        content=pattern["content"],
+                        rationale=f"Extracted from git commit {pattern['source'][:7]}",
+                        source_variants=[],
+                        confidence=pattern["confidence"],
+                        priority=3
+                    )
+                    self.storage.store(proposal)
                     learned_decisions.append(pattern)
+                except Exception as e:
+                    logger.debug(f"Failed to store decision: {e}")
 
-        # Learn corrections
+        # Learn corrections using new SQLite storage
         for pattern in extraction["corrections"]:
             if dry_run:
                 learned_corrections.append(pattern)
             else:
-                result = self.correction_manager.learn_correction(
-                    pattern["content"],
-                    note=f"Extracted from git: {pattern['source'][:7]}",
-                )
-                if result["success"]:
+                try:
+                    proposal = self._MemoryProposal(
+                        id=str(uuid.uuid4()),
+                        category="correction",
+                        scope="universal",
+                        content=pattern["content"],
+                        rationale=f"Extracted from git commit {pattern['source'][:7]}",
+                        source_variants=[],
+                        confidence=pattern["confidence"],
+                        priority=3
+                    )
+                    self.storage.store(proposal)
                     learned_corrections.append(pattern)
+                except Exception as e:
+                    logger.debug(f"Failed to store correction: {e}")
 
         return {
             "success": True,

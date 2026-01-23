@@ -353,6 +353,7 @@ class ContextInjector:
         by_category = {
             "preference": [],
             "rule": [],
+            "decision": [],
             "correction": []
         }
 
@@ -363,10 +364,11 @@ class ContextInjector:
         category_labels = {
             "preference": "Preferences",
             "rule": "Rules",
+            "decision": "Decisions",
             "correction": "Corrections"
         }
 
-        for category in ["preference", "rule", "correction"]:
+        for category in ["preference", "rule", "decision", "correction"]:
             items = by_category[category]
             if not items:
                 continue

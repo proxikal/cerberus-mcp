@@ -83,22 +83,30 @@ def register(mcp):
         except Exception:
             recommendations.append("Index check failed. Run: index_build()")
 
-        # Check memory
+        # Check memory (SQLite-based)
         memory_info = {"available": False, "preferences": 0, "decisions": 0}
         try:
-            from cerberus.memory import MemoryStore
-            store = MemoryStore()
-            if store.profile_path.exists():
+            from cerberus.memory.storage import MemoryStorage
+            # Disable anchoring for health check to avoid initialization overhead
+            storage = MemoryStorage(enable_anchoring=False)
+
+            if storage.db_path.exists():
                 memory_info["available"] = True
-                from cerberus.memory import ProfileManager, DecisionManager
-                profile = ProfileManager(store).load_profile()
-                memory_info["preferences"] = len(profile.general) + len(profile.patterns)
-                dm = DecisionManager(store)
-                projects = dm.list_projects()
-                memory_info["decision_projects"] = len(projects)
-                total_decisions = sum(len(dm.load_decisions(p).decisions) for p in projects)
-                memory_info["decisions"] = total_decisions
+                stats = storage.get_stats()
+                memory_info["total"] = stats.get("total", 0)
+
+                # Count by category
+                by_category = stats.get("by_category", {})
+                memory_info["preferences"] = by_category.get("preference", 0)
+                memory_info["decisions"] = by_category.get("decision", 0)
+                memory_info["corrections"] = by_category.get("correction", 0)
+
+                # Count unique projects
+                by_scope = stats.get("by_scope", {})
+                project_scopes = [s for s in by_scope.keys() if s.startswith("project:")]
+                memory_info["decision_projects"] = len(project_scopes)
         except Exception:
+            # Silently continue if memory system unavailable
             pass
 
         # Check summarization (Ollama)

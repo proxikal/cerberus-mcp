@@ -65,7 +65,8 @@ def register(mcp):
     def get_extractor() -> GitExtractor:
         nonlocal _extractor
         if _extractor is None:
-            _extractor = GitExtractor(get_store())
+            from cerberus.memory.storage import MemoryStorage
+            _extractor = GitExtractor(storage=MemoryStorage())
         return _extractor
 
     @mcp.tool()
@@ -272,12 +273,35 @@ def register(mcp):
         Returns:
             dict with extraction results including learned patterns and statistics
         """
-        # TODO: GitExtractor needs refactoring to use SQLite instead of JSON
-        # Currently disabled until GitExtractor is updated to work with MemoryStorage
-        return {
-            "success": False,
-            "message": "memory_extract is temporarily disabled - GitExtractor needs SQLite migration"
-        }
+        import os
+        from pathlib import Path
+        from cerberus.memory.storage import MemoryStorage
+
+        # Change to the specified path
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(path)
+
+            # Create extractor with SQLite storage
+            storage = MemoryStorage()
+            extractor = get_extractor()
+            extractor.storage = storage
+
+            # Calculate since date
+            since = f"{lookback_days} days ago"
+
+            # Learn from git history
+            result = extractor.learn_from_git(since=since, max_commits=100)
+
+            return result
+
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"Failed to extract patterns: {str(e)}"
+            }
+        finally:
+            os.chdir(original_cwd)
 
     @mcp.tool()
     def memory_forget(
