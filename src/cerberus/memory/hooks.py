@@ -1,17 +1,31 @@
 """
 Phase 16: Integration Specification - Hook Implementation
 
-This module provides integration between the memory system and CLI tools
-(Claude Code, Codex, Gemini, etc.) via session hooks.
+PRIMARY MEMORY COLLECTION SYSTEM - Batch Processing at Session End
+
+This is WHERE ALL MEMORY COLLECTION HAPPENS.
 
 CRITICAL ARCHITECTURE:
-- Session START: MCP tool `memory_context()` auto-called (NO bash hook)
-- Session END: Bash hook calls `cerberus memory propose` CLI command
+- Session START: MCP tool `memory_context()` auto-called (injects previous memories)
+- Session END: Bash hook calls `cerberus memory propose` (collects NEW memories)
 
 Integration Flow:
-1. Session starts → MCP tool auto-injection (2000 tokens)
-2. During session → Corrections detected, session codes captured
-3. Session ends → Bash hook → propose_hook() → CLI approval → storage
+1. Session starts → MCP injects previous session context (if exists)
+2. During session → User works, NO automatic memory collection
+3. Session ends → Bash hook triggers → propose_hook() runs:
+   - Reads ENTIRE transcript file
+   - Extracts semantic codes (done:, next:, impl:)
+   - Detects correction patterns ("don't do X")
+   - Clusters → Proposes → CLI approval → Storage
+
+WHY BATCH PROCESSING AT END:
+- ✅ Full conversation context
+- ✅ Multi-turn patterns (User → AI → User correction)
+- ✅ Tool results in context
+- ✅ Delayed corrections (2-3 turns later)
+- ✅ More accurate than real-time
+
+SessionContextCapture is for OPTIONAL manual tracking, NOT automatic collection.
 """
 
 import json

@@ -1,8 +1,21 @@
 """
 PHASE 8: SESSION CONTINUITY
 
-Capture session context during work, inject at next session start.
-Zero re-explanation needed. NO LLM.
+CRITICAL: This module provides context injection + optional manual tracking.
+It is NOT the primary memory collection system.
+
+Primary Memory Collection (see hooks.py):
+- Batch processing at session end via propose_hook()
+- Analyzes entire transcript for correction patterns
+- Requires full conversation context, multi-turn patterns
+- More accurate than real-time tracking
+
+This Module:
+- SessionContextInjector: Loads previous session context at MCP startup
+- SessionContextCapture: OPTIONAL manual work tracking (like developer notes)
+  - NOT used for automatic correction detection
+  - For explicit tracking via CLI: record_completion(), record_decision()
+  - Only used by manual session commands
 
 Multi-tier session scopes:
 - Global scope: Brainstorming, non-project work
@@ -103,8 +116,20 @@ def detect_session_scope() -> tuple[str, Optional[str]]:
 
 class SessionContextCapture:
     """
-    Captures session context during work.
-    Called by MCP tool handlers or hooks.
+    OPTIONAL manual session tracking (like developer notes).
+
+    NOT used for automatic memory collection - that happens via
+    batch processing at session end (see hooks.py propose_hook).
+
+    This is for EXPLICIT tracking only:
+    - record_completion("finished feature X")
+    - record_decision("use SQLite for storage")
+    - record_blocker("waiting on API docs")
+
+    Used by:
+    - Manual CLI: cerberus memory session-start
+    - Tests
+    - NOT: Automatic MCP memory collection
 
     Uses SQLite for persistence (not JSON).
     """

@@ -2,6 +2,59 @@
 
 **For AI Agents: Read this first to understand the module structure.**
 
+---
+
+## ⚠️ CRITICAL: How Memory Collection Works
+
+### Batch Processing at Session End (PRIMARY SYSTEM)
+
+**ALL memory collection happens at session end via the bash hook.**
+
+When Claude Code exits:
+```bash
+cerberus memory propose --interactive  # Runs automatically
+```
+
+**This is the ONLY way memories are collected** because:
+1. ✅ **Full conversation context** - Sees entire conversation flow
+2. ✅ **Multi-turn patterns** - Detects "User asks → AI does X → User corrects with 'don't do X'"
+3. ✅ **Tool results in context** - Sees tool calls AND their results together
+4. ✅ **Delayed corrections** - Catches corrections 2-3 turns after AI action
+5. ✅ **More accurate** - Can analyze relationships between messages
+
+**Process:**
+1. Reads entire transcript file (Claude Code conversation history)
+2. Extracts semantic codes (done:, next:, impl:, etc.)
+3. Detects correction patterns ("don't do X", "never Y")
+4. Clusters similar corrections
+5. Generates memory proposals
+6. User approves/rejects via CLI
+7. Stores to SQLite
+
+### SessionContextCapture (OPTIONAL MANUAL TRACKING)
+
+**This is NOT used for automatic memory collection.**
+
+`SessionContextCapture` is for **manual structured work tracking** (like developer notes):
+- Explicitly mark completed tasks: `capture.record_completion("finished auth")`
+- Record decisions: `capture.record_decision("use SQLite for storage")`
+- Note blockers: `capture.record_blocker("waiting on API docs")`
+
+**Why NOT used for correction detection:**
+- ❌ No conversation context
+- ❌ Can't see multi-turn patterns
+- ❌ Doesn't have tool results
+- ❌ Real-time = misses delayed corrections
+
+**When it's used:**
+- Manual CLI: `cerberus memory session-start` (explicit user command)
+- Tests
+- Future features (if we add mid-session structured tracking)
+
+**TL;DR:** Batch processing = automatic learning. SessionContextCapture = manual notes.
+
+---
+
 ## Module Responsibilities
 
 ### 🎯 Core Layers (Session Management)
@@ -18,14 +71,18 @@
 **Dependencies:** → `session_continuity.py`
 
 #### `session_continuity.py` - Core Implementation
-**Purpose:** Core session tracking and context injection
+**Purpose:** Session context injection and OPTIONAL manual tracking
 **Provides:**
-- `SessionContextCapture` - Records work during session to SQLite
-- `SessionContextInjector` - Injects session context at MCP startup
-- `AutoCapture` - Automatically captures tool usage
+- `SessionContextCapture` - **OPTIONAL** manual structured tracking (not used for correction detection)
+- `SessionContextInjector` - Injects previous session context at MCP startup
+- `AutoCapture` - Experimental tool usage capture (not production)
 - `detect_session_scope()` - Determines project vs global scope
 
-**When to use:** Need direct access to session tracking logic
+**When to use:**
+- Context injection at session start ✅
+- Manual tracking via CLI commands (optional) ✅
+- NOT for automatic correction detection ❌ (use batch processing instead)
+
 **Storage:** `~/.cerberus/memory.db` (SQLite)
 
 #### `session_analyzer.py` - Analytics & Extraction
