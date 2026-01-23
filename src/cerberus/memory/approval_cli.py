@@ -46,8 +46,9 @@ class ApprovalCLI:
         self,
         user_proposals: List,
         agent_proposals: List = None,
-        interactive: bool = True
-    ) -> ApprovalResult:
+        interactive: bool = True,
+        optimize: bool = True
+    ) -> Union[ApprovalResult, List[str]]:
         """
         Run approval interface for proposals.
 
@@ -55,9 +56,10 @@ class ApprovalCLI:
             user_proposals: List of MemoryProposal from Phase 3
             agent_proposals: Optional list of AgentProposal from Phase 10
             interactive: If False, run in batch mode (auto-approve high confidence)
+            optimize: If True, use Phase 18 optimized approval (default: True)
 
         Returns:
-            ApprovalResult with approved/rejected proposal IDs
+            ApprovalResult (Phase 4) OR List[str] (Phase 18 when called from optimizer)
         """
         start_time = datetime.now()
 
@@ -76,6 +78,41 @@ class ApprovalCLI:
                 duration_seconds=0.0
             )
 
+        # Phase 18: Optimized approval
+        if optimize:
+            from cerberus.memory.approval_optimizer import (
+                run_optimized_approval,
+                get_all_approved_ids,
+                ApprovalStrategy
+            )
+
+            strategy = ApprovalStrategy(
+                auto_approve_threshold=self.auto_approve_threshold,
+                review_threshold=0.6,
+                skip_threshold=0.5,
+                batch_similar=True
+            )
+
+            result = run_optimized_approval(
+                all_proposals,
+                strategy=strategy,
+                interactive=interactive
+            )
+
+            # Convert Phase 18 result to Phase 4 format
+            duration = (datetime.now() - start_time).total_seconds()
+
+            return ApprovalResult(
+                approved_ids=get_all_approved_ids(result),
+                rejected_ids=result.user_rejected,
+                total=result.stats.get("total", 0),
+                approved_count=result.stats.get("auto", 0) + result.stats.get("approved", 0),
+                rejected_count=result.stats.get("rejected", 0),
+                auto_approved_count=result.stats.get("auto", 0),
+                duration_seconds=duration
+            )
+
+        # Phase 4: Legacy approval (fallback)
         # Batch mode: auto-approve high confidence
         if not interactive:
             return self._batch_mode(all_proposals, start_time)
@@ -261,7 +298,8 @@ def approve_proposals(
     user_proposals: List,
     agent_proposals: List = None,
     interactive: bool = True,
-    auto_approve_threshold: float = 0.9
+    auto_approve_threshold: float = 0.9,
+    optimize: bool = True
 ) -> ApprovalResult:
     """
     Convenience function for proposal approval.
@@ -271,12 +309,13 @@ def approve_proposals(
         agent_proposals: Optional list of AgentProposal from Phase 10
         interactive: If False, run in batch mode
         auto_approve_threshold: Confidence threshold for batch mode
+        optimize: If True, use Phase 18 optimized approval (default: True)
 
     Returns:
         ApprovalResult with approved/rejected IDs
     """
     cli = ApprovalCLI(auto_approve_threshold=auto_approve_threshold)
-    return cli.run(user_proposals, agent_proposals, interactive)
+    return cli.run(user_proposals, agent_proposals, interactive, optimize)
 
 
 def create_test_scenarios():

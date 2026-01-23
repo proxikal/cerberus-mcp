@@ -60,7 +60,7 @@ def sample_proposals():
 def test_batch_mode_auto_approves_high_confidence(sample_proposals):
     """Batch mode should auto-approve proposals >= 0.9 confidence."""
     cli = ApprovalCLI(auto_approve_threshold=0.9)
-    result = cli.run(sample_proposals, interactive=False)
+    result = cli.run(sample_proposals, interactive=False, optimize=False)
 
     # High confidence: 0.95, 0.92, 0.91 (3 proposals)
     assert result.approved_count == 3
@@ -76,7 +76,7 @@ def test_batch_mode_auto_approves_high_confidence(sample_proposals):
 def test_batch_mode_respects_custom_threshold(sample_proposals):
     """Batch mode should respect custom threshold."""
     cli = ApprovalCLI(auto_approve_threshold=0.93)
-    result = cli.run(sample_proposals, interactive=False)
+    result = cli.run(sample_proposals, interactive=False, optimize=False)
 
     # Only 0.95 meets >= 0.93 threshold
     assert result.approved_count == 1
@@ -87,7 +87,7 @@ def test_batch_mode_respects_custom_threshold(sample_proposals):
 def test_batch_mode_with_empty_proposals():
     """Batch mode with no proposals should return empty result."""
     cli = ApprovalCLI()
-    result = cli.run([], interactive=False)
+    result = cli.run([], interactive=False, optimize=False)
 
     assert result.total == 0
     assert result.approved_count == 0
@@ -103,7 +103,7 @@ def test_batch_mode_with_empty_proposals():
 def test_interactive_mode_approve_all(mock_print, mock_input, sample_proposals):
     """Interactive mode: 'all' should approve all proposals."""
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     assert result.approved_count == 5
     assert result.rejected_count == 0
@@ -116,7 +116,7 @@ def test_interactive_mode_approve_all(mock_print, mock_input, sample_proposals):
 def test_interactive_mode_approve_none(mock_print, mock_input, sample_proposals):
     """Interactive mode: 'none' should reject all proposals."""
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     assert result.approved_count == 0
     assert result.rejected_count == 5
@@ -129,7 +129,7 @@ def test_interactive_mode_approve_none(mock_print, mock_input, sample_proposals)
 def test_interactive_mode_specific_comma(mock_print, mock_input, sample_proposals):
     """Interactive mode: '1,3,5' should approve specific proposals."""
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     assert result.approved_count == 3
     assert result.rejected_count == 2
@@ -145,7 +145,7 @@ def test_interactive_mode_specific_comma(mock_print, mock_input, sample_proposal
 def test_interactive_mode_specific_space(mock_print, mock_input, sample_proposals):
     """Interactive mode: '2 4' should approve specific proposals."""
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     assert result.approved_count == 2
     assert result.rejected_count == 3
@@ -158,7 +158,7 @@ def test_interactive_mode_specific_space(mock_print, mock_input, sample_proposal
 def test_interactive_mode_quit(mock_print, mock_input, sample_proposals):
     """Interactive mode: 'q' should quit and reject all."""
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     assert result.approved_count == 0
     assert result.rejected_count == 5
@@ -169,7 +169,7 @@ def test_interactive_mode_quit(mock_print, mock_input, sample_proposals):
 def test_interactive_mode_invalid_then_valid(mock_print, mock_input, sample_proposals):
     """Interactive mode: invalid input should retry."""
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     # Should eventually accept 'all'
     assert result.approved_count == 5
@@ -180,7 +180,7 @@ def test_interactive_mode_invalid_then_valid(mock_print, mock_input, sample_prop
 def test_interactive_mode_out_of_range(mock_print, mock_input, sample_proposals):
     """Interactive mode: out-of-range number should retry."""
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     # Should eventually accept 'all'
     assert result.approved_count == 5
@@ -191,7 +191,7 @@ def test_interactive_mode_out_of_range(mock_print, mock_input, sample_proposals)
 def test_interactive_mode_keyboard_interrupt(mock_print, mock_input, sample_proposals):
     """Interactive mode: KeyboardInterrupt should quit gracefully."""
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     assert result.approved_count == 0
     assert result.rejected_count == 5
@@ -205,7 +205,7 @@ def test_approval_time_under_30_seconds(mock_print, mock_input, sample_proposals
     """Approval should complete in under 30 seconds (fast approval)."""
     cli = ApprovalCLI()
     start = datetime.now()
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
     duration = (datetime.now() - start).total_seconds()
 
     # Interactive mode with mocked input should be instant
@@ -217,7 +217,7 @@ def test_batch_mode_timing(sample_proposals):
     """Batch mode should be fast (< 1 second)."""
     cli = ApprovalCLI()
     start = datetime.now()
-    result = cli.run(sample_proposals, interactive=False)
+    result = cli.run(sample_proposals, interactive=False, optimize=False)
     duration = (datetime.now() - start).total_seconds()
 
     # Batch mode should be nearly instant
@@ -233,7 +233,8 @@ def test_convenience_function_interactive(mock_print, mock_input, sample_proposa
     """approve_proposals convenience function should work."""
     result = approve_proposals(
         user_proposals=sample_proposals,
-        interactive=True
+        interactive=True,
+        optimize=False
     )
 
     assert result.approved_count == 5
@@ -244,7 +245,8 @@ def test_convenience_function_batch(sample_proposals):
     result = approve_proposals(
         user_proposals=sample_proposals,
         interactive=False,
-        auto_approve_threshold=0.9
+        auto_approve_threshold=0.9,
+        optimize=False
     )
 
     assert result.approved_count == 3  # 0.95, 0.92, 0.91
@@ -263,7 +265,7 @@ def test_combined_user_and_agent_proposals(mock_print, mock_input, sample_propos
     ]
 
     cli = ApprovalCLI()
-    result = cli.run(sample_proposals, agent_proposals, interactive=True)
+    result = cli.run(sample_proposals, agent_proposals, interactive=True, optimize=False)
 
     # 5 user + 2 agent = 7 total
     assert result.total == 7
@@ -290,7 +292,7 @@ def test_display_shows_all_fields(mock_print, mock_input):
     ]
 
     cli = ApprovalCLI()
-    cli.run(proposals, interactive=True)
+    cli.run(proposals, interactive=True, optimize=False)
 
     # Check that print was called with proposal details
     call_args = [str(call) for call in mock_print.call_args_list]
@@ -365,7 +367,7 @@ def test_duplicate_numbers(mock_print, mock_input):
     ]
 
     cli = ApprovalCLI()
-    result = cli.run(proposals, interactive=True)
+    result = cli.run(proposals, interactive=True, optimize=False)
 
     # Should only count proposal 1 once
     assert result.approved_count == 1
@@ -382,7 +384,7 @@ def test_full_integration(mock_print, mock_input, sample_proposals):
     cli = ApprovalCLI(auto_approve_threshold=0.9)
 
     # Interactive mode
-    result = cli.run(sample_proposals, interactive=True)
+    result = cli.run(sample_proposals, interactive=True, optimize=False)
 
     assert result.total == 5
     assert result.approved_count == 3

@@ -358,9 +358,12 @@ def propose_hook(interactive: bool = True, batch_threshold: float = 0.9) -> Prop
             }
         )
 
-    # Phase 4: CLI approval
-    cli = ApprovalCLI()
-    approved_ids = cli.run(proposals, interactive=interactive, auto_approve_threshold=batch_threshold)
+    # Phase 4/18: CLI approval (with Phase 18 optimization)
+    cli = ApprovalCLI(auto_approve_threshold=batch_threshold)
+    result = cli.run(proposals, interactive=interactive, optimize=True)
+
+    # Extract approved IDs from result
+    approved_ids = result.approved_ids
 
     # Phase 5: Store
     storage = MemoryStorage()

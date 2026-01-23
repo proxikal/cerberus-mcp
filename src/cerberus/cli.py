@@ -116,8 +116,7 @@ def handle_memory_command(args):
         end_session,
         get_session_state_info,
         list_crashed_sessions,
-        recover_crashed_session,
-        detect_context
+        recover_crashed_session
     )
     from cerberus.memory.hooks import detect_context as hooks_detect_context
 
