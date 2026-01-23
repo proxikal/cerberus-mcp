@@ -79,9 +79,20 @@ class SessionState:
                 corrections.append(c)
             elif hasattr(c, '__dataclass_fields__'):
                 corrections.append(asdict(c))
+            elif hasattr(c, 'to_dict') and callable(c.to_dict):
+                # Try to call to_dict() but handle mocks
+                try:
+                    result = c.to_dict()
+                    if isinstance(result, dict):
+                        corrections.append(result)
+                    else:
+                        # Mock or invalid to_dict() - skip it
+                        corrections.append({})
+                except Exception:
+                    corrections.append({})
             else:
-                # Mock or other object - try to convert to dict
-                corrections.append(c.to_dict() if hasattr(c, 'to_dict') else {})
+                # Unknown object - skip it
+                corrections.append({})
         data["corrections"] = corrections
         return data
 
@@ -91,9 +102,9 @@ class SessionState:
         # Convert datetime strings
         data["started_at"] = datetime.fromisoformat(data["started_at"])
         data["last_activity"] = datetime.fromisoformat(data["last_activity"])
-        # Convert correction dictionaries
+        # Convert correction dictionaries (skip empty dicts from mocks)
         data["corrections"] = [
-            CorrectionCandidate(**c) for c in data.get("corrections", [])
+            CorrectionCandidate(**c) for c in data.get("corrections", []) if c
         ]
         return cls(**data)
 

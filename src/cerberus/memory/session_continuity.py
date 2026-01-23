@@ -356,12 +356,13 @@ class SessionContextInjector:
 
     def _touch_session(self, session_id: str):
         """Update last_accessed timestamp."""
+        from datetime import datetime
         conn = sqlite3.connect(self.db_path)
         conn.execute("""
             UPDATE sessions
-            SET last_accessed = CURRENT_TIMESTAMP
+            SET last_accessed = ?
             WHERE id = ?
-        """, (session_id,))
+        """, (datetime.now().isoformat(), session_id))
         conn.commit()
         conn.close()
 

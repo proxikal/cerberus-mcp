@@ -389,13 +389,13 @@ def test_detect_crash_no_session_file(temp_dir):
 # Auto-Recovery Tests
 # ============================================================================
 
-@patch("cerberus.memory.session_lifecycle.SemanticAnalyzer")
-@patch("cerberus.memory.session_lifecycle.ProposalEngine")
 @patch("cerberus.memory.storage.MemoryStorage")
+@patch("cerberus.memory.proposal_engine.ProposalEngine")
+@patch("cerberus.memory.semantic_analyzer.SemanticAnalyzer")
 def test_auto_recover_crash_with_corrections(
-    mock_storage,
-    mock_engine,
     mock_semantic,
+    mock_engine,
+    mock_storage,
     mock_correction_candidate
 ):
     """Test auto-recovery with corrections."""
@@ -574,6 +574,8 @@ def test_list_crashed_sessions(temp_dir, monkeypatch):
     monkeypatch.chdir(temp_dir)
 
     # Create stale session
+    from cerberus.memory.session_analyzer import CorrectionCandidate
+
     crashed_state = SessionState(
         session_id="session-crashed",
         started_at=datetime.now() - timedelta(minutes=20),
@@ -582,7 +584,14 @@ def test_list_crashed_sessions(temp_dir, monkeypatch):
         project_name="test",
         language="python",
         turn_count=5,
-        corrections=[MagicMock()],
+        corrections=[CorrectionCandidate(
+            turn_number=1,
+            user_message="Test correction",
+            ai_response="Generated code",
+            correction_type="rule",
+            confidence=0.9,
+            context_before=[]
+        )],
         status="active"
     )
 

@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from cerberus.memory.approval_cli import ApprovalResult
 from cerberus.memory.hooks import (
     start_session,
     end_session,
@@ -58,7 +59,7 @@ def test_full_session_flow(project_dir, monkeypatch):
     # 1. Session Start
     context = start_session()
 
-    assert context.working_directory == str(project_dir)
+    assert Path(context.working_directory).resolve() == Path(project_dir).resolve()
     assert context.language == "python"
 
     session_file = project_dir / SESSION_FILE
@@ -78,17 +79,17 @@ def test_full_session_flow(project_dir, monkeypatch):
     assert not session_file.exists()  # Cleanup
 
 
-@patch("cerberus.memory.hooks.SessionAnalyzer")
-@patch("cerberus.memory.hooks.SemanticAnalyzer")
-@patch("cerberus.memory.hooks.ProposalEngine")
-@patch("cerberus.memory.hooks.ApprovalCLI")
-@patch("cerberus.memory.hooks.MemoryStorage")
+@patch("cerberus.memory.storage.MemoryStorage")
+@patch("cerberus.memory.approval_cli.ApprovalCLI")
+@patch("cerberus.memory.proposal_engine.ProposalEngine")
+@patch("cerberus.memory.semantic_analyzer.SemanticAnalyzer")
+@patch("cerberus.memory.session_analyzer.SessionAnalyzer")
 def test_propose_hook_integration(
-    mock_storage,
-    mock_cli,
-    mock_engine,
-    mock_semantic,
     mock_analyzer,
+    mock_semantic,
+    mock_engine,
+    mock_cli,
+    mock_storage,
     project_dir,
     monkeypatch
 ):
@@ -133,16 +134,19 @@ def test_propose_hook_integration(
 
     # Mock Phase 2: Clustering
     cluster = CorrectionCluster(
-        canonical="Avoid global variables",
+        canonical_text="Avoid global variables",
         variants=["Don't use global variables", "Never use global state"],
-        avg_confidence=0.875,
-        frequency=2
+        correction_type="rule",
+        frequency=2,
+        confidence=0.875
     )
 
     analyzed = AnalyzedCorrections(
         clusters=[cluster],
-        compression_ratio=0.5,
-        total_candidates=2
+        outliers=[],
+        total_raw=2,
+        total_clustered=2,
+        compression_ratio=0.5
     )
 
     mock_semantic_instance = MagicMock()
@@ -152,13 +156,13 @@ def test_propose_hook_integration(
     # Mock Phase 3: Proposals
     proposal = MemoryProposal(
         id="proposal-1",
-        content="Avoid global variables",
-        scope="universal",
         category="correction",
-        confidence=0.875,
+        scope="universal",
+        content="Avoid global variables",
         rationale="Detected 2 similar corrections",
-        source_corrections=cluster.variants,
-        priority=1.75
+        source_variants=cluster.variants,
+        confidence=0.875,
+        priority=2
     )
 
     mock_engine_instance = MagicMock()
@@ -167,7 +171,13 @@ def test_propose_hook_integration(
 
     # Mock Phase 4: Approval
     mock_cli_instance = MagicMock()
-    mock_cli_instance.run.return_value = ["proposal-1"]  # User approves
+    mock_cli_instance.run.return_value = ApprovalResult(
+        approved_ids=["proposal-1"],
+        rejected_ids=[],
+        total=1,
+        approved_count=1,
+        rejected_count=0
+    )
     mock_cli.return_value = mock_cli_instance
 
     # Mock Phase 5: Storage
@@ -223,7 +233,7 @@ def test_hook_installation_workflow(tmp_path, monkeypatch):
     assert "cerberus memory propose --interactive" in content
 
 
-@patch("cerberus.memory.hooks.SessionAnalyzer")
+@patch("cerberus.memory.session_analyzer.SessionAnalyzer")
 def test_propose_hook_batch_mode(mock_analyzer, project_dir, monkeypatch):
     """
     Test propose hook in batch mode (auto-approve high confidence).
@@ -257,23 +267,23 @@ def test_context_detection_comprehensive(project_dir, monkeypatch):
 
     context = detect_context()
 
-    assert context.working_directory == str(project_dir)
+    assert Path(context.working_directory).resolve() == Path(project_dir).resolve()
     assert context.language == "python"
-    assert context.git_repo == str(project_dir)
+    assert Path(context.git_repo).resolve() == Path(project_dir).resolve()
     assert context.session_id.startswith("session-")
 
 
-@patch("cerberus.memory.hooks.SessionAnalyzer")
-@patch("cerberus.memory.hooks.SemanticAnalyzer")
-@patch("cerberus.memory.hooks.ProposalEngine")
-@patch("cerberus.memory.hooks.ApprovalCLI")
-@patch("cerberus.memory.hooks.MemoryStorage")
+@patch("cerberus.memory.storage.MemoryStorage")
+@patch("cerberus.memory.approval_cli.ApprovalCLI")
+@patch("cerberus.memory.proposal_engine.ProposalEngine")
+@patch("cerberus.memory.semantic_analyzer.SemanticAnalyzer")
+@patch("cerberus.memory.session_analyzer.SessionAnalyzer")
 def test_session_with_agent_proposals(
-    mock_storage,
-    mock_cli,
-    mock_engine,
-    mock_semantic,
     mock_analyzer,
+    mock_semantic,
+    mock_engine,
+    mock_cli,
+    mock_storage,
     project_dir,
     monkeypatch
 ):
@@ -306,16 +316,19 @@ def test_session_with_agent_proposals(
 
     # Mock clustering
     cluster = CorrectionCluster(
-        canonical="Always use type hints",
+        canonical_text="Always use type hints",
         variants=["Always use type hints"],
-        avg_confidence=0.9,
-        frequency=1
+        correction_type="rule",
+        frequency=1,
+        confidence=0.9
     )
 
     analyzed = AnalyzedCorrections(
         clusters=[cluster],
-        compression_ratio=1.0,
-        total_candidates=1
+        outliers=[],
+        total_raw=1,
+        total_clustered=1,
+        compression_ratio=1.0
     )
 
     mock_semantic_instance = MagicMock()
@@ -325,13 +338,13 @@ def test_session_with_agent_proposals(
     # Mock proposals (user + agent)
     user_proposal = MemoryProposal(
         id="user-1",
-        content="Always use type hints",
-        scope="language:python",
         category="rule",
-        confidence=0.9,
+        scope="language:python",
+        content="Always use type hints",
         rationale="User directive",
-        source_corrections=["Always use type hints"],
-        priority=0.9
+        source_variants=["Always use type hints"],
+        confidence=0.9,
+        priority=1
     )
 
     # Note: In real usage, agent proposals would come from Phase 10
@@ -343,7 +356,13 @@ def test_session_with_agent_proposals(
 
     # Mock approval (approve user proposal)
     mock_cli_instance = MagicMock()
-    mock_cli_instance.run.return_value = ["user-1"]
+    mock_cli_instance.run.return_value = ApprovalResult(
+        approved_ids=["user-1"],
+        rejected_ids=[],
+        total=1,
+        approved_count=1,
+        rejected_count=0
+    )
     mock_cli.return_value = mock_cli_instance
 
     # Mock storage
@@ -366,7 +385,7 @@ def test_error_recovery_during_proposal(project_dir, monkeypatch, capsys):
     from cerberus.memory.hooks import propose_hook_with_error_handling
 
     # Mock SessionAnalyzer to raise error
-    with patch("cerberus.memory.hooks.SessionAnalyzer") as mock_analyzer:
+    with patch("cerberus.memory.session_analyzer.SessionAnalyzer") as mock_analyzer:
         mock_analyzer.side_effect = Exception("Simulated error")
 
         # Should not raise

@@ -132,11 +132,13 @@ def test_crash_detection_and_recovery(project_dir, monkeypatch):
     # Add some corrections
     for i in range(3):
         candidate = CorrectionCandidate(
-            content=f"Correction {i}",
-            confidence=0.8 + (i * 0.05),
-            source_turn=i,
-            pattern="direct_command"
-        )
+        turn_number=i,
+        user_message=f"Correction {i}",
+        ai_response="Generated code",
+        correction_type="rule",
+        confidence=0.8 + (i * 0.05),
+        context_before=[]
+    )
         update_session_activity(
             "correction",
             {"candidate": candidate},
@@ -175,13 +177,13 @@ def test_crash_detection_and_recovery(project_dir, monkeypatch):
     assert state2.session_id.startswith("session-")
 
 
-@patch("cerberus.memory.session_lifecycle.SemanticAnalyzer")
-@patch("cerberus.memory.session_lifecycle.ProposalEngine")
-@patch("cerberus.memory.session_lifecycle.MemoryStorage")
+@patch("cerberus.memory.storage.MemoryStorage")
+@patch("cerberus.memory.proposal_engine.ProposalEngine")
+@patch("cerberus.memory.semantic_analyzer.SemanticAnalyzer")
 def test_auto_recovery_workflow(
-    mock_storage,
-    mock_engine,
     mock_semantic,
+    mock_engine,
+    mock_storage,
     project_dir,
     monkeypatch
 ):
@@ -227,23 +229,27 @@ def test_auto_recovery_workflow(
     from cerberus.memory.semantic_analyzer import CorrectionCluster, AnalyzedCorrections
 
     cluster1 = CorrectionCluster(
-        canonical="Always use const",
+        canonical_text="Always use const",
         variants=["Always use const"],
-        avg_confidence=0.95,
-        frequency=1
+        correction_type="rule",
+        frequency=1,
+        confidence=0.95
     )
 
     cluster2 = CorrectionCluster(
-        canonical="Prefer arrow functions",
+        canonical_text="Prefer arrow functions",
         variants=["Prefer arrow functions"],
-        avg_confidence=0.85,
-        frequency=1
+        correction_type="preference",
+        frequency=1,
+        confidence=0.85
     )
 
     analyzed = AnalyzedCorrections(
         clusters=[cluster1, cluster2],
-        compression_ratio=1.0,
-        total_candidates=2
+        outliers=[],
+        total_raw=2,
+        total_clustered=2,
+        compression_ratio=1.0
     )
 
     mock_semantic_instance = MagicMock()
@@ -255,24 +261,24 @@ def test_auto_recovery_workflow(
 
     proposal_high = MemoryProposal(
         id="p1",
-        content="Always use const",
-        scope="language:typescript",
         category="rule",
-        confidence=0.95,
+        scope="language:typescript",
+        content="Always use const",
         rationale="High confidence",
-        source_corrections=["Always use const"],
-        priority=0.95
+        source_variants=["Always use const"],
+        confidence=0.95,
+        priority=1
     )
 
     proposal_low = MemoryProposal(
         id="p2",
-        content="Prefer arrow functions",
-        scope="language:typescript",
         category="preference",
-        confidence=0.85,
+        scope="language:typescript",
+        content="Prefer arrow functions",
         rationale="Medium confidence",
-        source_corrections=["Prefer arrow functions"],
-        priority=0.85
+        source_variants=["Prefer arrow functions"],
+        confidence=0.85,
+        priority=3
     )
 
     mock_engine_instance = MagicMock()
@@ -542,7 +548,7 @@ def test_recovery_failure_handling(project_dir, monkeypatch):
     )
 
     # Auto-recovery with exception
-    with patch("cerberus.memory.session_lifecycle.SemanticAnalyzer") as mock_semantic:
+    with patch("cerberus.memory.semantic_analyzer.SemanticAnalyzer") as mock_semantic:
         mock_semantic.side_effect = Exception("Recovery failed")
 
         recovery = auto_recover_crash(crashed_state)

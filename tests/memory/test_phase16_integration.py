@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch, mock_open
 
 import pytest
 
+from cerberus.memory.approval_cli import ApprovalResult
 from cerberus.memory.hooks import (
     HookContext,
     ProposalResult,
@@ -99,13 +100,15 @@ def test_find_git_repo_found(mock_git_repo):
     """Test finding git repo when .git exists."""
     # Test from repo root
     result = _find_git_repo(str(mock_git_repo))
-    assert result == str(mock_git_repo)
+    # macOS: /var is symlink to /private/var, so resolve both paths
+    assert Path(result).resolve() == Path(mock_git_repo).resolve()
 
     # Test from subdirectory
     subdir = mock_git_repo / "src" / "nested"
     subdir.mkdir(parents=True)
     result = _find_git_repo(str(subdir))
-    assert result == str(mock_git_repo)
+    # macOS: /var is symlink to /private/var, so resolve both paths
+    assert Path(result).resolve() == Path(mock_git_repo).resolve()
 
 
 def test_find_git_repo_not_found(temp_dir):
@@ -158,8 +161,9 @@ def test_detect_context_with_git(mock_subprocess, mock_git_repo, monkeypatch):
     context = detect_context()
 
     assert context.session_id.startswith("session-")
-    assert context.working_directory == str(mock_git_repo)
-    assert context.git_repo == str(mock_git_repo)
+    # macOS: resolve symlinks for path comparison
+    assert Path(context.working_directory).resolve() == Path(mock_git_repo).resolve()
+    assert Path(context.git_repo).resolve() == Path(mock_git_repo).resolve()
     assert context.project_name == "awesome-project"
     assert context.language == "python"
     assert isinstance(context.timestamp, datetime)
@@ -175,7 +179,8 @@ def test_detect_context_without_git(temp_dir, monkeypatch):
     context = detect_context()
 
     assert context.session_id.startswith("session-")
-    assert context.working_directory == str(temp_dir)
+    # macOS: resolve symlinks for path comparison
+    assert Path(context.working_directory).resolve() == Path(temp_dir).resolve()
     assert context.git_repo is None
     assert context.project_name == temp_dir.name
     assert context.language == "typescript"
@@ -188,6 +193,9 @@ def test_detect_context_without_git(temp_dir, monkeypatch):
 def test_start_session(temp_dir, mock_session_context, monkeypatch):
     """Test session start creates state file."""
     monkeypatch.chdir(temp_dir)
+    # Update mock to use temp_dir
+    mock_session_context.working_directory = str(temp_dir)
+    mock_session_context.git_repo = str(temp_dir)
 
     context = start_session(mock_session_context)
 
@@ -214,7 +222,8 @@ def test_start_session_auto_detect(temp_dir, monkeypatch):
     context = start_session()
 
     assert context.session_id.startswith("session-")
-    assert context.working_directory == str(temp_dir)
+    # macOS: resolve symlinks for path comparison
+    assert Path(context.working_directory).resolve() == Path(temp_dir).resolve()
     assert context.language == "python"
 
     # Check session file created
@@ -281,11 +290,11 @@ def test_get_session_state_no_file(temp_dir, monkeypatch):
 # Proposal Hook Tests
 # ============================================================================
 
-@patch("cerberus.memory.hooks.SessionAnalyzer")
-@patch("cerberus.memory.hooks.SemanticAnalyzer")
-@patch("cerberus.memory.hooks.ProposalEngine")
-@patch("cerberus.memory.hooks.ApprovalCLI")
-@patch("cerberus.memory.hooks.MemoryStorage")
+@patch("cerberus.memory.session_analyzer.SessionAnalyzer")
+@patch("cerberus.memory.semantic_analyzer.SemanticAnalyzer")
+@patch("cerberus.memory.proposal_engine.ProposalEngine")
+@patch("cerberus.memory.approval_cli.ApprovalCLI")
+@patch("cerberus.memory.storage.MemoryStorage")
 def test_propose_hook_no_corrections(
     mock_storage, mock_cli, mock_engine, mock_semantic, mock_analyzer
 ):
@@ -303,11 +312,11 @@ def test_propose_hook_no_corrections(
     assert result.session_stats["proposals"] == 0
 
 
-@patch("cerberus.memory.hooks.SessionAnalyzer")
-@patch("cerberus.memory.hooks.SemanticAnalyzer")
-@patch("cerberus.memory.hooks.ProposalEngine")
-@patch("cerberus.memory.hooks.ApprovalCLI")
-@patch("cerberus.memory.hooks.MemoryStorage")
+@patch("cerberus.memory.session_analyzer.SessionAnalyzer")
+@patch("cerberus.memory.semantic_analyzer.SemanticAnalyzer")
+@patch("cerberus.memory.proposal_engine.ProposalEngine")
+@patch("cerberus.memory.approval_cli.ApprovalCLI")
+@patch("cerberus.memory.storage.MemoryStorage")
 def test_propose_hook_with_proposals(
     mock_storage, mock_cli, mock_engine, mock_semantic, mock_analyzer
 ):
@@ -337,7 +346,13 @@ def test_propose_hook_with_proposals(
 
     # Mock CLI approval
     mock_cli_instance = MagicMock()
-    mock_cli_instance.run.return_value = ["p1", "p2"]  # Both approved
+    mock_cli_instance.run.return_value = ApprovalResult(
+        approved_ids=["p1", "p2"],
+        rejected_ids=[],
+        total=2,
+        approved_count=2,
+        rejected_count=0
+    )
     mock_cli.return_value = mock_cli_instance
 
     # Mock storage
