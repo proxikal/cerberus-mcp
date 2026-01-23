@@ -170,6 +170,45 @@ class MemoryStorage:
         result = self.store_batch([proposal])
         return result.get("total_stored", 0) > 0
 
+    def delete_memory(self, memory_id: str) -> bool:
+        """
+        Delete a memory from both storage and FTS tables.
+
+        Phase 19 requirement for conflict resolution.
+
+        Args:
+            memory_id: Memory ID to delete
+
+        Returns:
+            True if memory was deleted, False if not found
+        """
+        if not self.db_path.exists():
+            return False
+
+        conn = sqlite3.connect(str(self.db_path))
+
+        try:
+            # Check if memory exists
+            cursor = conn.execute(
+                "SELECT id FROM memory_store WHERE id = ?",
+                (memory_id,)
+            )
+            if not cursor.fetchone():
+                return False
+
+            # Delete from both tables
+            conn.execute("DELETE FROM memory_store WHERE id = ?", (memory_id,))
+            conn.execute("DELETE FROM memory_fts WHERE id = ?", (memory_id,))
+
+            conn.commit()
+            return True
+
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise RuntimeError(f"Failed to delete memory {memory_id}: {e}")
+        finally:
+            conn.close()
+
     def _ensure_database(self) -> None:
         """
         Ensure database exists with correct schema.
