@@ -188,17 +188,17 @@ def _generate_session_id() -> str:
 
 
 # ============================================================================
-# Session Tracking (SQLite-based via session_lifecycle module)
+# Session Tracking (SQLite-based via session_cli module)
 # ============================================================================
 #
 # CRITICAL: Session tracking now uses SQLite exclusively via:
-# - session_lifecycle.py: start_session(), end_session(), update_session_activity()
+# - session_cli.py: start_session(), end_session(), update_session_activity()
 # - session_continuity.py: SessionContextCapture (writes to ~/.cerberus/memory.db)
 #
 # NO file-based tracking (.cerberus-session.json) - all data in memory.db
 #
 # For session operations, use:
-#   from cerberus.memory.session_lifecycle import start_session, end_session
+#   from cerberus.memory.session_cli import start_session, end_session
 #
 
 

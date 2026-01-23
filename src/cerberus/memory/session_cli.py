@@ -1,7 +1,8 @@
 """
-Phase 17: Session Lifecycle & Recovery - SQLite Edition
+Session CLI - Command-line Interface for Session Management
 
-This module handles session boundary detection, crash recovery, and session lifecycle management.
+This module provides CLI commands for manual session operations and crash recovery.
+It wraps session_continuity.py (core implementation) with a user-friendly CLI interface.
 
 Key features:
 - Session start/end detection

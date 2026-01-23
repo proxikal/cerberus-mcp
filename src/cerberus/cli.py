@@ -144,7 +144,7 @@ def handle_memory_command(args):
         uninstall_hooks,
         verify_hooks
     )
-    from cerberus.memory.session_lifecycle import (
+    from cerberus.memory.session_cli import (
         start_session,
         end_session,
         get_session_state_info,

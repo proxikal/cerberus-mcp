@@ -122,7 +122,7 @@ def track_tool_usage(
     )
 
     # Append to session state
-    from cerberus.memory.session_lifecycle import update_session_activity
+    from cerberus.memory.session_cli import update_session_activity
     update_session_activity("tool_use", {"tool": tool, "event": event})
 ```
 
