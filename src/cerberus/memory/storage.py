@@ -5,6 +5,7 @@ Write approved proposals to SQLite database using Phase 12 infrastructure.
 This is Phase Beta implementation - replaces JSON storage from Phase Alpha.
 
 Phase 14 Integration: Discovers and stores code anchors for memories.
+Phase 15 Integration: Auto-tags memories with valid modes.
 
 Zero token cost (pure storage).
 """
@@ -18,6 +19,9 @@ from typing import List, Dict, Optional, Union
 
 # Phase 14: Dynamic Anchoring
 from .anchoring import AnchorEngine, extract_language_from_scope, extract_project_from_scope
+
+# Phase 15: Mode-Aware Context
+from .mode_detection import auto_tag_memory
 
 
 class MemoryStorage:
@@ -103,13 +107,17 @@ class MemoryStorage:
                     "recency_score": anchor.recency_score
                 }) if anchor else None
 
-                # Insert into memory_store (metadata table with anchors)
+                # Phase 15: Auto-tag modes
+                valid_modes, mode_priority = auto_tag_memory(proposal.content)
+
+                # Insert into memory_store (metadata table with anchors + modes)
                 conn.execute("""
                     INSERT INTO memory_store (
                         id, category, scope, confidence,
                         created_at, last_accessed, access_count, metadata,
-                        anchor_file, anchor_symbol, anchor_score, anchor_metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        anchor_file, anchor_symbol, anchor_score, anchor_metadata,
+                        valid_modes, mode_priority
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     memory_id,
                     proposal.category,
@@ -122,7 +130,9 @@ class MemoryStorage:
                     anchor_file,
                     anchor_symbol,
                     anchor_score,
-                    anchor_metadata
+                    anchor_metadata,
+                    json.dumps(valid_modes),
+                    json.dumps(mode_priority)
                 ))
 
                 # Insert into memory_fts (FTS5 search table)

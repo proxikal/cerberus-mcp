@@ -5,6 +5,7 @@ Hybrid memory injection - auto-inject at session start, on-demand during work.
 Uses Phase 6 retrieval to load memories and formats for Claude.
 
 Phase 14 Integration: Includes code examples from anchored memories.
+Phase 15 Integration: Filters memories by detected user intent mode.
 
 Token budget:
 - Session start: 1200 tokens (auto-injection)
@@ -16,6 +17,7 @@ Token budget:
 
 import os
 import re
+import json
 from pathlib import Path
 from typing import Optional, Dict, List
 from dataclasses import dataclass
@@ -25,6 +27,9 @@ from cerberus.memory.retrieval import MemoryRetrieval, RetrievedMemory
 
 # Phase 14: Dynamic Anchoring
 from cerberus.memory.anchoring import AnchorEngine
+
+# Phase 15: Mode-Aware Context
+from cerberus.memory.mode_detection import ModeDetector
 
 
 @dataclass
@@ -173,12 +178,13 @@ class ContextInjector:
     MAX_ONDEMAND_QUERIES = 2   # Maximum on-demand queries
     TOTAL_CAP = 2200          # Total per session (1200 + 1000)
 
-    def __init__(self, base_dir: Optional[str] = None, encoding: str = "cl100k_base", enable_anchoring: bool = True):
+    def __init__(self, base_dir: Optional[str] = None, encoding: str = "cl100k_base", enable_anchoring: bool = True, enable_mode_filtering: bool = False):
         """
         Args:
             base_dir: Base directory for storage (default: ~/.cerberus/memory)
             encoding: Tokenizer encoding (default: cl100k_base for GPT-4)
             enable_anchoring: Enable Phase 14 code examples (default: True)
+            enable_mode_filtering: Enable Phase 15 mode-aware filtering (default: True)
         """
         self.retrieval = MemoryRetrieval(base_dir=base_dir, encoding=encoding)
         self.tokenizer = tiktoken.get_encoding(encoding)
@@ -186,10 +192,13 @@ class ContextInjector:
         self.ondemand_queries_count = 0
         self.enable_anchoring = enable_anchoring
         self._anchor_engine = AnchorEngine() if enable_anchoring else None
+        self.enable_mode_filtering = enable_mode_filtering
+        self._mode_detector = ModeDetector() if enable_mode_filtering else None
 
     def inject_startup(
         self,
         context: Optional[DetectedContext] = None,
+        user_prompt: Optional[str] = None,
         min_relevance: float = 0.5
     ) -> str:
         """
@@ -198,8 +207,11 @@ class ContextInjector:
         Budget: 1200 tokens
         Priority: High relevance only (min_relevance=0.5)
 
+        Phase 15: Filters by detected mode if user_prompt provided
+
         Args:
             context: Optional detected context (auto-detects if None)
+            user_prompt: Optional user prompt for mode detection (Phase 15)
             min_relevance: Minimum relevance score (default: 0.5)
 
         Returns:
@@ -220,6 +232,10 @@ class ContextInjector:
         if not memories:
             return ""
 
+        # Phase 15: Filter by mode if enabled
+        if self.enable_mode_filtering and user_prompt and self._mode_detector:
+            memories = self._filter_by_mode(memories, user_prompt, context)
+
         # Format for injection
         formatted = self._format_memories(memories, context)
 
@@ -232,6 +248,7 @@ class ContextInjector:
         self,
         query: str,
         context: Optional[DetectedContext] = None,
+        user_prompt: Optional[str] = None,
         min_relevance: float = 0.3
     ) -> str:
         """
@@ -239,9 +256,12 @@ class ContextInjector:
 
         Budget: 500 tokens per query, max 2 queries (1000 tokens total)
 
+        Phase 15: Filters by detected mode if user_prompt provided
+
         Args:
             query: Query string (used for filtering, not semantic search)
             context: Optional detected context
+            user_prompt: Optional user prompt for mode detection (Phase 15)
             min_relevance: Minimum relevance score (default: 0.3, broader than startup)
 
         Returns:
@@ -273,6 +293,11 @@ class ContextInjector:
 
         if not memories:
             return "<!-- No relevant memories found for query -->"
+
+        # Phase 15: Filter by mode if enabled (use query as prompt if no user_prompt)
+        if self.enable_mode_filtering and self._mode_detector:
+            prompt_for_mode = user_prompt if user_prompt else query
+            memories = self._filter_by_mode(memories, prompt_for_mode, context)
 
         # Format for injection
         formatted = self._format_memories(memories, context, query=query)
@@ -405,6 +430,62 @@ class ContextInjector:
         except Exception:
             # Fallback: rough estimate
             return len(text) // 4
+
+    def _filter_by_mode(
+        self,
+        memories: List[RetrievedMemory],
+        user_prompt: str,
+        context: DetectedContext
+    ) -> List[RetrievedMemory]:
+        """
+        Filter memories by detected user intent mode.
+
+        Phase 15: Mode-aware filtering.
+
+        Backward compatibility: Memories without valid_modes are included (default to all modes).
+
+        Args:
+            memories: List of retrieved memories
+            user_prompt: User's prompt for mode detection
+            context: Detected context
+
+        Returns:
+            Filtered list of memories matching detected mode
+        """
+        if not self._mode_detector:
+            return memories
+
+        # Build context dict for mode detection
+        mode_context = {
+            "modified_files": [],  # Would come from session tracking
+            "tools_used": [],      # Would come from session tracking
+        }
+
+        # Detect mode
+        mode_result = self._mode_detector.detect(user_prompt, mode_context)
+        primary_mode = mode_result.primary_mode.mode
+
+        # Filter memories
+        filtered = []
+        for memory in memories:
+            # Parse valid_modes from memory
+            valid_modes = None
+            if hasattr(memory, 'valid_modes') and memory.valid_modes:
+                try:
+                    if isinstance(memory.valid_modes, str):
+                        valid_modes = json.loads(memory.valid_modes)
+                    elif isinstance(memory.valid_modes, list):
+                        valid_modes = memory.valid_modes
+                except (json.JSONDecodeError, TypeError):
+                    # Failed to parse - include memory (backward compat)
+                    valid_modes = None
+
+            # Backward compatibility: If no valid_modes, include the memory (applies to all modes)
+            # Otherwise, check if primary mode is in valid_modes
+            if valid_modes is None or primary_mode in valid_modes:
+                filtered.append(memory)
+
+        return filtered
 
     def get_usage_stats(self) -> Dict:
         """

@@ -44,6 +44,9 @@ class SearchResult:
     anchor_symbol: Optional[str] = None
     anchor_score: Optional[float] = None
     anchor_metadata: Optional[str] = None  # JSON string
+    # Phase 15: Mode fields
+    valid_modes: Optional[str] = None  # JSON string of list
+    mode_priority: Optional[str] = None  # JSON string of dict
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -62,7 +65,9 @@ class SearchResult:
             "anchor_file": self.anchor_file,
             "anchor_symbol": self.anchor_symbol,
             "anchor_score": self.anchor_score,
-            "anchor_metadata": self.anchor_metadata
+            "anchor_metadata": self.anchor_metadata,
+            "valid_modes": self.valid_modes,
+            "mode_priority": self.mode_priority
         }
 
 
@@ -131,7 +136,10 @@ class MemorySearchEngine:
                 anchor_file=row["anchor_file"] if "anchor_file" in row.keys() else None,
                 anchor_symbol=row["anchor_symbol"] if "anchor_symbol" in row.keys() else None,
                 anchor_score=row["anchor_score"] if "anchor_score" in row.keys() else None,
-                anchor_metadata=row["anchor_metadata"] if "anchor_metadata" in row.keys() else None
+                anchor_metadata=row["anchor_metadata"] if "anchor_metadata" in row.keys() else None,
+                # Phase 15: Mode fields
+                valid_modes=row["valid_modes"] if "valid_modes" in row.keys() else None,
+                mode_priority=row["mode_priority"] if "mode_priority" in row.keys() else None
             ))
 
         conn.close()

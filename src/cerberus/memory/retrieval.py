@@ -37,6 +37,9 @@ class RetrievedMemory:
     anchor_symbol: Optional[str] = None
     anchor_score: Optional[float] = None
     anchor_metadata: Optional[Dict] = None
+    # Phase 15: Mode fields
+    valid_modes: Optional[str] = None  # JSON string of list
+    mode_priority: Optional[str] = None  # JSON string of dict
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -55,7 +58,9 @@ class RetrievedMemory:
             "anchor_file": self.anchor_file,
             "anchor_symbol": self.anchor_symbol,
             "anchor_score": self.anchor_score,
-            "anchor_metadata": self.anchor_metadata
+            "anchor_metadata": self.anchor_metadata,
+            "valid_modes": self.valid_modes,
+            "mode_priority": self.mode_priority
         }
 
 
@@ -173,7 +178,9 @@ class MemoryRetrieval:
                 anchor_file=result.anchor_file,
                 anchor_symbol=result.anchor_symbol,
                 anchor_score=result.anchor_score,
-                anchor_metadata=anchor_metadata
+                anchor_metadata=anchor_metadata,
+                valid_modes=getattr(result, 'valid_modes', None),
+                mode_priority=getattr(result, 'mode_priority', None)
             ))
 
         # Sort by relevance (highest first)

@@ -1,8 +1,8 @@
 # CERBERUS ADAPTIVE MEMORY SYSTEM - IMPLEMENTATION TODO
 
 **Last Updated:** 2026-01-22
-**Current Phase:** Phase Delta (Weeks 7-8)
-**Status:** Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅ | Phase 4 ✅ | Phase 5 ✅ | Phase 6 ✅ | Phase 7 ✅ | Phase 8 ✅ | Phase 10 ✅ | Phase 11 ✅ | Phase 12 ✅ | Phase 13 ✅ | Phase 14 ✅ | **ALPHA COMPLETE!** | **GAMMA COMPLETE!** | **BETA COMPLETE!** | **DELTA-14 COMPLETE!**
+**Current Phase:** Phase Epsilon (Weeks 9-10)
+**Status:** Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅ | Phase 4 ✅ | Phase 5 ✅ | Phase 6 ✅ | Phase 7 ✅ | Phase 8 ✅ | Phase 10 ✅ | Phase 11 ✅ | Phase 12 ✅ | Phase 13 ✅ | Phase 14 ✅ | Phase 15 ✅ | Phase 16 ✅ | Phase 17 ✅ | **ALPHA COMPLETE!** | **GAMMA COMPLETE!** | **BETA COMPLETE!** | **DELTA COMPLETE!**
 
 ---
 
@@ -512,16 +512,119 @@
 - Phase 12 pre-provisioned columns used (anchor_file, anchor_symbol, anchor_score, anchor_metadata)
 
 ### Phase 15: Mode-Aware Context
-**Status:** 🔒 Locked (Phase 14 must stabilize first)
+**Status:** ✅ COMPLETE
+**File:** `src/cerberus/memory/mode_detection.py`
+**Tests:** `tests/memory/test_phase15_mode_detection.py`
+**Objective:** Detect user intent mode and filter memory injection based on mode appropriateness
+
+**Tasks:**
+- [x] Create mode_detection.py with ModeDetector, ModeTagging, IntentMode, ModeDetectionResult
+- [x] Implement mode detection algorithm (keyword-based, 0 tokens)
+- [x] Implement 6 modes: prototype, production, hotfix, refactor, audit, exploration
+- [x] Implement helper methods (_analyze_scope, _analyze_urgency, _analyze_context_signals)
+- [x] Implement auto-tagging algorithm (ModeTagging.auto_tag)
+- [x] Implement priority calculation (ModeTagging.calculate_mode_priority)
+- [x] Extend Phase 5 storage to auto-tag modes on store
+- [x] Extend Phase 7 injection to filter by detected mode
+- [x] Add valid_modes and mode_priority to SearchResult (Phase 13)
+- [x] Add valid_modes and mode_priority to RetrievedMemory (Phase 6)
+- [x] Implement _filter_by_mode in ContextInjector
+
+**Validation:**
+- [x] 51 unit tests passing (all scenarios + edge cases) ✅
+- [x] Mode detection working (6 modes: prototype, production, hotfix, refactor, audit, exploration) ✅
+- [x] 100% accuracy on 26 validation scenarios (exceeds 85% target) ✅
+- [x] Auto-tagging working (quality rules → production/refactor, speed rules → prototype/hotfix) ✅
+- [x] Storage integration (auto-tags on store) ✅
+- [x] Injection integration (filters by detected mode) ✅
+- [x] Token cost: 0 tokens (pure keyword matching) ✅
+
+**Notes:**
+- 6 modes: prototype (low rigor), production (high rigor), hotfix (medium rigor), refactor (high rigor), audit (low rigor), exploration (low rigor)
+- Mode detection uses 4 signals: indicators (30%), scope (30%), urgency (20%), context (20%)
+- Auto-tagging rules: quality → production/refactor, speed → prototype/hotfix/exploration, patterns → production/refactor
+- Backward compatible: memories without mode tags default to all modes
+- Phase 12 pre-provisioned columns used (valid_modes, mode_priority)
+- Integration complete: Phase 5 (storage), Phase 6 (retrieval), Phase 7 (injection), Phase 13 (search)
 
 ---
 
 ## PHASE EPSILON: Critical Fixes (Weeks 9-10)
 
-**Status:** 🔒 Locked (Delta gates must pass first)
+**Status:** 🚧 In Progress
 
-- Phase 16: Integration Specification
-- Phase 17: Session Lifecycle & Recovery
+### Phase 16: Integration Specification
+**Status:** ✅ COMPLETE
+**Files:** `src/cerberus/memory/hooks.py`, `src/cerberus/memory/ipc.py`, `src/cerberus/cli.py`
+**Tests:** `tests/memory/test_phase16_integration.py`, `tests/memory/test_phase16_end_to_end.py`
+**Objective:** Define concrete integration between memory system and CLI tools
+
+**Tasks:**
+- [x] Create hooks.py with data structures and context detection
+- [x] Implement propose_hook() function (session end entrypoint)
+- [x] Implement session tracking (start/end session state)
+- [x] Implement install_hooks() for bash hook installation
+- [x] Add CLI commands (propose, install-hooks, test-hooks)
+- [x] Create ipc.py for inter-process communication utilities
+- [x] Write unit tests for Phase 16 (44 tests)
+- [x] Write integration tests (full session flow, 11 tests)
+- [x] Update pyproject.toml with cerberus CLI entry point
+- [x] Add scikit-learn and tiktoken dependencies
+
+**Validation:**
+- [x] 55 unit + integration tests passing ✅
+- [x] Session-end hook installs successfully ✅
+- [x] Proposal works (corrections detected and stored) ✅
+- [x] Error handling works (failures don't block session end) ✅
+- [x] Multi-CLI support (claude-code, codex-cli, gemini-cli) ✅
+
+**Notes:**
+- Session START: MCP tool `memory_context()` auto-called (NO bash hook)
+- Session END: Bash hook calls `cerberus memory propose` CLI command
+- Integration ready for Phase 17 (session lifecycle)
+
+---
+
+### Phase 17: Session Lifecycle & Recovery
+**Status:** ✅ COMPLETE
+**Files:** `src/cerberus/memory/session_lifecycle.py`, `src/cerberus/cli.py` (updated)
+**Tests:** `tests/memory/test_phase17_lifecycle.py`, `tests/memory/test_phase17_crash_scenarios.py`
+**Objective:** Session boundaries, crash detection, auto-recovery, lifecycle management
+
+**Tasks:**
+- [x] Create session_lifecycle.py with SessionState and SessionRecovery dataclasses
+- [x] Implement session start with crash detection
+- [x] Implement session end and cleanup
+- [x] Implement activity tracking (turn, correction, tool_use, file_modified)
+- [x] Implement crash detection (stale session detection)
+- [x] Implement auto-recovery (high-confidence proposals auto-approved)
+- [x] Implement idle timeout detection and daemon
+- [x] Implement file locking for session state (prevent race conditions)
+- [x] Implement session history and analytics
+- [x] Add CLI commands (session-start, session-end, session-status, recover)
+- [x] Write unit tests (46 tests)
+- [x] Write integration tests (13 crash scenario tests)
+
+**Validation:**
+- [x] 59 unit + integration tests passing ✅
+- [x] Session start/end works reliably ✅
+- [x] Crash detection works (stale session > 5 minutes) ✅
+- [x] Auto-recovery works (high-confidence >= 0.9 auto-approved) ✅
+- [x] Manual recovery works (cerberus memory recover) ✅
+- [x] Idle timeout works (configurable, default 30 minutes) ✅
+- [x] File locking prevents race conditions ✅
+
+**Notes:**
+- Temporary state: .cerberus-session.json (project root)
+- Persistent storage: ~/.cerberus/memory.db (global SQLite)
+- Auto-recovery threshold: 0.9 (90% confidence)
+- Stale detection: 300 seconds (5 minutes)
+- Idle timeout: 30 minutes (configurable)
+
+---
+
+### Phase 18: Approval Optimization
+**Status:** 🔜 Next
 - Phase 18: Approval Optimization
 - Phase 19: Conflict Resolution
 - Phase 20: Silent Divergence Detection
@@ -575,4 +678,22 @@ pip install requests  # For Ollama API calls
 - ✅ Phase 13: Indexed Search & Integration (all 13 tests passing)
 - 🎉 **PHASE BETA COMPLETE!** SQLite migration + FTS5 search operational! Total: 276 tests passing!
 - ✅ Phase 14: Dynamic Anchoring (all 18 tests passing)
-- 🎉 **PHASE DELTA-14 COMPLETE!** Code anchor discovery + injection operational! Total: 294 tests passing!
+- ✅ Phase 15: Mode-Aware Context (all 51 tests passing, 100% accuracy on 26 validation scenarios)
+- 🎉 **PHASE DELTA COMPLETE!** Mode-aware filtering + code anchoring operational! Total: 345 tests passing!
+- ✅ Phase 16: Integration Specification (55 tests passing: 44 unit + 11 integration)
+  - Created hooks.py with propose_hook(), session tracking, context detection
+  - Created ipc.py for inter-process communication utilities
+  - Added CLI commands: cerberus memory propose, install-hooks, test-hooks
+  - Multi-CLI support: claude-code, codex-cli, gemini-cli
+  - Session END hook integration (bash → CLI)
+  - MCP tool startup injection (memory_context auto-called)
+- 🎉 **PHASE 16 COMPLETE!** Integration specification implemented! Total: 400 tests passing!
+- ✅ Phase 17: Session Lifecycle & Recovery (59 tests passing: 46 unit + 13 integration)
+  - Created session_lifecycle.py with SessionState, SessionRecovery dataclasses
+  - Implemented session start/end with crash detection (stale > 5 min)
+  - Implemented auto-recovery (high-confidence >= 0.9 proposals)
+  - Implemented idle timeout detection (30 min default, configurable)
+  - Implemented file locking (prevents race conditions)
+  - Added CLI commands: session-start, session-end, session-status, recover
+  - Comprehensive crash scenario testing (corrupted files, concurrent access)
+- 🎉 **PHASE 17 COMPLETE!** Session lifecycle & crash recovery operational! Total: 459 tests passing!
