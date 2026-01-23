@@ -607,6 +607,66 @@ def register(mcp):
             conn.close()
 
     @mcp.tool()
+    def memory_propose(
+        interactive: bool = True,
+        batch_threshold: float = 0.9
+    ) -> dict:
+        """
+        Propose and store memories from current session (manual trigger).
+
+        Runs the full memory collection pipeline:
+        1. Reads entire transcript
+        2. Extracts semantic codes (done:, next:, impl:)
+        3. Detects correction patterns ("don't do X")
+        4. Clusters similar corrections
+        5. Generates memory proposals
+        6. CLI approval (interactive or batch)
+        7. Stores approved memories
+
+        This is the SAME process that runs automatically at session end via hook.
+        Use this to:
+        - Manually trigger memory collection mid-session
+        - Test memory collection without ending session
+        - Recover from hook failures
+
+        Args:
+            interactive: Use interactive CLI approval (default: True)
+            batch_threshold: Auto-approve threshold for batch mode (default: 0.9)
+
+        Returns:
+            dict with:
+            - status: "completed" or "error"
+            - proposals_generated: Number of proposals created
+            - proposals_approved: Number approved by user
+            - stored_count: Number stored to database
+            - session_stats: Candidate/cluster/proposal counts
+
+        Example:
+            # Interactive approval (default)
+            memory_propose()
+
+            # Batch mode (auto-approve high confidence)
+            memory_propose(interactive=False, batch_threshold=0.85)
+        """
+        from cerberus.memory.hooks import propose_hook
+
+        try:
+            result = propose_hook(interactive=interactive, batch_threshold=batch_threshold)
+
+            return {
+                "status": "completed",
+                "proposals_generated": len(result.proposals),
+                "proposals_approved": len(result.approved_ids),
+                "stored_count": result.stored_count,
+                "session_stats": result.session_stats
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e)
+            }
+
+    @mcp.tool()
     def memory_search(
         query: str,
         scope: Optional[str] = None,

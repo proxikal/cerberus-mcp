@@ -31,6 +31,18 @@ cerberus memory propose --interactive  # Runs automatically
 6. User approves/rejects via CLI
 7. Stores to SQLite
 
+**Manual Trigger:**
+You can also trigger this manually during a session via MCP tool:
+```python
+# Ask AI: "propose memories from this session"
+memory_propose(interactive=True)
+```
+
+Use cases:
+- ✅ Hook not working → Trigger manually
+- ✅ Keep session open → Collect memories mid-session
+- ✅ Test without ending session → Run whenever needed
+
 ### SessionContextCapture (OPTIONAL MANUAL TRACKING)
 
 **This is NOT used for automatic memory collection.**
