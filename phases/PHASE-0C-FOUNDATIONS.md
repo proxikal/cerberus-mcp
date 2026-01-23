@@ -406,9 +406,14 @@ pip install requests  # For Ollama API calls
 
 ## Integration Points
 
-**1. Claude Code Session Hook (auto-inject):**
+**1. Agent Initialization (Session Start):**
 ```python
+# No shell hook for session start. The Agent (Claude/Gemini) 
+# auto-calls the memory_context() MCP tool upon receiving 
+# the first user message.
+
 def on_session_start():
+    # Called internally by MCP tool memory_context()
     # Memory injection (Phase 7, uses Phase 6 retrieval)
     context = ContextDetector().detect()
     memory_context = ContextInjector().inject(context)
@@ -416,7 +421,7 @@ def on_session_start():
     # Session context injection (Phase 8)
     session_context = SessionContextInjector().inject(context.project)
 
-    # Combine and inject into system prompt
+    # Combine and return to Agent
     return memory_context + "\n\n" + session_context
 ```
 

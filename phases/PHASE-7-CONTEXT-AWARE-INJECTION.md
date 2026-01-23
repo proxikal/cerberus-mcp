@@ -58,7 +58,7 @@ class InjectionResult:
 
 ### Mode 1: Session Start Auto-Injection
 
-**When:** SessionStart hook (Phase 16 integration)
+**When:** Agent Initialization (First Message). The Agent calls the `memory_context()` tool. No shell hook required.
 
 **What gets auto-loaded:**
 
@@ -609,14 +609,14 @@ class ContextDetector:
 
 ### 1. Session Start Auto-Injection
 
-**Called by:** SessionStart hook (Phase 16)
+**Called by:** Agent internally via MCP tool call at initialization (Phase 16)
 
 ```python
 def inject_session_start() -> str:
     """
     Auto-inject high-relevance memories at session start.
 
-    Called by SessionStart hook, runs before first user message.
+    Called internally when the Agent initializes and calls memory_context().
 
     Returns:
         Markdown-formatted memories (~1000 tokens)

@@ -13,15 +13,9 @@
 
 ## Storage Integration
 
-### SQLite Schema Extension
+### SQLite Schema
 
-```sql
--- Extend existing memories table
-ALTER TABLE memories ADD COLUMN anchor_file TEXT;
-ALTER TABLE memories ADD COLUMN anchor_symbol TEXT;
-ALTER TABLE memories ADD COLUMN anchor_score REAL;
-ALTER TABLE memories ADD COLUMN anchor_metadata TEXT;  -- JSON blob
-```
+*Note: The columns `anchor_file`, `anchor_symbol`, `anchor_score`, and `anchor_metadata` were pre-provisioned in the `memory_store` table during Phase 12 to avoid SQLite limitations with ALTER TABLE.*
 
 ### Storage Operations (Phase 5 Extension)
 
@@ -43,7 +37,7 @@ def store_memory_with_anchor(memory: MemoryProposal, anchor: Optional[AnchorCand
 
     # Store memory
     db.execute("""
-        INSERT INTO memories (
+        INSERT INTO memory_store (
             id, category, scope, content,
             anchor_file, anchor_symbol, anchor_score, anchor_metadata
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)

@@ -88,12 +88,12 @@ Revolutionary memory system that learns from user corrections automatically, sto
 ```
 Session Cycle:
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. SESSION START (SessionStart hook)                        │
-│    ├─ Auto-inject relevant memories (Phase 7: 1500 tokens)  │
+│ 1. SESSION START (Agent calls memory_context tool)          │
+│    ├─ Auto-inject relevant memories (Phase 7: 1200 tokens)  │
 │    │  └─ Context-aware: universal + language + project      │
-│    ├─ Auto-inject session codes (Phase 8: 1000-1500 tokens) │
+│    ├─ Auto-inject session codes (Phase 8: 800 tokens)       │
 │    │  └─ Scope-matched: only current project session        │
-│    └─ Total budget: 2500-3000 tokens (filtered, not all)    │
+│    └─ Total budget: 2000 tokens (startup injection)         │
 ├─────────────────────────────────────────────────────────────┤
 │ 2. DURING SESSION                                           │
 │    ├─ Detect user corrections (Phase 1)                     │

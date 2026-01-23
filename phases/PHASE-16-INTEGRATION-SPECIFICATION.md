@@ -31,6 +31,8 @@ Define concrete integration mechanism between memory system and Claude Code CLI.
 
 ## Integration Architecture
 
+**CRITICAL:** There is NO bash hook for session start. The architecture relies entirely on the Agent calling the MCP tool at initialization. **Do NOT create a session-start.sh script.**
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                        USER                                   │
@@ -99,7 +101,7 @@ Define concrete integration mechanism between memory system and Claude Code CLI.
 **Session START (MCP tool - no bash hook needed):**
 - Claude Code auto-calls `memory_context()` MCP tool at session start
 - MCP server is already running, tool returns startup injection (2000 tokens)
-- No bash script needed - MCP handles this directly
+- **CRITICAL: No bash script needed or allowed for session start.** MCP handles this directly.
 
 **Session END (bash hook required):**
 ```bash
@@ -378,7 +380,8 @@ def install_hooks(cli_name: str) -> None:
     """
     Install session end hook for CLI tool.
 
-    Note: Session START uses MCP tool (no bash hook needed).
+    CRITICAL: Do NOT create a session-start hook.
+    The agent handles startup context via MCP.
     Only session END needs bash hook (MCP shutting down).
     """
 
@@ -519,6 +522,7 @@ cerberus memory test-hooks
 - [ ] Implement session tracking (start/end session state)
 - [ ] Add CLI commands (`cerberus memory propose`, `install-hooks`)
 - [ ] Write session-end hook installation script
+- [ ] Verify that NO session-start hook is created (handled via MCP)
 - [ ] Add error handling for propose hook (fallback on failure)
 - [ ] Write unit tests (context detection, propose hook execution)
 - [ ] Write integration tests (full session: MCP start + bash end)

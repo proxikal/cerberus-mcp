@@ -70,13 +70,9 @@ def auto_tag_memory(memory: MemoryProposal) -> List[str]:
 
 ## Storage Integration
 
-### SQLite Schema Extension
+### SQLite Schema
 
-```sql
--- Extend memories table
-ALTER TABLE memories ADD COLUMN valid_modes TEXT;  -- JSON array
-ALTER TABLE memories ADD COLUMN mode_priority TEXT;  -- JSON object
-```
+*Note: The columns `valid_modes` and `mode_priority` were pre-provisioned in the `memory_store` table during Phase 12 to avoid SQLite limitations with ALTER TABLE.*
 
 ### Storage Operations (Phase 5 Extension)
 
@@ -91,7 +87,7 @@ def store_memory_with_modes(memory: MemoryProposal) -> None:
     mode_priority = {mode: 5 for mode in valid_modes}
 
     db.execute("""
-        INSERT INTO memories (
+        INSERT INTO memory_store (
             id, category, scope, content,
             valid_modes, mode_priority
         ) VALUES (?, ?, ?, ?, ?, ?)

@@ -153,7 +153,7 @@ class ConflictDetector:
 
     def __init__(self, hierarchy: MemoryHierarchy):
         self.hierarchy = hierarchy
-        self.embedder = EmbeddingEngine()  # From Phase 2
+        self.similarity_engine = SimilarityEngine()  # From Phase 2
 
     def detect_conflicts(self) -> List[ConflictDetection]:
         """
@@ -258,7 +258,7 @@ class ConflictDetector:
         for scope, scope_mems in by_scope.items():
             for i, mem1 in enumerate(scope_mems):
                 for mem2 in scope_mems[i+1:]:
-                    similarity = self.embedder.similarity(
+                    similarity = self.similarity_engine.similarity(
                         mem1["content"],
                         mem2["content"]
                     )
@@ -297,7 +297,7 @@ class ConflictDetector:
                     obsolete.append(ConflictDetection(
                         id=f"obsolete-{uuid.uuid4().hex[:8]}",
                         memory1=mem,
-                        memory2={},  # No second memory
+                        memory2={{}},  # No second memory
                         conflict_type="obsolete",
                         severity="medium",
                         suggestion=f"Update: '{mem['content']}' references deprecated '{dep}'"
@@ -318,6 +318,7 @@ class PromotionDetector:
 
     def __init__(self, hierarchy: MemoryHierarchy):
         self.hierarchy = hierarchy
+        self.similarity_engine = SimilarityEngine()  # From Phase 2
 
     def detect_candidates(self) -> List[PromotionCandidate]:
         """
@@ -372,14 +373,11 @@ class PromotionDetector:
         if not memories:
             return []
 
-        embedder = EmbeddingEngine()
-
-        # Compute embeddings
+        # Extract texts
         texts = [m["content"] for m in memories]
-        embeddings = np.array([embedder.embed(t) for t in texts])
 
-        # Compute similarity matrix
-        similarity_matrix = embeddings @ embeddings.T
+        # Compute similarity matrix using TF-IDF (from Phase 2)
+        similarity_matrix = self.similarity_engine.compute_similarity_matrix(texts)
 
         # Cluster (threshold = 0.75)
         clusters = []
@@ -596,7 +594,7 @@ Same rule in 3+ projects
 
 ## Dependencies
 
-- sentence-transformers (from Phase 2)
+- scikit-learn (from Phase 2)
 - numpy
 
 ---
@@ -604,7 +602,7 @@ Same rule in 3+ projects
 ## Token Budget
 
 - Health check: 0 tokens (local analysis)
-- Conflict detection: 0 tokens (embeddings local)
+- Conflict detection: 0 tokens (TF-IDF local)
 - Promotion detection: 0 tokens (clustering local)
 - Total: 0 tokens (fully offline)
 
@@ -615,3 +613,5 @@ Same rule in 3+ projects
 - Health check: O(n²) for n memories (similarity comparisons)
 - Acceptable for n < 1000
 - Run weekly or on-demand (not every session)
+
+```
