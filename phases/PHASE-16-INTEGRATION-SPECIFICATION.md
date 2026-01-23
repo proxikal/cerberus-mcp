@@ -38,25 +38,28 @@ Define concrete integration mechanism between memory system and Claude Code CLI.
 │                   claude-code CLI                             │
 │                          ↓                                    │
 │                 SESSION STARTS                                │
-│         (No auto-injection, zero startup cost)                │
 │                          ↓                                    │
-│                   USER CONVERSATION                           │
-│                          ↓                                    │
-│          Claude: "Let me check memories..."                   │
+│              ┌───────────────────────┐                        │
+│              │  SessionStart Hook    │                        │
+│              └───────────────────────┘                        │
 │                          ↓                                    │
 │    ┌─────────────────────────────────────────────┐           │
-│    │  MCP: memory_context()                      │           │
-│    │  (On-demand, like cerberus search)          │           │
+│    │  Auto-call: memory_context()                │           │
+│    │  (ONE-TIME at session start)                │           │
 │    └─────────────────────────────────────────────┘           │
 │                          ↓                                    │
-│              Phase 7: Retrieve memories                       │
-│              (query database, return relevant)                │
+│    Phase 7: Context-aware memory injection                    │
+│    (1500 tokens: universal + language + project)             │
 │                          ↓                                    │
-│         Returns: Markdown (only when needed)                  │
+│    Phase 8: Active session injection                          │
+│    (1000-1500 tokens: files, decisions, blockers)            │
 │                          ↓                                    │
-│              Claude uses memories                             │
+│         Returns: 2500-3000 tokens (relevant only)             │
+│                          ↓                                    │
+│              Claude has full context                          │
 │                          ↓                                    │
 │                   USER CONVERSATION                           │
+│              (zero re-explanation needed)                     │
 │                          ↓                                    │
 │              ┌───────────────────────┐                        │
 │              │  Session End Hook     │                        │
@@ -73,30 +76,32 @@ Define concrete integration mechanism between memory system and Claude Code CLI.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**Key Difference from Original Design:**
-- NO session-start hook (zero startup cost)
-- Memory retrieval via MCP tool (on-demand, like Cerberus search)
-- Claude decides when to call memory_context()
-- Session-end hook ONLY for proposal pipeline
+**Key Integration Points:**
+- SessionStart hook: Auto-calls memory_context() (2500-3000 tokens ONE-TIME)
+- Context-aware injection: Tiered filtering ensures relevance (Phase 7 + 8)
+- Session-end hook: Captures session codes + runs proposal pipeline
+- Zero tokens after startup (all context injected once at start)
 
 ---
 
 ## Integration Methods
 
-### Method 1: MCP Tool + Session-End Hook (Recommended)
+### Method 1: SessionStart + SessionEnd Hooks (Recommended)
 
 **Claude Code hooks:**
 ```bash
+# ~/.claude/hooks/session-start.sh
+#!/bin/bash
+# Auto-calls memory_context() via MCP (built-in, no manual call needed)
+
 # ~/.claude/hooks/session-end.sh
 #!/bin/bash
 cerberus memory propose --interactive
 ```
 
-**No session-start hook needed** - memory retrieval via MCP tool
-
 **Implementation in `src/cerberus/memory/hooks.py`:**
 ```python
-# NO inject_hook() - memory retrieval via MCP tool (Phase 7)
+# SessionStart handled by MCP auto-call to memory_context() (Phase 7 + 8)
 
 def propose_hook() -> None:
     """
@@ -147,7 +152,7 @@ cerberus memory propose --interactive
 cerberus memory propose --batch --threshold 0.85
 ```
 
-**Note:** NO session-start command - memory retrieval via MCP tool (on-demand)
+**Note:** SessionStart hook auto-calls memory_context() - zero manual intervention
 
 ---
 

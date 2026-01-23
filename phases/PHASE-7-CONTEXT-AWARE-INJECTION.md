@@ -429,7 +429,7 @@ class ContextDetector:
         # Detect language
         language = self._detect_language(cwd)
 
-        # Detect task (requires session analysis)
+        # Detect task (requires session analysis - Phase 8)
         task = self._detect_task()
 
         return InjectionContext(
@@ -480,7 +480,7 @@ class ContextDetector:
     def _detect_task(self) -> Optional[str]:
         """
         Detect current task from recent session activity.
-        Requires integration with session tracker.
+        Requires integration with session tracker (Phase 8).
         """
         # Stub: Analyze last 5 messages for task indicators
         return None
@@ -595,6 +595,8 @@ pip install tiktoken  # Token counting
 - Injection output: 1500 tokens max (enforced)
 - Scoring computation: 0 tokens (local)
 - Context detection: 0 tokens (file system analysis)
+
+**Note:** Phase 8 extends this with session context (1000-1500 tokens), bringing total injection budget to 2500-3000 tokens.
 
 ---
 

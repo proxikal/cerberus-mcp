@@ -16,7 +16,7 @@
 - ✅ Real-world testing: 5+ sessions successful
 
 ## Objective
-Migrate memories from JSON → SQLite FTS5. Foundation for scalable search.
+Migrate memories and sessions to unified SQLite database. Memories use FTS5 for full-text search. Sessions use regular tables for scope-based queries.
 
 **Why Phase Beta (not Alpha):**
 - Database complexity isolated from learning logic
@@ -35,6 +35,8 @@ Migrate memories from JSON → SQLite FTS5. Foundation for scalable search.
 ---
 
 ## Schema Design
+
+**Note:** Memories use FTS5 (full-text search). Sessions use regular tables.
 
 ```sql
 -- Memories table with FTS5
@@ -67,6 +69,38 @@ INSERT OR IGNORE INTO memory_metadata (key, value) VALUES
 CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope);
 CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
 CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at);
+
+-- Sessions table (Phase 8)
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,           -- UUID
+    scope TEXT NOT NULL,            -- "global" or "project:{name}"
+    project_path TEXT,              -- Absolute path (null for global)
+    phase TEXT,                     -- Current phase/feature being worked on
+    context_data TEXT,              -- JSON blob: {files, functions, decisions, blockers, next_actions}
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    turn_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'active',   -- "active", "idle", "archived"
+    UNIQUE(scope, status) WHERE status = 'active'
+);
+
+-- Session activity tracking (Phase 8)
+CREATE TABLE IF NOT EXISTS session_activity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    turn_number INTEGER,
+    activity_type TEXT NOT NULL,    -- correction, pattern, task_start, etc.
+    activity_data TEXT,             -- JSON blob
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+-- Indexes for session queries
+CREATE INDEX IF NOT EXISTS idx_sessions_scope ON sessions(scope, status);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_accessed ON sessions(last_accessed);
+CREATE INDEX IF NOT EXISTS idx_sessions_project_path ON sessions(project_path) WHERE project_path IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_activity_session ON session_activity(session_id);
 ```
 
 ---
@@ -86,6 +120,20 @@ class IndexedMemory:
     last_accessed: str
     access_count: int
     metadata: Dict[str, Any]
+
+@dataclass
+class SessionRecord:
+    """Session stored in SQLite (Phase 8)."""
+    id: str  # UUID
+    scope: str  # "global" or "project:{name}"
+    project_path: Optional[str]
+    phase: Optional[str]  # Current phase/feature
+    context_data: Dict[str, Any]  # {files, functions, decisions, blockers, next_actions}
+    created_at: str
+    last_accessed: str
+    last_activity: str
+    turn_count: int
+    status: str  # "active", "idle", "archived"
 ```
 
 ---
@@ -95,7 +143,7 @@ class IndexedMemory:
 ```python
 class MemoryIndexManager:
     """
-    Manage SQLite FTS5 index for memories.
+    Manage SQLite database for memories (FTS5) and sessions (regular tables).
     """
 
     def __init__(self, base_path: Path):
@@ -210,6 +258,57 @@ class MemoryIndexManager:
 
         return counts
 
+    def migrate_sessions_from_json(self) -> Dict[str, int]:
+        """
+        Migrate session summaries from JSON to SQLite (Phase 8).
+
+        Legacy location: ~/.cerberus/session_summary.json (temporary, global only)
+        New location: SQLite sessions table (multi-tier: global + project)
+        """
+        legacy_path = Path.home() / ".cerberus" / "session_summary.json"
+
+        if not legacy_path.exists():
+            return {"status": "no_legacy_sessions", "migrated": 0}
+
+        conn = sqlite3.connect(self.db_path)
+        migrated = 0
+
+        try:
+            with open(legacy_path) as f:
+                legacy_data = json.load(f)
+
+            # Legacy format: single global session
+            session_id = str(uuid.uuid4())
+            conn.execute("""
+                INSERT INTO sessions (
+                    id, scope, project_path, context_data,
+                    created_at, last_accessed, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                session_id,
+                "global",  # Legacy sessions were global
+                None,
+                json.dumps(legacy_data),
+                datetime.now().isoformat(),
+                datetime.now().isoformat(),
+                "ended"  # Mark legacy as ended
+            ))
+
+            migrated = 1
+            conn.commit()
+
+            # Backup and remove legacy file
+            legacy_path.rename(legacy_path.with_suffix(".json.migrated"))
+
+        except (json.JSONDecodeError, IOError) as e:
+            conn.rollback()
+            return {"status": "error", "message": str(e), "migrated": 0}
+
+        finally:
+            conn.close()
+
+        return {"status": "success", "migrated": migrated}
+
     def _migrate_file(
         self,
         conn: sqlite3.Connection,
@@ -306,6 +405,19 @@ class MemoryIndexManager:
         """)
         scope_counts = dict(cursor.fetchall())
 
+        # Count sessions (Phase 8)
+        session_stats = {}
+        if "sessions" in tables:
+            cursor = conn.execute("SELECT COUNT(*) FROM sessions")
+            session_stats["total_sessions"] = cursor.fetchone()[0]
+
+            cursor = conn.execute("""
+                SELECT status, COUNT(*)
+                FROM sessions
+                GROUP BY status
+            """)
+            session_stats["by_status"] = dict(cursor.fetchall())
+
         # Database size
         db_size = self.db_path.stat().st_size if self.db_path.exists() else 0
 
@@ -315,6 +427,7 @@ class MemoryIndexManager:
             "status": "ok",
             "total_memories": total_count,
             "by_scope": scope_counts,
+            "sessions": session_stats,
             "db_size_bytes": db_size,
             "db_size_mb": round(db_size / 1024 / 1024, 2),
             "tables": tables
@@ -412,6 +525,29 @@ def cli_verify():
     print(f"  - Total memories: {stats['total_memories']}")
     print(f"  - Database size: {stats['db_size_mb']} MB")
     print(f"  - By scope: {stats['by_scope']}")
+
+    # Show session stats if available (Phase 8)
+    if "sessions" in stats and stats["sessions"]:
+        print(f"  - Sessions: {stats['sessions'].get('total_sessions', 0)}")
+        if "by_status" in stats["sessions"]:
+            print(f"    - By status: {stats['sessions']['by_status']}")
+
+# cerberus memory migrate-sessions
+def cli_migrate_sessions():
+    """
+    CLI command to migrate legacy session summaries (Phase 8).
+    """
+    manager = MemoryIndexManager(Path.home() / ".cerberus")
+
+    print("Migrating legacy session summaries to SQLite...")
+    result = manager.migrate_sessions_from_json()
+
+    if result["status"] == "no_legacy_sessions":
+        print("No legacy session summaries found.")
+    elif result["status"] == "error":
+        print(f"✗ Migration failed: {result['message']}")
+    else:
+        print(f"✓ Migrated {result['migrated']} session(s)")
 ```
 
 ---
@@ -420,14 +556,14 @@ def cli_verify():
 
 ```
 ✓ MemoryIndexManager class implemented
-✓ SQLite schema with FTS5 created
-✓ Migration from JSON working
+✓ SQLite schema created: FTS5 for memories + regular tables for sessions
+✓ Migration from JSON working (memories + sessions)
 ✓ Backward compatibility (JSON fallback)
-✓ Integrity verification working
+✓ Integrity verification working (includes sessions)
 ✓ Auto-migration on first access
-✓ CLI tools (migrate, verify)
+✓ CLI tools (migrate, verify, migrate-sessions)
 ✓ WAL mode enabled (concurrency)
-✓ Tests: 10 indexing scenarios
+✓ Tests: 12 indexing scenarios (10 memories + 2 sessions)
 ```
 
 ---
@@ -474,6 +610,16 @@ SQLite fails → fallback to JSON
 # Scenario 10: Large migration
 JSON: 500 memories
 → expect: all migrated, < 5 seconds
+
+# Scenario 11: Session migration (Phase 8)
+Legacy session_summary.json exists
+→ migrate_sessions_from_json()
+→ expect: 1 session migrated, status="ended", scope="global"
+
+# Scenario 12: No legacy sessions
+No session_summary.json
+→ migrate_sessions_from_json()
+→ expect: status="no_legacy_sessions", migrated=0
 ```
 
 ---
@@ -522,14 +668,15 @@ pip install sqlite3  # Built-in, no install needed
 
 ```
 ~/.cerberus/
-├── memory.db              # SQLite FTS5 index (new)
+├── memory.db              # Unified SQLite (FTS5 for memories + regular tables for sessions)
 ├── memory.db-wal          # Write-ahead log (SQLite)
 ├── memory.db-shm          # Shared memory (SQLite)
-└── memory/                # Legacy JSON (kept for compat)
-    ├── profile.json
-    ├── corrections.json
-    ├── languages/
-    └── projects/
+├── memory/                # Legacy JSON (kept for compat)
+│   ├── profile.json
+│   ├── corrections.json
+│   ├── languages/
+│   └── projects/
+└── session_summary.json   # Legacy sessions (Phase 8 - migrated to DB)
 ```
 
 ---
@@ -559,11 +706,12 @@ def safe_index_operation(func):
 
 ## Key Design Decisions
 
-**Why SQLite + FTS5:**
+**Why SQLite + FTS5 for memories:**
+- FTS5 provides full-text search for memory content
 - Same as Cerberus code indexing (proven)
 - No daemon, no server, just a file
-- FTS5 = full-text search built-in
 - Scales to 10,000+ memories
+- Sessions use regular SQLite tables (no FTS5 needed - queries by scope/status)
 
 **Why keep JSON:**
 - Backward compatibility
@@ -586,5 +734,6 @@ def safe_index_operation(func):
 
 **Phase 5 (Storage):** Will write to SQLite in Phase 13
 **Phase 6 (Retrieval):** Will query SQLite in Phase 13
-**Phase 11 (Maintenance):** Update for SQLite stale detection
-**MCP Tools:** New `memory_search()` in Phase 13
+**Phase 8 (Sessions):** Unified database for memories + sessions
+**Phase 11 (Maintenance):** Update for SQLite stale detection (memories + sessions)
+**MCP Tools:** New `memory_search()` in Phase 13, session tools in Phase 8
