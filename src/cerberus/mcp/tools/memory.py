@@ -36,9 +36,14 @@ def register(mcp):
         metadata: Optional[Dict[str, Any]] = None,
         details: Optional[str] = None,
         relevance_decay_days: int = 90,
+        bulk_memories: Optional[List[Dict[str, Any]]] = None,
     ) -> dict:
         """
         Teach Session Memory something new (hybrid format).
+
+        Supports both single and bulk operations:
+        - Single: Provide category, content, etc. parameters
+        - Bulk: Provide bulk_memories list, other params ignored
 
         Args:
             category: Type of memory - "preference", "decision", "correction"
@@ -47,20 +52,110 @@ def register(mcp):
             metadata: Additional structured data (topic, rationale, etc.)
             details: Structured explanations (why/how/where) - optional but recommended
             relevance_decay_days: Auto-deprioritize after N days (default: 90)
+            bulk_memories: List of memory dicts for bulk insertion (each with same keys as single params)
 
         Returns:
-            Confirmation with memory ID
+            Confirmation with memory ID(s)
 
-        Example:
+        Examples:
+            # Single memory
             memory_learn(
                 category="decision",
                 content="config_hierarchical_defaults_global_local",
                 details="Root: User needed per-project config override\\nFix: Added .cerberus/ local config\\nFiles: src/cerberus/mcp/config.py:45"
             )
+
+            # Bulk memories
+            memory_learn(bulk_memories=[
+                {
+                    "category": "decision",
+                    "content": "use_sqlite_for_storage",
+                    "details": "Root: Need fast queries\\nFix: Migrated to SQLite\\nFiles: storage.py"
+                },
+                {
+                    "category": "preference",
+                    "content": "prefer_compact_output",
+                    "details": "User prefers concise results"
+                }
+            ])
         """
         import uuid
         from datetime import datetime
 
+        # Handle bulk operation
+        if bulk_memories:
+            storage = MemoryStorage()
+            results = []
+            errors = []
+
+            for idx, mem in enumerate(bulk_memories):
+                try:
+                    # Validate and store each memory
+                    mem_category = mem.get("category")
+                    mem_content = mem.get("content")
+                    mem_project = mem.get("project")
+                    mem_metadata = mem.get("metadata", {})
+                    mem_details = mem.get("details")
+                    mem_decay_days = mem.get("relevance_decay_days", 90)
+
+                    # Quality filters
+                    if len(mem_content) > 500:
+                        errors.append(f"Memory {idx}: Content too long (max 500 chars)")
+                        continue
+
+                    conversational_markers = ["now i want", "let me know", "can you", "should i"]
+                    if any(marker in mem_content.lower() for marker in conversational_markers):
+                        errors.append(f"Memory {idx}: Content appears conversational")
+                        continue
+
+                    # Determine scope
+                    if mem_category == "preference":
+                        scope = "universal"
+                    elif mem_category == "decision":
+                        if mem_project is None:
+                            from pathlib import Path
+                            mem_project = Path.cwd().name
+                        scope = f"project:{mem_project}"
+                    elif mem_category == "correction":
+                        scope = "universal"
+                    else:
+                        errors.append(f"Memory {idx}: Unknown category '{mem_category}'")
+                        continue
+
+                    # Create and store
+                    memory_id = str(uuid.uuid4())
+                    proposal = MemoryProposal(
+                        id=memory_id,
+                        category=mem_category,
+                        scope=scope,
+                        content=mem_content,
+                        rationale=mem_metadata.get("rationale", "Bulk memory via memory_learn"),
+                        source_variants=[],
+                        confidence=1.0,
+                        priority=1,
+                        details=mem_details,
+                        relevance_decay_days=mem_decay_days
+                    )
+
+                    stored_id = storage.store(proposal)
+                    results.append({
+                        "memory_id": stored_id,
+                        "category": mem_category,
+                        "content": mem_content
+                    })
+
+                except Exception as e:
+                    errors.append(f"Memory {idx}: {str(e)}")
+
+            return {
+                "status": "bulk_learned",
+                "stored_count": len(results),
+                "error_count": len(errors),
+                "memories": results,
+                "errors": errors if errors else None
+            }
+
+        # Single memory operation (original logic)
         metadata = metadata or {}
 
         # Quality filter: Reject garbage data
@@ -302,32 +397,101 @@ def register(mcp):
     @mcp.tool()
     def memory_forget(
         category: str,
-        identifier: str,
+        identifier: str = None,
         project: Optional[str] = None,
+        ids: Optional[List[str]] = None,
     ) -> dict:
         """
-        Remove a specific memory entry.
+        Remove memory entries (single or bulk).
 
-        Deletes a previously learned preference, decision, correction, or rule
-        from memory.
+        Supports both single and bulk deletion:
+        - Single: Provide category and identifier
+        - Bulk: Provide ids list (category optional for validation)
 
         Args:
             category: Type of memory - "preference", "decision", "correction", or "rule"
             identifier: The content or ID of the entry to remove (can be memory ID or content text)
             project: Project name (required for decisions, auto-detected if not provided)
+            ids: List of memory IDs for bulk deletion
 
         Returns:
             dict with:
-            - status: "forgotten" if removed, "not_found" if entry doesn't exist, or "error"
-            - category: The category that was searched
-            - message: Description of result
+            - status: "forgotten", "bulk_forgotten", "not_found", or "error"
+            - deleted_count: Number of memories deleted (bulk mode)
+            - errors: List of errors encountered (bulk mode)
+
+        Examples:
+            # Single deletion
+            memory_forget(category="preference", identifier="prop-123abc")
+
+            # Bulk deletion
+            memory_forget(ids=["prop-123abc", "dec-456def", "corr-789ghi"])
         """
         # Validate category
         valid_categories = ["preference", "decision", "correction", "rule"]
-        if category not in valid_categories:
+        if category and category not in valid_categories:
             return {
                 "status": "error",
                 "message": f"Invalid category: {category}. Must be one of: {', '.join(valid_categories)}"
+            }
+
+        # Handle bulk deletion
+        if ids:
+            import sqlite3
+            from pathlib import Path
+
+            storage = MemoryStorage()
+            db_path = Path.home() / ".cerberus" / "memory.db"
+            conn = sqlite3.connect(str(db_path))
+
+            deleted = []
+            not_found = []
+            errors = []
+
+            try:
+                for memory_id in ids:
+                    try:
+                        # Validate ID exists and matches category if provided
+                        if category:
+                            cursor = conn.execute(
+                                "SELECT category FROM memory_store WHERE id = ?",
+                                (memory_id,)
+                            )
+                            row = cursor.fetchone()
+                            if not row:
+                                not_found.append(memory_id)
+                                continue
+                            if row[0] != category:
+                                errors.append(f"{memory_id}: category mismatch (expected {category}, got {row[0]})")
+                                continue
+
+                        # Delete the memory
+                        if storage.delete_memory(memory_id):
+                            deleted.append(memory_id)
+                        else:
+                            not_found.append(memory_id)
+
+                    except Exception as e:
+                        errors.append(f"{memory_id}: {str(e)}")
+
+                return {
+                    "status": "bulk_forgotten",
+                    "deleted_count": len(deleted),
+                    "not_found_count": len(not_found),
+                    "error_count": len(errors),
+                    "deleted_ids": deleted,
+                    "not_found_ids": not_found if not_found else None,
+                    "errors": errors if errors else None
+                }
+
+            finally:
+                conn.close()
+
+        # Single deletion (original logic)
+        if not identifier:
+            return {
+                "status": "error",
+                "message": "Must provide either 'identifier' for single deletion or 'ids' for bulk deletion"
             }
 
         try:
