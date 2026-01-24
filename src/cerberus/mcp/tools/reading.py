@@ -196,7 +196,7 @@ def register(mcp):
                 response,
                 snippet.content,
                 alternative_approach="Read full file",
-                estimated_alternative_tokens=estimated_full_file_tokens
+                estimated_alternative_tokens=single_file_token_estimate
             )
 
         return response
