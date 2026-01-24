@@ -4,8 +4,9 @@ Configuration for code summarization using local LLMs.
 
 # LLM backend configuration
 LLM_CONFIG = {
+    "enabled": False,  # Must opt-in to LLM summarization
     "backend": "ollama",  # "ollama", "llamacpp", "api", or "none"
-    "model": "llama2:7b",  # Model identifier
+    "model": "deepseek-coder:6.7b",  # Best for code analysis
     "temperature": 0.2,  # Lower = more deterministic
     "max_tokens": 500,  # Maximum tokens in response
     "timeout": 30,  # Request timeout in seconds

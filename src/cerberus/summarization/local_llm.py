@@ -35,6 +35,11 @@ class LocalLLMClient:
         self.backend = self.config["backend"]
         self.available = False
 
+        # Check if explicitly disabled via config
+        if not self.config.get("enabled", True):
+            logger.info("LLM summarization disabled in config (enabled=false)")
+            return
+
         if self.backend == "none":
             logger.info("LLM backend disabled (backend='none')")
             return

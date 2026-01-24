@@ -25,7 +25,7 @@ class SummarizationFacade:
             config: Optional configuration overrides
         """
         self.config = {**SUMMARIZATION_CONFIG, **(config or {})}
-        self.llm_client = LocalLLMClient()
+        self.llm_client = LocalLLMClient(config=config)
         self.parser = SummaryParser()
         logger.debug("SummarizationFacade initialized")
 
@@ -287,5 +287,14 @@ def get_summarization_facade(config: Optional[Dict[str, Any]] = None) -> Summari
     """
     global _facade
     if _facade is None:
+        # Read from MCP config if not provided
+        if config is None:
+            from ..mcp.config import get_config_value
+            config = {
+                "enabled": get_config_value("summarization.enabled", False),
+                "model": get_config_value("summarization.model", "deepseek-coder:6.7b"),
+                "api_base": get_config_value("summarization.ollama_url", "http://localhost:11434"),
+                "max_file_size": get_config_value("summarization.max_file_size_for_summary", 50000),
+            }
         _facade = SummarizationFacade(config=config)
     return _facade

@@ -46,12 +46,13 @@ style_rules = ["black", "isort"]
 auto_fix_on_edit = false
 
 [summarization]
+enabled = true  # Set to true to enable LLM summarization (requires Ollama)
 ollama_url = "http://localhost:11434"
-model = "llama3.2"
+model = "deepseek-coder:6.7b"  # Best for code: deepseek-coder:6.7b, llama3.2, qwen3:8b
 max_file_size_for_summary = 50000
 
 [skill]
-# CerberusBeta activation summary template
+# Cerberus activation summary template
 # Options: professional, minimal, dashboard, modern, terminal
 # Default: modern
 summary_template = "modern"

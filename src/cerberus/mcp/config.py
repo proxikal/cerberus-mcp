@@ -106,8 +106,9 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "auto_fix_on_edit": False,
     },
     "summarization": {
+        "enabled": False,  # Must opt-in to LLM summarization
         "ollama_url": "http://localhost:11434",
-        "model": "llama3.2",
+        "model": "deepseek-coder:6.7b",
         "max_file_size_for_summary": 50000,
     },
 }
