@@ -151,6 +151,7 @@ class IndexManager:
         self._index: Optional[Union[ScanResult, ScanResultAdapter]] = None
         self._index_path: Optional[Path] = None
         self._watcher: Optional[_WatcherHandle] = None
+        self._freshness_checked: bool = False  # Track if we've done initial freshness check
         self._auto_update_enabled: bool = get_config_value(
             "index.auto_update", DEFAULTS["index"]["auto_update"]
         )
@@ -166,6 +167,9 @@ class IndexManager:
         """
         Get index, loading lazily on first access.
 
+        On first access, automatically checks for staleness and updates if needed.
+        Uses 60-second cache to avoid excessive git checks.
+
         Returns:
             Loaded ScanResult/ScanResultAdapter
 
@@ -174,6 +178,25 @@ class IndexManager:
         """
         if self._index is None:
             self._load_index()
+
+        # Auto-check freshness on first access
+        # Uses 60-second cache internally, so subsequent calls are fast
+        if not self._freshness_checked:
+            self._freshness_checked = True
+
+            # Silently attempt to ensure index is fresh
+            # If it fails, we log but continue with potentially stale index
+            try:
+                result = self.ensure_fresh_index()
+                if result["status"] == "updated":
+                    logger.info(f"Auto-updated stale index: {result['reason']}")
+                elif result["status"] == "stale" and result["error"]:
+                    logger.warning(
+                        f"Index may be stale ({result['reason']}): {result['error']}"
+                    )
+            except Exception as e:
+                logger.error(f"Freshness check failed: {e}")
+
         return self._index
 
     def _load_index(self):
@@ -321,6 +344,140 @@ class IndexManager:
         """Invalidate cached index - next get_index() will reload."""
         self._index = None
         logger.debug("Index cache invalidated")
+
+    def ensure_fresh_index(self) -> dict:
+        """
+        Ensure index is fresh by checking staleness and auto-updating if needed.
+
+        This method:
+        1. Checks if index is stale (uncommitted changes or new commits)
+        2. If stale, attempts smart_update with file locking
+        3. On failure, logs warning and continues with stale index
+        4. Caches staleness check for 60 seconds
+
+        Returns:
+            {
+                "status": "fresh" | "updated" | "stale" | "error",
+                "was_stale": bool,
+                "update_attempted": bool,
+                "update_succeeded": bool,
+                "reason": str or None,  # Why stale
+                "error": str or None,    # Error message if failed
+            }
+        """
+        from .staleness import check_staleness
+        from .file_lock import index_update_lock, FileLockError
+
+        # Get index path and metadata
+        if not self._index_path or not self._index_path.exists():
+            return {
+                "status": "error",
+                "was_stale": False,
+                "update_attempted": False,
+                "update_succeeded": False,
+                "reason": None,
+                "error": "No index available. Run index_build first.",
+            }
+
+        # Get current index metadata
+        try:
+            index = self.get_index()
+            index_git_commit = index.metadata.get("git_commit")
+            project_root = Path(index.metadata.get("project_root", Path.cwd()))
+        except Exception as e:
+            return {
+                "status": "error",
+                "was_stale": False,
+                "update_attempted": False,
+                "update_succeeded": False,
+                "reason": None,
+                "error": f"Could not load index metadata: {e}",
+            }
+
+        # Check staleness (uses 60-second cache)
+        staleness = check_staleness(
+            project_root=project_root,
+            index_git_commit=index_git_commit,
+            use_cache=True,
+        )
+
+        if not staleness["is_stale"]:
+            return {
+                "status": "fresh",
+                "was_stale": False,
+                "update_attempted": False,
+                "update_succeeded": False,
+                "reason": None,
+                "error": None,
+            }
+
+        # Index is stale - attempt update
+        logger.info(f"Index is stale: {staleness['reason']}")
+
+        if not staleness["can_update"]:
+            return {
+                "status": "stale",
+                "was_stale": True,
+                "update_attempted": False,
+                "update_succeeded": False,
+                "reason": staleness["reason"],
+                "error": "Update not possible for this staleness type",
+            }
+
+        # Try to acquire lock and update
+        try:
+            with index_update_lock(self._index_path, timeout=10.0):
+                logger.info("Acquired lock for auto-update")
+
+                # Run incremental update
+                from cerberus.incremental.facade import update_index_incrementally
+
+                result = update_index_incrementally(
+                    index_path=self._index_path,
+                    force_full_reparse=False,
+                )
+
+                # Invalidate cache
+                self.invalidate()
+
+                logger.info(
+                    f"Auto-update complete: "
+                    f"{result.files_reparsed} files, "
+                    f"{len(result.updated_symbols)} symbols"
+                )
+
+                return {
+                    "status": "updated",
+                    "was_stale": True,
+                    "update_attempted": True,
+                    "update_succeeded": True,
+                    "reason": staleness["reason"],
+                    "error": None,
+                }
+
+        except FileLockError as e:
+            # Lock timeout - another process is updating
+            logger.warning(f"Lock timeout during auto-update: {e}")
+            return {
+                "status": "stale",
+                "was_stale": True,
+                "update_attempted": True,
+                "update_succeeded": False,
+                "reason": staleness["reason"],
+                "error": f"Lock timeout: {e}",
+            }
+
+        except Exception as e:
+            # Update failed for some reason
+            logger.error(f"Auto-update failed: {e}")
+            return {
+                "status": "stale",
+                "was_stale": True,
+                "update_attempted": True,
+                "update_succeeded": False,
+                "reason": staleness["reason"],
+                "error": f"Update failed: {e}",
+            }
 
     def set_auto_update(self, enabled: bool):
         """Enable or disable auto-update on file changes."""
