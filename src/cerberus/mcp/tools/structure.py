@@ -26,18 +26,21 @@ def register(mcp):
         TOKEN EFFICIENCY:
 
         Format costs (approx):
-        - tree: ~350 tokens (recommended for LLM consumption; names only, no signatures)
-        - json: ~1,800 tokens (≈5x more expensive; use only for programmatic parsing)
+        - list: ~100 tokens (NEW - simple file/dir listing, lightest)
         - flat: ~200 tokens (symbol list)
+        - tree: ~350 tokens (recommended for LLM consumption; names only, no signatures)
+        - json-compact: ~800 tokens (minified structured data)
+        - json: ~1,800 tokens (≈5x more expensive; use only for programmatic parsing)
 
         Metadata costs:
         - Basic (show_deps=False, show_meta=False): ~350 tokens
         - With deps/meta: up to ~1,500 tokens (≈4x increase)
 
         Best practices:
-        - Prefer format="tree" for exploration (compact, names-only view).
-        - Use format="json" or "json-compact" if you need full signatures.
-        - Enable show_deps/show_meta only when necessary.
+        - Use format="list" for quick directory exploration (what files exist?)
+        - Prefer format="tree" for code structure (compact, names-only view)
+        - Use format="json" or "json-compact" if you need full signatures
+        - Enable show_deps/show_meta only when necessary
 
         Defaults that protect tokens:
         - max_depth=10 prevents deep trees
@@ -48,14 +51,64 @@ def register(mcp):
             path: File or directory path to analyze
             show_deps: Include dependency information (imports, calls); adds ~1k tokens
             show_meta: Include metadata (docstrings, line counts); adds ~1k tokens
-            format: Output format - "tree" (efficient), "json" (verbose), "json-compact" (minified), "flat" (list)
+            format: Output format - "list" (simple listing), "tree" (efficient), "json" (verbose), "json-compact" (minified), "flat" (symbols)
 
         Returns:
             Formatted blueprint showing code structure. Format depends on 'format' parameter:
+            - list: Simple file/directory listing (NEW - no symbols, just paths)
             - tree: ASCII tree visualization (bounded by max_depth/width)
             - json: Structured dict with symbols and metadata
             - flat: Simple list of symbols
         """
+        # Handle simple list format (no index required)
+        if format == "list":
+            target_path = Path(path).resolve()
+
+            if not target_path.exists():
+                return {"error": f"Path not found: {path}"}
+
+            if target_path.is_file():
+                # Single file
+                return {
+                    "result": str(target_path),
+                    "type": "file",
+                    "_token_info": {
+                        "estimated_tokens": 10,
+                        "format": "list"
+                    }
+                }
+
+            # Directory listing
+            items = []
+            try:
+                for item in sorted(target_path.iterdir()):
+                    # Skip hidden files and common ignore patterns
+                    if item.name.startswith('.'):
+                        continue
+                    if item.name in ['__pycache__', 'node_modules', '.git']:
+                        continue
+
+                    item_type = "dir" if item.is_dir() else "file"
+                    items.append({
+                        "name": item.name,
+                        "type": item_type,
+                        "path": str(item.relative_to(target_path.parent))
+                    })
+
+                tokens = estimate_tokens(str(items))
+                return {
+                    "path": str(target_path),
+                    "items": items,
+                    "count": len(items),
+                    "_token_info": {
+                        "estimated_tokens": tokens,
+                        "format": "list"
+                    }
+                }
+            except PermissionError:
+                return {"error": f"Permission denied: {path}"}
+
+        # All other formats require index
         manager = get_index_manager()
         index = manager.get_index()
 
