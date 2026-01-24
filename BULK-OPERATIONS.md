@@ -317,6 +317,11 @@ read_range(ranges=[
 ])
 ```
 
+**Token safety limit:**
+- Full file reads limited to **200 lines** by default
+- Files > 200 lines require explicit `start_line`/`end_line`
+- Configurable via `limits.full_file_read_max_lines` in config
+
 **When to use:**
 - Quick file reads without counting lines first
 - More natural than "count lines then read 1-N"
@@ -368,6 +373,10 @@ skeletonize(files=[
     }
 }
 ```
+
+**Token safety limit:**
+- Bulk mode limited to **20 files** by default
+- Configurable via `limits.bulk_skeletonize_max_files` in config
 
 **Savings:** 70-90% token reduction vs full file reads, bulk mode reduces round-trips by 67%
 
@@ -572,6 +581,10 @@ file_info(paths=[
 }
 ```
 
+**Token safety limit:**
+- Bulk mode limited to **50 files** by default
+- Configurable via `limits.bulk_file_info_max_files` in config
+
 **Savings:** 95-98% token reduction vs reading full file content
 
 **When to use:**
@@ -725,8 +738,29 @@ Potential candidates for bulk operations:
 
 ---
 
+## Configuration
+
+All token safety limits are configurable via:
+- `./cerberus.toml` (project-level)
+- `~/.config/cerberus/config.toml` (user-level)
+- `CERBERUS_CONFIG` environment variable (custom path)
+
+**Example configuration:**
+```toml
+[limits]
+# Token safety limits (v2.8)
+full_file_read_max_lines = 200        # read_range() full file limit
+bulk_skeletonize_max_files = 20       # skeletonize() bulk limit
+bulk_file_info_max_files = 50         # file_info() bulk limit
+```
+
+See `cerberus.toml.example` for complete configuration reference.
+
+---
+
 **Implementation Status:** ✅ Production Ready (v2.0)
 **Test Coverage:** Comprehensive Python tests passed
 **Bulk Operations:** 8 tools with bulk support
 **Tool Enhancements:** 4 major improvements (v2.0)
+**Token Safety Limits:** 3 configurable limits enforced
 **MCP Integration:** Pending Hydra setup for full MCP testing
