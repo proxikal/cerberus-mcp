@@ -221,7 +221,7 @@ class TypeTracker:
         Returns:
             List of SymbolReference objects for resolved method calls
         """
-        references = []
+        references: list = []
         resolved_count = 0
         total_count = 0
 
@@ -339,7 +339,7 @@ class TypeTracker:
         Returns:
             List of SymbolReference objects for instantiations
         """
-        references = []
+        references: list = []
 
         logger.info("Tracking class instantiations...")
 

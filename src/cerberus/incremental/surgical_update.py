@@ -389,7 +389,7 @@ def _parse_new_files(added_files: List[str], project_path: Path) -> List[CodeSym
     # This is inefficient but simple; can be optimized later
     # TODO: Add support for scanning specific files only
 
-    all_symbols = []
+    all_symbols: list = []
 
     for added_file in added_files:
         file_path = project_path / added_file

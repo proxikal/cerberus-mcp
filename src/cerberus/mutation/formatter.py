@@ -73,7 +73,7 @@ class CodeFormatter:
             min_indent = 0
 
         # Reindent each line relative to base
-        reindented_lines = []
+        reindented_lines: list = []
         for line in lines:
             if not line.strip():
                 # Keep blank lines blank

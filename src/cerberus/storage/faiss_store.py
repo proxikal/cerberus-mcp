@@ -7,7 +7,7 @@ L2-normalized vectors for cosine similarity.
 
 import pickle
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 import numpy as np
 
@@ -214,8 +214,8 @@ class FAISSVectorStore:
         faiss_ids_set = set(faiss_ids)
 
         # Extract remaining vectors
-        remaining_vectors = []
-        remaining_symbol_ids = []
+        remaining_vectors: list = []
+        remaining_symbol_ids: list = []
 
         for symbol_id, fid in self.id_map.items():
             if fid not in faiss_ids_set:
@@ -275,7 +275,7 @@ class FAISSVectorStore:
             logger.error(f"Failed to save FAISS store: {e}")
             raise
 
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> Dict[str, Any]:
         """
         Get vector store statistics.
 

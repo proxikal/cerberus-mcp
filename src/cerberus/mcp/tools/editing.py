@@ -101,7 +101,7 @@ def register(mcp):
         matches = find_symbol_fts(name, index, exact=True)
         # Deduplicate identical entries (FTS can emit dupes)
         seen = set()
-        unique_matches = []
+        unique_matches: list = []
         for m in matches:
             key = (m.file_path, m.start_line, m.end_line)
             if key not in seen:

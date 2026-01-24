@@ -88,7 +88,7 @@ def register(mcp):
             return {"error": "No paths provided"}
 
         # Validate paths
-        valid_files = []
+        valid_files: list = []
         for p in paths:
             file_path = Path(p).resolve()
             if file_path.exists() and file_path.is_file():

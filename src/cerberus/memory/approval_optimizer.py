@@ -86,9 +86,9 @@ def auto_approve_high_confidence(
     Returns:
         (auto_approved_ids, remaining_proposals, skipped_proposals)
     """
-    auto_approved = []
-    remaining = []
-    skipped = []
+    auto_approved: list = []
+    remaining: list = []
+    skipped: list = []
 
     for proposal in proposals:
         if proposal.confidence >= threshold:
@@ -190,7 +190,7 @@ def batch_similar_proposals(proposals: List[MemoryProposal]) -> List[ApprovalBat
         batches_dict[label].append(proposals[i])
 
     # Create batches
-    batches = []
+    batches: list = []
     for label, batch_proposals in batches_dict.items():
         theme = _extract_theme(batch_proposals)
         avg_conf = float(np.mean([p.confidence for p in batch_proposals]))
@@ -401,7 +401,7 @@ def _show_batched_approval(batches: List[ApprovalBatch]) -> List[str]:
     Returns:
         List of approved proposal IDs
     """
-    approved_ids = []
+    approved_ids: list = []
 
     print(f"\n{len(batches)} batch(es) to review:\n")
 
@@ -472,7 +472,7 @@ def batch_mode_approval(
     Returns:
         List of auto-approved proposal IDs
     """
-    auto_approved = []
+    auto_approved: list = []
 
     for proposal in proposals:
         if proposal.confidence >= threshold and _is_safe_to_auto_approve(proposal):

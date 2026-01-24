@@ -73,7 +73,7 @@ class AnchorGenerator:
                 return None
 
             # 2. Dependencies (optional)
-            dependencies = []
+            dependencies: list = []
             if include_dependencies:
                 dependencies = self._extract_dependencies(file_path, symbol_name)
 
@@ -159,7 +159,7 @@ class AnchorGenerator:
         Returns:
             List of DependencyInfo
         """
-        dependencies = []
+        dependencies: list = []
 
         try:
             # Phase 5 integration: Query dependencies

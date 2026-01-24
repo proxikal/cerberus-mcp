@@ -15,6 +15,8 @@ import json
 import os
 import re
 
+from cerberus.logging_config import logger
+
 
 @dataclass
 class CorrectionCandidate:
@@ -450,7 +452,7 @@ class SessionAnalyzer:
         Simple Jaccard similarity for Phase 1.
         Phase 2 will use TF-IDF for better semantic matching.
         """
-        similar = []
+        similar: list = []
 
         # Extract keywords (words > 3 chars, excluding common words)
         stop_words = {"this", "that", "with", "from", "have", "been", "were", "will"}
@@ -502,7 +504,7 @@ class SessionAnalyzer:
 
     def _get_context(self, n: int) -> List[str]:
         """Get last n user messages for context."""
-        context = []
+        context: list = []
         count = 0
 
         # Walk backwards through conversation buffer
@@ -642,7 +644,7 @@ def parse_claude_code_transcript(transcript_path: Path) -> List[Tuple[str, str]]
     Returns:
         List of (user_msg, assistant_msg) tuples
     """
-    messages = []
+    messages: list = []
 
     try:
         with open(transcript_path, 'r') as f:
@@ -687,7 +689,7 @@ def parse_claude_code_transcript(transcript_path: Path) -> List[Tuple[str, str]]
                         continue
 
                     # Handle array content (assistant messages with tool use, thinking, etc)
-                    text_parts = []
+                    text_parts: list = []
                     for block in content:
                         if isinstance(block, dict) and block.get('type') == 'text':
                             text_parts.append(block.get('text', ''))
@@ -724,7 +726,7 @@ def parse_claude_code_transcript(transcript_path: Path) -> List[Tuple[str, str]]
         return []
 
     # Pair user messages with following assistant messages
-    conversations = []
+    conversations: list = []
     i = 0
     while i < len(messages):
         role, text = messages[i]
@@ -801,7 +803,7 @@ def analyze_session_from_transcript() -> List[CorrectionCandidate]:
 
     # Deduplicate by turn number and message content
     seen = set()
-    unique_candidates = []
+    unique_candidates: list = []
     for candidate in analyzer.candidates:
         key = (candidate.turn_number, candidate.user_message[:100])
         if key not in seen:
@@ -822,7 +824,7 @@ def extract_tool_calls_from_transcript(transcript_path: Path) -> List[Dict[str, 
     Returns:
         List of {tool: str, params: dict} dicts
     """
-    tool_calls = []
+    tool_calls: list = []
 
     try:
         with open(transcript_path, 'r') as f:
@@ -869,7 +871,7 @@ def extract_session_codes() -> List[str]:
     if not transcript:
         return []
 
-    codes = []
+    codes: list = []
 
     # Parse conversations first (needed for context)
     conversations = parse_claude_code_transcript(transcript)
@@ -944,7 +946,7 @@ def extract_session_codes() -> List[str]:
         msg_text = (user_msg + ' ' + ai_msg).lower()
 
         # Extract what work is being discussed
-        work_contexts = []
+        work_contexts: list = []
         if 'transcript' in msg_text and 'parsing' in msg_text:
             work_contexts.append('transcript-parsing')
         if 'nlp' in msg_text or 'extraction' in msg_text or 'keyword' in msg_text:
@@ -1059,8 +1061,8 @@ def extract_session_codes() -> List[str]:
                     code = formatter(match)
                     if code and len(code) > 10:
                         codes.append(code)
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error formatting decision pattern: {e}")
 
         # Extract FIXES from assistant messages (what was fixed + how)
         fix_patterns = [
@@ -1077,8 +1079,8 @@ def extract_session_codes() -> List[str]:
                     code = formatter(match)
                     if code and len(code) > 12:
                         codes.append(code)
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error formatting fix pattern: {e}")
 
         # Extract BLOCKERS with specifics
         blocker_patterns_contextual = [
@@ -1098,8 +1100,8 @@ def extract_session_codes() -> List[str]:
                         code = formatter(match)
                         if len(code) > 12:
                             codes.append(code)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error formatting blocker pattern: {e}")
                 else:
                     codes.append(formatter)
 
@@ -1120,8 +1122,8 @@ def extract_session_codes() -> List[str]:
                     code = formatter(match)
                     if code and len(code) > 10:
                         codes.append(code)
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error formatting next action pattern: {e}")
 
         # Extract COMPLETIONS with context
         completion_patterns_contextual = [
@@ -1139,8 +1141,8 @@ def extract_session_codes() -> List[str]:
                         code = formatter(match)
                         if code:
                             codes.append(code)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error formatting completion pattern: {e}")
                 else:
                     codes.append(formatter)
 
@@ -1159,8 +1161,8 @@ def extract_session_codes() -> List[str]:
                     code = formatter(match)
                     if code and len(code) > 10:
                         codes.append(code)
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error formatting AI completion pattern: {e}")
 
     # 4. Quality filter and deduplicate
     def is_meaningful(code: str) -> bool:
@@ -1191,7 +1193,7 @@ def extract_session_codes() -> List[str]:
 
     def semantic_dedupe(codes_list: List[str]) -> List[str]:
         """Remove semantically duplicate codes."""
-        unique = []
+        unique: list = []
         seen = set()
 
         for code in codes_list:
@@ -1363,7 +1365,7 @@ def extract_session_details() -> str:
                 sections['files'].add(filename)
 
     # Format output
-    output = []
+    output: list = []
 
     # Bugs/Fixes section
     if sections['bugs']:
@@ -1458,7 +1460,7 @@ def save_session_context_to_db():
         return len(intersection) / min_size if min_size > 0 else 0.0
 
     # Filter next_actions: remove items that match completed items
-    filtered_next_actions = []
+    filtered_next_actions: list = []
     for next_item in context_data["next_actions"]:
         next_keywords = extract_keywords_from_code(next_item)
 

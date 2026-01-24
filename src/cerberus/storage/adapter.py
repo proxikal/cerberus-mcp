@@ -121,7 +121,7 @@ class ScanResultAdapter:
 
                 # For backward compatibility, we need to reconstruct vectors from FAISS
                 # This is expensive and should be avoided - consumers should use FAISS directly
-                embeddings = []
+                embeddings: list = []
 
                 if self._store._faiss_store and hasattr(self._store, '_faiss_store'):
                     for row in cursor.fetchall():

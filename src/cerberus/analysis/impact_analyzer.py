@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Any, Set
 import re
 
+from cerberus.logging_config import logger
 from cerberus.resolution.call_graph_builder import CallGraphBuilder
 
 
@@ -161,7 +162,7 @@ class ImpactAnalyzer:
         direct_callers: List[tuple]
     ) -> List[str]:
         """Find test files that would be affected by changes."""
-        affected_tests = []
+        affected_tests: list = []
 
         # Convert file path to potential test names
         path_obj = Path(file_path)
@@ -191,7 +192,8 @@ class ImpactAnalyzer:
                                 func_match = re.search(f'def {func}.*?(?=def |$)', content, re.DOTALL)
                                 if func_match and symbol_name in func_match.group(0):
                                     affected_tests.append(f"{rel_path}::{func}")
-                    except:
+                    except Exception as e:
+                        logger.debug(f"Error reading test file {test_file}: {e}")
                         continue
 
         # Also check if any direct callers are test functions
@@ -265,7 +267,7 @@ class ImpactAnalyzer:
 
     def _identify_breaking_changes(self, result: ImpactAnalysis) -> List[str]:
         """Identify potential breaking changes."""
-        breaking = []
+        breaking: list = []
 
         if result.direct_callers > 0:
             breaking.append(
@@ -291,7 +293,7 @@ class ImpactAnalyzer:
 
     def _generate_recommendations(self, result: ImpactAnalysis) -> List[str]:
         """Generate recommendations for safe modification."""
-        recommendations = []
+        recommendations: list = []
 
         if result.risk_score in ("high", "critical"):
             recommendations.append(

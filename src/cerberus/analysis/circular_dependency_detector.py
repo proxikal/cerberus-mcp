@@ -106,7 +106,7 @@ class CircularDependencyDetector:
 
     def _get_python_files(self, scope_path: Path) -> List[Path]:
         """Get all Python files in scope."""
-        files = []
+        files: list = []
 
         if scope_path.is_file():
             if scope_path.suffix == '.py':
@@ -185,7 +185,7 @@ class CircularDependencyDetector:
 
     def _find_circular_chains(self) -> List[CircularChain]:
         """Find all circular dependency chains using DFS."""
-        chains = []
+        chains: list = []
         visited_cycles = set()
 
         for module in self.dependency_graph.keys():
@@ -224,7 +224,7 @@ class CircularDependencyDetector:
         visited: Set[str]
     ) -> List[List[str]]:
         """DFS to find cycles from current node."""
-        cycles = []
+        cycles: list = []
 
         # Get dependencies
         dependencies = self.dependency_graph.get(current, set())
@@ -303,11 +303,11 @@ class CircularDependencyDetector:
             return f"✓ No circular dependencies found ({total_modules} modules analyzed)"
 
         # Count by severity
-        by_severity = {}
+        by_severity: dict = {}
         for chain in chains:
             by_severity[chain.severity] = by_severity.get(chain.severity, 0) + 1
 
-        parts = []
+        parts: list = []
         for severity in ["critical", "high", "medium", "low"]:
             if severity in by_severity:
                 parts.append(f"{by_severity[severity]} {severity}")

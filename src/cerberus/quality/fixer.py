@@ -288,7 +288,7 @@ class StyleFixer:
             )
 
         # Text mode
-        lines = []
+        lines: list = []
         if file_path:
             lines.append(f"[File: {file_path}]")
 

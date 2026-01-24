@@ -18,6 +18,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from cerberus.logging_config import logger
+
 
 # ============================================================================
 # Data Structures
@@ -371,7 +373,7 @@ class CodebaseAnalyzer:
 
     def _detect_error_handling(self, path: Path) -> Optional[Dict]:
         """Detect error handling patterns in codebase."""
-        patterns = []
+        patterns: list = []
 
         # Go error handling
         go_files = list(path.rglob("*.go"))
@@ -383,8 +385,8 @@ class CodebaseAnalyzer:
                     content = f.read_text()
                     err_nil_count += content.count("if err != nil")
                     logger_count += content.count("logger.Error") + content.count("log.Error")
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error reading file {f}: {e}")
 
             if err_nil_count > 5 and logger_count > 3:
                 return {
@@ -402,8 +404,8 @@ class CodebaseAnalyzer:
                     content = f.read_text()
                     try_count += content.count("try:")
                     logging_count += content.count("logging.") + content.count("logger.")
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error reading file {f}: {e}")
 
             if try_count > 5 and logging_count > 3:
                 return {
@@ -424,8 +426,8 @@ class CodebaseAnalyzer:
                     content = f.read_text()
                     if "testify" in content or "suite.Suite" in content:
                         testify_count += 1
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error reading file {f}: {e}")
 
             if testify_count >= 3:
                 return {
@@ -442,8 +444,8 @@ class CodebaseAnalyzer:
                     content = f.read_text()
                     if "import pytest" in content or "@pytest" in content:
                         pytest_count += 1
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error reading file {f}: {e}")
 
             if pytest_count >= 3:
                 return {
@@ -464,8 +466,8 @@ class CodebaseAnalyzer:
                     # Check for isort-style grouping (stdlib, third-party, local)
                     if "from __future__" in content or "\n\nimport " in content:
                         sorted_imports += 1
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error reading file {f}: {e}")
 
             if sorted_imports >= 5:
                 return {
@@ -637,7 +639,7 @@ class AgentLearningEngine:
         """
         Generate agent proposals from observations.
         """
-        proposals = []
+        proposals: list = []
 
         # Pattern 1: Success reinforcement
         success_proposal = detect_success_pattern(self.collector.observations)

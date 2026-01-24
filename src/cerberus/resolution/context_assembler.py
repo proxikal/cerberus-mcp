@@ -9,7 +9,7 @@ Automatically assembles relevant context for a symbol including:
 """
 
 import json
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Any
 from dataclasses import dataclass
 
 from cerberus.logging_config import logger
@@ -25,8 +25,8 @@ class AssembledContext:
     target_symbol: str
     target_file: str
     target_code: str
-    base_classes: List[Dict[str, any]]  # List of base class info with code
-    related_symbols: List[Dict[str, any]]  # Related functions, imports, etc.
+    base_classes: List[Dict[str, Any]]  # List of base class info with code
+    related_symbols: List[Dict[str, Any]]  # Related functions, imports, etc.
     total_lines: int
     compression_ratio: float  # Compared to full file
     includes_inheritance: bool
@@ -88,7 +88,7 @@ class ContextAssembler:
         target_code = self._get_symbol_code(symbol)
 
         # Assemble base classes if applicable and requested
-        base_classes = []
+        base_classes: list = []
         includes_inheritance = False
 
         if include_bases and symbol.type == "class":
@@ -204,7 +204,7 @@ class ContextAssembler:
         from pathlib import Path
 
         cwd = Path.cwd()
-        ranked = []
+        ranked: list = []
 
         for result in results:
             file_path = result[2]
@@ -271,14 +271,14 @@ class ContextAssembler:
         class_name: str,
         file_path: str,
         max_depth: int
-    ) -> List[Dict[str, any]]:
+    ) -> List[Dict[str, Any]]:
         """
         Assemble base class contexts (skeletonized if configured).
 
         Returns:
             List of dicts with base class info and code
         """
-        base_classes = []
+        base_classes: list = []
 
         # Get MRO
         mro = self.mro_calculator.compute_mro(class_name, file_path)
@@ -328,14 +328,14 @@ class ContextAssembler:
             # Fallback: just return signature
             return f"class {symbol.name}:\n    # ... (skeletonized)\n    pass\n"
 
-    def _get_related_symbols(self, symbol: CodeSymbol) -> List[Dict[str, any]]:
+    def _get_related_symbols(self, symbol: CodeSymbol) -> List[Dict[str, Any]]:
         """
         Get related symbols (imports, type dependencies, etc.).
 
         Returns:
             List of related symbol info
         """
-        related = []
+        related: list = []
 
         # Get imports for this file
         conn = self.store._get_connection()
@@ -386,7 +386,7 @@ class ContextAssembler:
         Returns:
             Formatted string with all context
         """
-        lines = []
+        lines: list = []
 
         # Header
         lines.append(f"# Context for: {context.target_symbol}")
@@ -403,7 +403,7 @@ class ContextAssembler:
                     lines.append(f"# - {related['name']}")
             lines.append("")
 
-        # Base classes (if any)
+        # Base classes (if Any)
         if context.base_classes:
             lines.append(f"# Inheritance chain ({len(context.base_classes)} base classes):")
             for base in context.base_classes:

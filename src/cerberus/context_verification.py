@@ -225,7 +225,7 @@ def verify_context_file(context_file: Path) -> Dict[str, Any]:
     # Parse CERBERUS.md to extract claimed values
     content = context_file.read_text()
 
-    issues = []
+    issues: list = []
     checks = 0
 
     # Check version
@@ -275,7 +275,7 @@ def verify_context_file(context_file: Path) -> Dict[str, Any]:
     }
 
 
-def generate_context_file(output: Path, data: Dict[str, Any] = None) -> None:
+def generate_context_file(output: Path, data: Dict[str, Any] | None = None) -> None:
     """
     Generate fresh CERBERUS.md from codebase state.
 

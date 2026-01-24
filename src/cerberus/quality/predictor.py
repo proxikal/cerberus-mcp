@@ -83,7 +83,7 @@ class PredictionEngine:
         Returns:
             Tuple of (predictions, stats)
         """
-        all_suggestions = []
+        all_suggestions: list = []
 
         # 1. Direct Callers (Confidence: 1.0)
         # Who calls this symbol? They might need updates.
@@ -125,7 +125,7 @@ class PredictionEngine:
 
         Confidence: 1.0 (AST-verified)
         """
-        predictions = []
+        predictions: list = []
 
         try:
             # Use symbolic deps command to get callers
@@ -170,7 +170,7 @@ class PredictionEngine:
 
         Confidence: 1.0 (AST-verified)
         """
-        predictions = []
+        predictions: list = []
 
         try:
             # Query the calls table for what this symbol calls
@@ -218,7 +218,7 @@ class PredictionEngine:
 
         Confidence: 0.95 (exact pattern + verified import)
         """
-        predictions = []
+        predictions: list = []
 
         # Extract module name from file path
         module_name = Path(file_path).stem
@@ -294,7 +294,7 @@ class PredictionEngine:
         Uses Phase 13.2 stability scoring.
         """
         # For each prediction, get stability score
-        scored_predictions = []
+        scored_predictions: list = []
 
         for pred in predictions:
             risk_score = self._get_risk_score(pred.file)

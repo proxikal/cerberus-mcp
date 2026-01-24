@@ -34,7 +34,7 @@ def _check_index_health(index_path: Path) -> Dict:
             }
 
         # Check if referenced files exist
-        missing_files = []
+        missing_files: list = []
         for file_obj in scan_result.files[:10]:  # Check first 10 for performance
             if not Path(file_obj.abs_path).exists():
                 missing_files.append(file_obj.path)
@@ -89,7 +89,7 @@ def _check_grammars() -> Dict:
 
 def _check_embeddings() -> Dict:
     try:
-        from sentence_transformers import SentenceTransformer  # type: ignore
+        from sentence_transformers import SentenceTransformer
         # Avoid heavy download by probing model name only
         model_name = "all-MiniLM-L6-v2"
         return {"name": "embeddings", "status": "ok", "detail": f"sentence-transformers available ({model_name})", "remediation": ""}
@@ -104,7 +104,7 @@ def _check_embeddings() -> Dict:
 
 def _check_faiss() -> Dict:
     try:
-        import faiss  # type: ignore
+        import faiss
         _ = faiss.IndexFlatIP(4)
         return {"name": "faiss", "status": "ok", "detail": "faiss available for vector search", "remediation": ""}
     except Exception as exc:
@@ -118,7 +118,7 @@ def _check_faiss() -> Dict:
 
 def _check_permissions() -> Dict:
     dirs = [Path("build"), Path("vendor")]
-    non_writable = []
+    non_writable: list = []
     for d in dirs:
         target = d if d.exists() else d.parent
         if not os.access(target, os.W_OK):
@@ -180,7 +180,7 @@ def _check_index_bloat(index_path: Path) -> Dict:
         validation = validate_index_health(index_path)
 
         # Summarize the validation checks
-        checks_summary = []
+        checks_summary: list = []
         for check in validation.checks:
             if check.get("status") != "ok":
                 checks_summary.append(f"{check['name']}: {check.get('detail', 'issue')}")

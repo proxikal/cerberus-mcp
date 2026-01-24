@@ -119,7 +119,7 @@ def _find_closing_brace(content: str, start_index: int, start_line: int) -> int:
         return start_line
 
 
-def _add_symbol(symbols: List, name: str, symbol_type: str, match, content: str, file_path: Path, parent_class: str = None):
+def _add_symbol(symbols: List, name: str, symbol_type: str, match, content: str, file_path: Path, parent_class: str | None = None):
     line_number = _get_line_number(content, match.start())
 
     # Extract signature (the whole line)

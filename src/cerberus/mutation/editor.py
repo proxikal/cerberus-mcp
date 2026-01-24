@@ -229,7 +229,7 @@ class CodeEditor:
 
         # Clean up extra whitespace (remove double blank lines)
         lines = modified_content.split('\n')
-        cleaned_lines = []
+        cleaned_lines: list = []
         prev_blank = False
         for line in lines:
             is_blank = line.strip() == ""
@@ -501,11 +501,11 @@ class CodeEditor:
         Returns:
             Truncated diff with metadata
         """
-        truncated = []
-        header_lines = []
-        deleted_lines = []
-        context_lines = []
-        added_lines = []
+        truncated: list = []
+        header_lines: list = []
+        deleted_lines: list = []
+        context_lines: list = []
+        added_lines: list = []
         current_lines = 0
 
         # Collect all lines by type

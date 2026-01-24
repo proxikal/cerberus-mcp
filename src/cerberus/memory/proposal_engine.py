@@ -168,7 +168,7 @@ class ProposalEngine:
         top_clusters = sorted_clusters[:self.max_proposals]
 
         # Generate proposals using templates (PRIMARY)
-        proposals = []
+        proposals: list = []
         for i, cluster in enumerate(top_clusters):
             proposal = self._create_proposal(cluster, project, priority=i+1)
             if proposal:

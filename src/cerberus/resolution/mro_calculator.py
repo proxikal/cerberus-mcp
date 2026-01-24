@@ -4,7 +4,7 @@ Phase 6: Method Resolution Order (MRO) Calculator.
 Computes inheritance chains and method resolution order for classes.
 """
 
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Set, Optional, Tuple, Any
 from dataclasses import dataclass
 
 from cerberus.logging_config import logger
@@ -245,7 +245,7 @@ class MROCalculator:
         self,
         class_name: str,
         file_path: Optional[str] = None
-    ) -> Dict[str, List[Dict[str, any]]]:
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Find methods that override base class methods.
 
@@ -278,7 +278,7 @@ class MROCalculator:
             class_methods = {row[0]: {"line": row[1], "end_line": row[2]} for row in cursor.fetchall()}
 
             # Check each base class for methods with same name
-            overrides: Dict[str, List[Dict[str, any]]] = {}
+            overrides: Dict[str, List[Dict[str, Any]]] = {}
 
             for base_node in mro[1:]:  # Skip self (index 0)
                 cursor = conn.execute("""

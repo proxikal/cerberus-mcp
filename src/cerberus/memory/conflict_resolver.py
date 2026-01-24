@@ -87,7 +87,7 @@ def detect_conflicts(
     retrieval = MemoryRetrieval()
 
     memories = retrieval.get_all(scope=scope)
-    conflicts = []
+    conflicts: list = []
 
     # Pairwise contradiction and redundancy detection
     for i, mem_a in enumerate(memories):
@@ -310,7 +310,7 @@ def _detect_obsolescence(memories: List[Any]) -> List[MemoryConflict]:
     Returns:
         List of obsolescence conflicts
     """
-    conflicts = []
+    conflicts: list = []
 
     for i, mem_a in enumerate(memories):
         for mem_b in memories[i+1:]:

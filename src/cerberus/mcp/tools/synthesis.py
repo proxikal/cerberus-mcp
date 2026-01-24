@@ -60,8 +60,8 @@ def register(mcp):
                             f"Reduce request size or adjust 'limits.bulk_skeletonize_max_files' in config."
                 }
 
-            all_results = []
-            errors = []
+            all_results: list = []
+            errors: list = []
             total_original_lines = 0
             total_skeleton_lines = 0
             skeletonizer = Skeletonizer()

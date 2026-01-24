@@ -111,7 +111,7 @@ class StyleGuardV2:
             List of detected issues
         """
         language = self._detect_language(file_path)
-        issues = []
+        issues: list = []
 
         if language == "python":
             issues.extend(self._detect_python_issues(content))
@@ -149,7 +149,7 @@ class StyleGuardV2:
             issues = self.detect_issues(content, file_path)
 
         # Apply fixes based on language
-        fixes = []
+        fixes: list = []
         if language == "python":
             content, py_fixes = self._fix_python_issues(content, issues)
             fixes.extend(py_fixes)
@@ -200,7 +200,7 @@ class StyleGuardV2:
         Returns:
             List of detected issues
         """
-        issues = []
+        issues: list = []
         lines = content.split('\n')
 
         # Check trailing whitespace
@@ -234,7 +234,7 @@ class StyleGuardV2:
         Returns:
             List of detected issues
         """
-        issues = []
+        issues: list = []
 
         # Start with basic issues
         issues.extend(self._detect_basic_issues(content))
@@ -298,10 +298,10 @@ class StyleGuardV2:
         Returns:
             List of import-related issues
         """
-        issues = []
+        issues: list = []
 
         # Find all import statements
-        imports = []
+        imports: list = []
         for node in ast.walk(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 if hasattr(node, 'lineno'):
@@ -311,7 +311,7 @@ class StyleGuardV2:
             return issues
 
         # Group consecutive imports
-        import_groups = []
+        import_groups: list = []
         current_group = [imports[0]]
 
         for i in range(1, len(imports)):
@@ -361,7 +361,7 @@ class StyleGuardV2:
         Returns:
             Tuple of (fixed_content, fixes_applied)
         """
-        fixes = []
+        fixes: list = []
         lines = content.split('\n')
 
         # Fix trailing whitespace
@@ -409,7 +409,7 @@ class StyleGuardV2:
         Returns:
             Tuple of (fixed_content, fixes_applied)
         """
-        fixes = []
+        fixes: list = []
         lines = content.split('\n')
 
         # First fix basic issues
@@ -424,7 +424,7 @@ class StyleGuardV2:
         ]
 
         if blank_lines_to_fix:
-            cleaned_lines = []
+            cleaned_lines: list = []
             blank_count = 0
             removed_count = 0
 
@@ -502,11 +502,11 @@ class StyleGuardV2:
         Returns:
             Tuple of (fixed_content, fixes_applied)
         """
-        fixes = []
+        fixes: list = []
         lines = content.split('\n')
 
         # Find all import statements with line numbers
-        imports = []
+        imports: list = []
         for node in ast.walk(tree):
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 if hasattr(node, 'lineno'):
@@ -521,7 +521,7 @@ class StyleGuardV2:
                 start_line, end_line = issue.lines
 
                 # Extract import lines
-                import_block = []
+                import_block: list = []
                 for i in range(start_line - 1, end_line):
                     if i < len(lines):
                         import_block.append(lines[i])

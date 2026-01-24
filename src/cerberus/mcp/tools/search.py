@@ -81,8 +81,8 @@ def generate_suggestions(query: str, index_path: Path, limit: int = 5) -> List[s
                 # Add symbol name if it looks relevant
                 if keyword.lower() in r.symbol.name.lower():
                     suggestions.add(r.symbol.name)
-        except:
-            # If keyword search fails, skip it
+        except Exception:
+            # If keyword search fails, skip it (intentionally broad catch)
             pass
 
     return sorted(list(suggestions))[:limit]
@@ -156,7 +156,7 @@ def register(mcp):
                     (f"%{query}%", query, limit)
                 )
 
-                import_results = []
+                import_results: list = []
                 seen = set()
 
                 for row in cursor.fetchall():
@@ -215,7 +215,7 @@ def register(mcp):
 
         # Deduplicate results by normalizing paths to relative
         seen = set()
-        result_list = []
+        result_list: list = []
 
         for r in results:
             # Normalize path to relative for deduplication

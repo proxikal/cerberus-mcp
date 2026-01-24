@@ -65,12 +65,12 @@ def register(mcp):
             manager = get_index_manager()
             scan_result = manager.get_index()
 
-            all_results = []
+            all_results: list = []
             all_seen = set()
             total_tokens = 0
             processed_files = set()
             estimated_full_file_tokens = 0
-            not_found = []
+            not_found: list = []
 
             for symbol_name in symbols:
                 matches = find_symbol_fts(symbol_name, scan_result, exact=True)
@@ -122,7 +122,8 @@ def register(mcp):
                                 with open(file_path_obj) as f:
                                     total_lines = sum(1 for _ in f)
                                 estimated_full_file_tokens += estimate_file_tokens(symbol.file_path, total_lines)
-                        except:
+                        except Exception:
+                            # Silently skip files we can't read for token estimation
                             pass
 
             # Build bulk response
@@ -160,7 +161,7 @@ def register(mcp):
         scan_result = manager.get_index()
         matches = find_symbol_fts(name, scan_result, exact=True)
 
-        results = []
+        results: list = []
         seen = set()
         total_tokens = 0
 
@@ -214,7 +215,8 @@ def register(mcp):
                         with open(file_path_obj) as f:
                             total_lines = sum(1 for _ in f)
                         estimated_full_file_tokens += estimate_file_tokens(symbol.file_path, total_lines)
-                except:
+                except Exception:
+                    # Silently skip files we can't read for token estimation
                     pass
 
         # Build response with token metadata

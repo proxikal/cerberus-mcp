@@ -53,7 +53,7 @@ def validate_index_health(
         ValidationResult with detailed checks
     """
     config = config or get_limits_config()
-    checks = []
+    checks: list = []
 
     # Normalize path - handle both str and Path
     if isinstance(index_path, str):

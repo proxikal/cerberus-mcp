@@ -109,7 +109,7 @@ class SemanticSearchEngine:
         files = self._get_python_files(scope_path)
 
         # Search for matches
-        all_matches = []
+        all_matches: list = []
         for pattern_name in matched_patterns:
             pattern = self.patterns[pattern_name]
             matches = self._find_matches(pattern, files, limit - len(all_matches))
@@ -178,7 +178,7 @@ class SemanticSearchEngine:
     def _match_query_to_patterns(self, query: str) -> List[str]:
         """Match query to behavior patterns."""
         query_lower = query.lower()
-        matched = []
+        matched: list = []
 
         for pattern_name, pattern in self.patterns.items():
             # Check if any keywords appear in query
@@ -193,7 +193,7 @@ class SemanticSearchEngine:
 
     def _get_python_files(self, scope_path: Path) -> List[Path]:
         """Get all Python files in scope."""
-        files = []
+        files: list = []
 
         if scope_path.is_file():
             if scope_path.suffix == '.py':
@@ -217,7 +217,7 @@ class SemanticSearchEngine:
         limit: int
     ) -> List[SemanticMatch]:
         """Find matches for a behavior pattern."""
-        matches = []
+        matches: list = []
 
         for file_path in files:
             if len(matches) >= limit:
@@ -244,7 +244,7 @@ class SemanticSearchEngine:
         pattern: BehaviorPattern
     ) -> List[SemanticMatch]:
         """Detect HTTP calls in code."""
-        matches = []
+        matches: list = []
 
         # Check for HTTP library imports
         has_httpx = 'httpx' in content
@@ -263,7 +263,7 @@ class SemanticSearchEngine:
                     continue
 
                 confidence = 0.0
-                reasons = []
+                reasons: list = []
 
                 # Check for HTTP method calls
                 if re.search(r'\.(get|post|put|delete|patch|head)\(', func_source):
@@ -308,7 +308,7 @@ class SemanticSearchEngine:
         pattern: BehaviorPattern
     ) -> List[SemanticMatch]:
         """Detect error handling in code."""
-        matches = []
+        matches: list = []
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
@@ -362,7 +362,7 @@ class SemanticSearchEngine:
         pattern: BehaviorPattern
     ) -> List[SemanticMatch]:
         """Detect database queries in code."""
-        matches = []
+        matches: list = []
 
         # Check for database library imports
         has_sqlite = 'sqlite' in content
@@ -377,7 +377,7 @@ class SemanticSearchEngine:
                 func_source = ast.get_source_segment(content, node) or ""
 
                 confidence = 0.0
-                reasons = []
+                reasons: list = []
 
                 # Check for SQL keywords
                 if re.search(r'\b(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP)\b', func_source, re.IGNORECASE):
@@ -419,14 +419,14 @@ class SemanticSearchEngine:
         pattern: BehaviorPattern
     ) -> List[SemanticMatch]:
         """Detect file I/O operations in code."""
-        matches = []
+        matches: list = []
 
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef):
                 func_source = ast.get_source_segment(content, node) or ""
 
                 confidence = 0.0
-                reasons = []
+                reasons: list = []
 
                 # Check for open() calls
                 if re.search(r'\bopen\(', func_source):
@@ -470,7 +470,7 @@ class SemanticSearchEngine:
         pattern: BehaviorPattern
     ) -> List[SemanticMatch]:
         """Detect async operations in code."""
-        matches = []
+        matches: list = []
 
         for node in ast.walk(tree):
             if isinstance(node, ast.AsyncFunctionDef):
@@ -506,7 +506,7 @@ class SemanticSearchEngine:
         pattern: BehaviorPattern
     ) -> List[SemanticMatch]:
         """Detect logging operations in code."""
-        matches = []
+        matches: list = []
 
         # Check for logging imports
         has_logging = 'logging' in content or 'logger' in content
@@ -519,7 +519,7 @@ class SemanticSearchEngine:
                 func_source = ast.get_source_segment(content, node) or ""
 
                 confidence = 0.0
-                reasons = []
+                reasons: list = []
 
                 # Check for logger method calls
                 log_methods = ['debug', 'info', 'warning', 'error', 'critical']
@@ -556,7 +556,7 @@ class SemanticSearchEngine:
         pattern: BehaviorPattern
     ) -> List[SemanticMatch]:
         """Detect data validation in code."""
-        matches = []
+        matches: list = []
 
         # Check for validation-related imports
         has_dataclass = '@dataclass' in content
@@ -571,7 +571,7 @@ class SemanticSearchEngine:
                 func_source = ast.get_source_segment(content, node) or ""
 
                 confidence = 0.0
-                reasons = []
+                reasons: list = []
 
                 # Check for dataclass decorator
                 if '@dataclass' in func_source and isinstance(node, ast.ClassDef):

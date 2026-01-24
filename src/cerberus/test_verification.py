@@ -20,7 +20,7 @@ class TestVerificationService:
             config: Optional configuration dictionary
         """
         self.config = config or {}
-        self.results = []
+        self.results: List[str] = []
 
     def verify_search(self, query: str) -> bool:
         """Verify that search functionality works.

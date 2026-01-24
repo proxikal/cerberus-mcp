@@ -77,7 +77,7 @@ class SynthesisFacade:
         """
         preserve_symbols = preserve_symbols or {}
         dir_path = Path(directory)
-        results = []
+        results: list = []
 
         logger.info(f"Skeletonizing directory {directory} with pattern {pattern}")
 
@@ -172,7 +172,7 @@ class SynthesisFacade:
         Returns:
             Formatted string representation
         """
-        parts = []
+        parts: list = []
 
         # Header
         parts.append(f"# Context for: {payload.target_symbol.name}")
@@ -223,7 +223,7 @@ class SynthesisFacade:
 
     def _format_call_graph_node(self, node, indent: int = 0) -> str:
         """Recursively format call graph node."""
-        lines = []
+        lines: list = []
         prefix = "  " * indent
         lines.append(f"{prefix}- {node.symbol_name} ({node.file_path}:{node.line})")
 

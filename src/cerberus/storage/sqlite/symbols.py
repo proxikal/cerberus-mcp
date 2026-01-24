@@ -123,7 +123,7 @@ class SQLiteSymbolsOperations:
 
         _conn = conn or self._get_connection()
         try:
-            all_symbol_ids = []
+            all_symbol_ids: list = []
             total_symbols = len(symbols)
 
             # Process in chunks to avoid memory buildup
@@ -132,7 +132,7 @@ class SQLiteSymbolsOperations:
                 chunk = symbols[chunk_start:chunk_end]
 
                 # Insert chunk
-                chunk_ids = []
+                chunk_ids: list = []
                 seen = set()
                 for s in chunk:
                     key = (s.file_path, s.name, s.start_line, s.end_line, s.type)
@@ -230,7 +230,7 @@ class SQLiteSymbolsOperations:
             cursor = _conn.execute("SELECT id FROM symbols WHERE file_path = ?", (file_path,))
             symbol_ids = [row[0] for row in cursor.fetchall()]
 
-            faiss_ids = []
+            faiss_ids: list = []
             if symbol_ids:
                 placeholders = ','.join('?' * len(symbol_ids))
                 cursor = _conn.execute(
@@ -272,10 +272,10 @@ class SQLiteSymbolsOperations:
         try:
             # Build query dynamically based on filter
             query = "SELECT * FROM symbols"
-            params = []
+            params: list = []
 
             if filter:
-                conditions = []
+                conditions: list = []
                 if 'name' in filter:
                     conditions.append("name = ?")
                     params.append(filter['name'])

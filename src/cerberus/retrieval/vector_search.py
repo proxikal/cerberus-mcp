@@ -51,7 +51,7 @@ def vector_search(
             logger.debug(f"Using {len(scan_result.embeddings)} precomputed embeddings")
 
             # Build vector documents from precomputed embeddings
-            vector_docs = []
+            vector_docs: list = []
             for embed_entry in scan_result.embeddings:
                 # Find matching symbol
                 symbol = next(
@@ -107,7 +107,7 @@ def vector_search(
             embeddings = embed_texts(texts, model_name=model_name)
             query_vec = embed_texts([query], model_name=model_name)[0]
 
-            vector_docs = []
+            vector_docs: list = []
             for i, doc in enumerate(snippets):
                 symbol = doc["symbol"]
                 snippet = CodeSnippet(

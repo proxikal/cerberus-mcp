@@ -108,7 +108,7 @@ def build_recursive_call_graph(
 
         # Get callers
         caller_refs = call_map.get(symbol_name, [])
-        caller_nodes = []
+        caller_nodes: list = []
 
         for call_ref in caller_refs:
             # Find the symbol that contains this call (the calling function)

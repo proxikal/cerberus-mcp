@@ -60,7 +60,7 @@ def semantic_search(
             scan_result = load_index(index_path)
             if scan_result.embeddings:
                 # Use precomputed embeddings
-                vector_docs = []
+                vector_docs: list = []
                 for embed_entry in scan_result.embeddings:
                     match = next((d for d in documents if d.symbol.name == embed_entry.name and d.symbol.file_path == embed_entry.file_path), None)
                     if not match:

@@ -515,10 +515,10 @@ class BranchComparator:
 
             symbol_changes: List[SymbolChange] = []
             if binary:
-                symbol_changes = []
+                symbol_changes: list = []
             elif change_type == "deleted":
                 # Can't map deleted symbols without base index; represent file-level change only
-                symbol_changes = []
+                symbol_changes: list = []
             elif change_type == "renamed" and not ranges:
                 # Pure rename - mark all symbols as renamed
                 for symbol in symbols:

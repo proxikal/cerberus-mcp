@@ -131,8 +131,8 @@ class ApprovalCLI:
         Returns:
             ApprovalResult
         """
-        approved = []
-        rejected = []
+        approved: list = []
+        rejected: list = []
 
         for proposal in proposals:
             if proposal.confidence >= self.auto_approve_threshold:
@@ -184,8 +184,8 @@ class ApprovalCLI:
         approved_indices = self._get_user_selection(len(proposals))
 
         # Process results
-        approved = []
-        rejected = []
+        approved: list = []
+        rejected: list = []
 
         if approved_indices is None:
             # User quit - reject all

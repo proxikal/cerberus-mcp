@@ -137,7 +137,7 @@ class UserConfig:
 
         return result
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: Any | None = None) -> Any:
         """
         Get a config value by dot-separated key.
 

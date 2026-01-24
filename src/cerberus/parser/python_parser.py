@@ -52,7 +52,7 @@ def _extract_symbols_ast(tree: ast.AST, file_path: str, content: str) -> List[Co
     Returns:
         List of CodeSymbol objects
     """
-    symbols = []
+    symbols: list = []
 
     class SymbolVisitor(ast.NodeVisitor):
         def __init__(self):

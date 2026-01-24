@@ -511,7 +511,7 @@ class MemoryIndexManager:
         return stats
 
 
-def migrate_memories(base_path: Path = None) -> Dict[str, int]:
+def migrate_memories(base_path: Path | None = None) -> Dict[str, int]:
     """
     CLI helper: Migrate memories from JSON to SQLite.
 
@@ -528,7 +528,7 @@ def migrate_memories(base_path: Path = None) -> Dict[str, int]:
     return manager.migrate_from_json()
 
 
-def verify_database(base_path: Path = None) -> Dict[str, Any]:
+def verify_database(base_path: Path | None = None) -> Dict[str, Any]:
     """
     CLI helper: Verify database integrity.
 
@@ -545,7 +545,7 @@ def verify_database(base_path: Path = None) -> Dict[str, Any]:
     return manager.verify_integrity()
 
 
-def show_stats(base_path: Path = None) -> Dict[str, Any]:
+def show_stats(base_path: Path | None = None) -> Dict[str, Any]:
     """
     CLI helper: Show database statistics.
 

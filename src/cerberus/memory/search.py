@@ -115,7 +115,7 @@ class MemorySearchEngine:
             return []
 
         # Convert to results
-        results = []
+        results: list = []
         for row in rows:
             # Get relevance score from FTS5 rank
             relevance = self._calculate_relevance(row, query.text)
@@ -166,8 +166,8 @@ class MemorySearchEngine:
         - memory_store: Standard table with filters
         - memory_fts: FTS5 virtual table for full-text search
         """
-        where_clauses = []
-        params = []
+        where_clauses: list = []
+        params: list = []
 
         # Full-text search: Join FTS5 table with metadata table
         if query.text:
@@ -363,7 +363,7 @@ class BudgetAwareSearch:
         results = self.search_engine.search(query)
 
         # Take results until budget exhausted
-        selected = []
+        selected: list = []
         tokens_used = 0
 
         for result in results:

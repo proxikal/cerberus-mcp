@@ -66,7 +66,7 @@ def scan_files_streaming(
     logger.info(f"Starting streaming scan on directory: '{directory}'")
 
     # Load ignore patterns
-    all_patterns = []
+    all_patterns: list = []
     if respect_gitignore:
         all_patterns.extend(DEFAULT_IGNORE_PATTERNS)
         gitignore_path = directory / ".gitignore"

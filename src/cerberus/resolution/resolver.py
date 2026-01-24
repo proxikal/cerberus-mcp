@@ -64,7 +64,7 @@ class ImportResolver:
             List of (link_id, definition_file, definition_symbol) tuples
             for links that were successfully resolved.
         """
-        resolved = []
+        resolved: list = []
         unresolved_count = 0
 
         logger.info("Starting import link resolution...")

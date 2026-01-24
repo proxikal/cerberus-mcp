@@ -59,7 +59,7 @@ class HydrationAnalyzer:
             return []
         
         # Filter for internal files with sufficient references
-        candidates = []
+        candidates: list = []
         for file_path, ref_count in file_references.items():
             if ref_count >= self.MIN_REFERENCES_THRESHOLD:
                 if self._is_internal_file(file_path):
@@ -73,7 +73,7 @@ class HydrationAnalyzer:
         candidates.sort(key=lambda x: x[1], reverse=True)
         
         # Select files to hydrate while staying under token budget
-        selected_files = []
+        selected_files: list = []
         estimated_tokens = 0
         
         for file_path, ref_count in candidates[:max_hydrated_files]:

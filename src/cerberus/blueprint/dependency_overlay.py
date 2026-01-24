@@ -63,7 +63,7 @@ class DependencyOverlay:
                 (symbol.file_path, symbol.start_line, symbol.end_line)
             )
 
-            dependencies = []
+            dependencies: list = []
             for row in cursor.fetchall():
                 target_symbol, target_file, confidence, resolution_method, reference_type = row
 

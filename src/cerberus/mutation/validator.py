@@ -83,8 +83,8 @@ class CodeValidator:
         Returns:
             (success, errors, warnings)
         """
-        errors = []
-        warnings = []
+        errors: list = []
+        warnings: list = []
 
         # Pillar 2: Syntax Verification
         syntax_valid, syntax_errors = self.validate_syntax(modified_code, language)
@@ -141,7 +141,7 @@ class CodeValidator:
             error_nodes = self._find_error_nodes(root_node)
 
             if error_nodes:
-                errors = []
+                errors: list = []
                 for error_node in error_nodes:
                     line = error_node.start_point[0] + 1
                     col = error_node.start_point[1] + 1
@@ -191,7 +191,7 @@ class CodeValidator:
         Returns:
             List of ERROR nodes
         """
-        errors = []
+        errors: list = []
         if node.type == "ERROR" or node.is_missing:
             errors.append(node)
 

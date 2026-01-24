@@ -139,7 +139,7 @@ class MemoryRetrieval:
         results = self.search_engine.search(search_query)
 
         # Convert to RetrievedMemory with relevance scoring
-        retrieved = []
+        retrieved: list = []
         for result in results:
             # Calculate relevance score (recency already from DB)
             relevance = self._calculate_relevance(
@@ -352,7 +352,7 @@ class MemoryRetrieval:
         if not memories:
             return []
 
-        budgeted = []
+        budgeted: list = []
         total_tokens = 0
 
         for memory in memories:

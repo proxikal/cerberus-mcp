@@ -173,7 +173,7 @@ class CoverageAnalyzer:
         Returns:
             List of test file paths
         """
-        test_files = []
+        test_files: list = []
 
         # Get the source file name
         source_file = Path(symbol.file_path)

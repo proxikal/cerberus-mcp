@@ -24,8 +24,8 @@ def extract_token_info(response: Any) -> tuple:
     tokens_used = None
     tokens_saved = None
     alternative_approach = None
-    warnings = []
-    hints = []
+    warnings: list = []
+    hints: list = []
 
     if isinstance(response, dict):
         # Extract _token_info if present
@@ -88,7 +88,8 @@ def track_mcp_tool(func: Callable) -> Callable:
                     safe_params[key] = dict(value)
                 else:
                     safe_params[key] = str(value)
-            except:
+            except Exception:
+                # Intentionally broad - we want to catch any serialization failure
                 safe_params[key] = "<not serializable>"
 
         # Execute the tool

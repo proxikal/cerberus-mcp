@@ -95,7 +95,7 @@ class UndoStack:
             reverse=True
         )
 
-        transactions = []
+        transactions: list = []
 
         for history_file in history_files[:limit]:
             try:
@@ -150,8 +150,8 @@ class UndoStack:
         if not transaction:
             return False, [], [f"Transaction {transaction_id} not found"]
 
-        applied_files = []
-        errors = []
+        applied_files: list = []
+        errors: list = []
 
         logger.info(f"Applying reverse patches for transaction {transaction_id}")
 

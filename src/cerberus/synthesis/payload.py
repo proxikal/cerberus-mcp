@@ -156,7 +156,7 @@ class PayloadSynthesizer:
         Resolve imported symbols that are used by the target.
         Returns CodeSymbol objects for internal imports.
         """
-        resolved = []
+        resolved: list = []
 
         # Find import links for the target file
         target_imports = [
@@ -189,7 +189,7 @@ class PayloadSynthesizer:
         """
         Build skeletonized context for the target's containing file.
         """
-        skeletons = []
+        skeletons: list = []
 
         # Skeletonize the containing file, preserving only the target symbol
         try:

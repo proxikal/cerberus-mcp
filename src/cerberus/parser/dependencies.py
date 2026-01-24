@@ -87,7 +87,7 @@ def extract_import_links(file_path: Path, content: str) -> List[ImportLink]:
             line_num = content.count("\n", 0, match.start()) + 1
 
             # Parse imported symbols (handle 'as' aliases and multiple imports)
-            symbols = []
+            symbols: list = []
             for part in symbols_str.split(','):
                 part = part.strip()
                 if ' as ' in part:

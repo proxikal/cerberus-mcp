@@ -81,7 +81,7 @@ def _load_config() -> dict:
     return config
 
 
-def get(key: str, default: Any = None) -> Any:
+def get(key: str, default: Any | None = None) -> Any:
     """Get a memory config value.
 
     Args:

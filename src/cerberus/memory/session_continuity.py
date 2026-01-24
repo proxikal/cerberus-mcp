@@ -588,7 +588,7 @@ def inject_all(scope: Optional[str] = None) -> str:
     session_injector = SessionContextInjector()
     session_pkg = session_injector.inject(scope)
 
-    parts = []
+    parts: list = []
     # if memory_context:
     #     parts.append(memory_context)
     if session_pkg:

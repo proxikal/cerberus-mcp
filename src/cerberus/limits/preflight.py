@@ -56,7 +56,7 @@ def run_preflight_checks(
         PreflightResult with status and details
     """
     config = config or get_limits_config()
-    checks = []
+    checks: list = []
 
     # Check 1: Disk space
     disk_check = _check_disk_space(output_path, config)

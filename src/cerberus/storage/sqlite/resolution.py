@@ -381,8 +381,8 @@ class SQLiteResolutionOperations:
         conn = self._get_connection()
         try:
             # Build dynamic query
-            conditions = []
-            params = []
+            conditions: list = []
+            params: list = []
 
             if method:
                 conditions.append("method = ?")
@@ -446,8 +446,8 @@ class SQLiteResolutionOperations:
         conn = self._get_connection()
         try:
             # Build dynamic query
-            conditions = []
-            params = []
+            conditions: list = []
+            params: list = []
 
             if source_symbol:
                 conditions.append("source_symbol = ?")

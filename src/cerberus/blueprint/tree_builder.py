@@ -18,7 +18,7 @@ class TreeBuilder:
     VERTICAL = "│   "
     SPACE = "    "
 
-    def __init__(self, options: TreeRenderOptions = None):
+    def __init__(self, options: TreeRenderOptions | None = None):
         """Initialize tree builder with render options."""
         self.options = options or TreeRenderOptions()
 
@@ -32,7 +32,7 @@ class TreeBuilder:
         Returns:
             ASCII tree string with proper indentation and tree characters
         """
-        lines = []
+        lines: list = []
 
         # File header
         lines.append(f"[File: {blueprint.file_path}]")
@@ -64,7 +64,7 @@ class TreeBuilder:
 
         Target: ~300-500 tokens for any directory size.
         """
-        lines = []
+        lines: list = []
         lines.append(f"[Package: {package_path}]")
         lines.append("")  # Spacer
 
@@ -89,7 +89,7 @@ class TreeBuilder:
             Summary string like "file.py (3 classes, 5 functions, 125 lines)"
         """
         # Count symbols by type
-        counts = {}
+        counts: dict = {}
         total_symbols = 0
         max_line = 0
 
@@ -112,7 +112,7 @@ class TreeBuilder:
         parts = [file_node.name]
 
         if counts:
-            count_strs = []
+            count_strs: list = []
             for sym_type in ["class", "function"]:
                 if sym_type in counts:
                     count = counts[sym_type]
@@ -151,7 +151,7 @@ class TreeBuilder:
         if self.options.max_depth is not None and depth >= self.options.max_depth:
             return []
 
-        lines = []
+        lines: list = []
 
         # Calculate prefix (tree characters)
         prefix = self._calculate_prefix(depth, is_last, parent_prefixes)
@@ -229,7 +229,7 @@ class TreeBuilder:
             return self.LAST_BRANCH if is_last else self.BRANCH
 
         # Build prefix from parent levels
-        prefix_parts = []
+        prefix_parts: list = []
         for i, parent_is_last in enumerate(parent_prefixes):
             if parent_is_last:
                 prefix_parts.append(self.SPACE)
@@ -262,7 +262,7 @@ class TreeBuilder:
             type_tag = node.type.capitalize()
 
         # Build label
-        parts = []
+        parts: list = []
 
         if type_tag:
             parts.append(f"[{type_tag}: {node.name}]")
@@ -307,7 +307,7 @@ class TreeBuilder:
         Returns:
             List of formatted overlay lines
         """
-        lines = []
+        lines: list = []
         overlay = node.overlay
 
         # Calculate indent for overlay lines (align under node content)
@@ -357,7 +357,7 @@ class TreeBuilder:
             return self.SPACE
 
         # Build indent from parent levels
-        indent_parts = []
+        indent_parts: list = []
         for parent_is_last in parent_prefixes:
             if parent_is_last:
                 indent_parts.append(self.SPACE)
@@ -384,7 +384,7 @@ class TreeBuilder:
 
         Phase 13.5: Added dependency type markers and smart truncation
         """
-        dep_strs = []
+        dep_strs: list = []
         classifier = DependencyClassifier()  # For marker lookup
 
         for dep in dependencies:
@@ -437,7 +437,7 @@ class TreeBuilder:
         Returns:
             Formatted churn string
         """
-        parts = []
+        parts: list = []
 
         if churn.last_modified:
             parts.append(f"[Modified: {churn.last_modified}]")
@@ -463,7 +463,7 @@ class TreeBuilder:
         Returns:
             Formatted coverage string
         """
-        parts = []
+        parts: list = []
 
         # Coverage percentage with indicator
         if coverage.percent >= 80:

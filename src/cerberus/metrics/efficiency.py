@@ -184,7 +184,7 @@ class MetricsStore:
 
     def get_events_since(self, since_timestamp: float) -> List[CommandEvent]:
         """Get events since a timestamp."""
-        events = []
+        events: list = []
         for e in self._data["events"]:
             if e.get("timestamp", 0) >= since_timestamp:
                 events.append(CommandEvent.from_dict(e))
@@ -415,7 +415,7 @@ class ReportGenerator:
         total_sessions: int,
     ) -> List[str]:
         """Generate actionable suggestions based on metrics."""
-        suggestions = []
+        suggestions: list = []
 
         # Check get-symbol usage without --snippet
         get_symbol_count = command_counts.get("get-symbol", 0)

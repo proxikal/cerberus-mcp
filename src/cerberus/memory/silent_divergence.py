@@ -121,7 +121,7 @@ def detect_silent_divergences(session_state: Any) -> List[SilentDivergence]:
     Returns:
         List of SilentDivergence objects
     """
-    divergences = []
+    divergences: list = []
     tool_events = getattr(session_state, 'tool_usage_events', [])
 
     # Find potential divergences
@@ -256,7 +256,7 @@ def _detect_structural_changes(before: str, after: str, file_path: str) -> List[
     Returns:
         List of detected structural changes
     """
-    changes = []
+    changes: list = []
     ext = file_path.split('.')[-1] if '.' in file_path else ""
 
     # Base indicators (Language Agnostic)
@@ -387,7 +387,7 @@ def _detect_style_changes(before: str, after: str) -> List[str]:
     Returns:
         List of detected style changes
     """
-    changes = []
+    changes: list = []
 
     # Quote style change
     before_single = before.count("'")
@@ -454,7 +454,7 @@ def _create_diff_summary(diff_analysis: DiffAnalysis) -> str:
     Returns:
         Human-readable summary
     """
-    parts = []
+    parts: list = []
 
     # Lines changed
     parts.append(f"+{diff_analysis.lines_added} -{diff_analysis.lines_removed}")

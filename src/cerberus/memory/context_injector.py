@@ -144,8 +144,8 @@ class ContextDetector:
             Tuple of (language, list of detected files)
         """
         # Count file extensions
-        extension_counts = {}
-        detected_files = []
+        extension_counts: dict = {}
+        detected_files: list = []
 
         # Scan current directory (not recursive to avoid performance issues)
         try:
@@ -225,7 +225,7 @@ class ContextInjector:
             detector = ContextDetector()
             context = detector.detect()
 
-        output_sections = []
+        output_sections: list = []
         has_session_context = False
 
         # Try to load previous session work context (read-once-delete pattern)
@@ -368,7 +368,7 @@ class ContextInjector:
         if not memories:
             return ""
 
-        lines = []
+        lines: list = []
 
         # Minimal header - AI Format
         lines.append("## Memory Context")
@@ -499,7 +499,7 @@ class ContextInjector:
         primary_mode = mode_result.primary_mode.mode
 
         # Filter memories
-        filtered = []
+        filtered: list = []
         for memory in memories:
             # Parse valid_modes from memory
             valid_modes = None

@@ -119,7 +119,7 @@ class BlueprintAggregator:
                 )
 
             # Aggregate symbols across all files
-            all_nodes = []
+            all_nodes: list = []
             total_symbols = 0
             cross_file_refs = defaultdict(list)
 
@@ -174,7 +174,7 @@ class BlueprintAggregator:
         Returns:
             List of file paths
         """
-        files = []
+        files: list = []
         package_path = package_path.resolve()
 
         # Get all files from database that are in this package
@@ -233,7 +233,7 @@ class BlueprintAggregator:
                 (str(file_path),)
             )
 
-            symbols = []
+            symbols: list = []
             for row in cursor.fetchall():
                 (
                     name, sym_type, start_line, end_line,
@@ -312,7 +312,7 @@ class BlueprintAggregator:
 
         # Build hierarchy recursively
         def build_children(parent_name: Optional[str]) -> List[BlueprintNode]:
-            children = []
+            children: list = []
             for sym in by_parent.get(parent_name, []):
                 node = BlueprintNode(
                     name=sym.name,

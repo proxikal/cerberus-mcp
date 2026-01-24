@@ -136,8 +136,8 @@ class GitExtractor:
             }
 
         # Extract patterns
-        decisions = []
-        corrections = []
+        decisions: list = []
+        corrections: list = []
 
         for commit_hash, message in commits:
             # Skip noise
@@ -193,8 +193,8 @@ class GitExtractor:
             return extraction
 
         project = extraction["project"]
-        learned_decisions = []
-        learned_corrections = []
+        learned_decisions: list = []
+        learned_corrections: list = []
 
         # Learn decisions using new SQLite storage
         for pattern in extraction["decisions"]:
@@ -278,7 +278,7 @@ class GitExtractor:
                 logger.debug(f"Git log failed: {result.stderr}")
                 return []
 
-            commits = []
+            commits: list = []
             for line in result.stdout.strip().split('\n'):
                 if '|' in line:
                     parts = line.split('|', 1)

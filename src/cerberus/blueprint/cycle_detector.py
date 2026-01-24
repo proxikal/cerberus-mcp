@@ -85,7 +85,7 @@ class CycleDetector:
         Returns:
             List of Cycle objects
         """
-        cycles = []
+        cycles: list = []
 
         try:
             if detect_imports:
@@ -115,7 +115,7 @@ class CycleDetector:
         Returns:
             List of import Cycle objects
         """
-        cycles = []
+        cycles: list = []
 
         try:
             # Build import graph
@@ -123,7 +123,7 @@ class CycleDetector:
 
             # Find cycles using DFS
             visited = set()
-            rec_stack = []
+            rec_stack: list = []
 
             def dfs(node: str, path: List[str]) -> None:
                 visited.add(node)
@@ -164,7 +164,7 @@ class CycleDetector:
         Returns:
             List of call Cycle objects
         """
-        cycles = []
+        cycles: list = []
 
         try:
             # Build call graph
@@ -172,7 +172,7 @@ class CycleDetector:
 
             # Find cycles
             visited = set()
-            rec_stack = []
+            rec_stack: list = []
 
             def dfs(node: str) -> None:
                 visited.add(node)
@@ -211,7 +211,7 @@ class CycleDetector:
         Returns:
             List of inheritance Cycle objects
         """
-        cycles = []
+        cycles: list = []
 
         try:
             # Build inheritance graph
@@ -219,7 +219,7 @@ class CycleDetector:
 
             # Find cycles
             visited = set()
-            rec_stack = []
+            rec_stack: list = []
 
             def dfs(node: str) -> None:
                 visited.add(node)

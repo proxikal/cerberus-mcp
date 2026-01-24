@@ -110,7 +110,7 @@ def register(mcp):
         store = index._store
         builder = CallGraphBuilder(store)
 
-        graphs = []
+        graphs: list = []
         try:
             if direction in ("callees", "both"):
                 graphs.append(builder.build_forward_graph(symbol_name, max_depth=depth))
@@ -119,7 +119,7 @@ def register(mcp):
         except Exception as exc:
             return {"status": "error", "error_type": "graph_failed", "message": str(exc)}
 
-        serialized = []
+        serialized: list = []
         for g in graphs:
             serialized.append(_serialize_graph(g))
 

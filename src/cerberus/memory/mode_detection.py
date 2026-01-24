@@ -272,7 +272,7 @@ class ModeDetector:
 
     def _extract_matched_indicators(self, prompt: str, mode_config: Dict[str, Any]) -> List[str]:
         """Extract which indicators matched."""
-        matched = []
+        matched: list = []
         for indicator in mode_config["indicators"]:
             if indicator in prompt:
                 matched.append(indicator)

@@ -31,7 +31,7 @@ def register(mcp):
             extensions.extend([".sh", ".bash"])
         else:
             # Validate and auto-correct extension format
-            corrected_extensions = []
+            corrected_extensions: list = []
             for ext in extensions:
                 if not ext.startswith("."):
                     # Auto-correct by adding dot prefix

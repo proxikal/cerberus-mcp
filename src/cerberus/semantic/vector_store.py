@@ -49,7 +49,7 @@ def build_faiss_store(documents: List[VectorDocument], query_embedding: np.ndarr
     Optionally build a FAISS-backed search. Returns results or [] on failure to keep flow safe.
     """
     try:
-        import faiss  # type: ignore
+        import faiss
     except ImportError:
         logger.warning("FAISS not installed; falling back to in-memory search.")
         return []

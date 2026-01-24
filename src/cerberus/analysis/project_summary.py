@@ -13,6 +13,8 @@ import json
 import re
 import subprocess
 
+from cerberus.logging_config import logger
+
 PROJECT_MARKERS = {
     "go": ["go.mod", "go.sum"],
     "javascript": ["package.json", "node_modules"],
@@ -169,7 +171,7 @@ class ProjectSummaryAnalyzer:
 
     def _detect_tech_stack(self) -> List[str]:
         """Detect technologies used in project."""
-        stack = []
+        stack: list = []
 
         languages = self._detect_languages()
         if not languages:
@@ -188,7 +190,7 @@ class ProjectSummaryAnalyzer:
                 stack.extend(self._detect_java_stack())
 
         seen = set()
-        deduped = []
+        deduped: list = []
         for item in stack:
             if item not in seen:
                 deduped.append(item)
@@ -198,7 +200,7 @@ class ProjectSummaryAnalyzer:
 
     def _detect_python_stack(self) -> List[str]:
         """Detect Python-specific technologies."""
-        stack = []
+        stack: list = []
         pyproject = self.project_root / "pyproject.toml"
 
         if pyproject.exists():
@@ -242,7 +244,7 @@ class ProjectSummaryAnalyzer:
 
     def _detect_go_stack(self) -> List[str]:
         """Detect Go-specific technologies."""
-        stack = []
+        stack: list = []
         go_mod = self.project_root / "go.mod"
 
         if not go_mod.exists():
@@ -274,7 +276,7 @@ class ProjectSummaryAnalyzer:
 
     def _detect_js_stack(self) -> List[str]:
         """Detect JavaScript/TypeScript technologies."""
-        stack = []
+        stack: list = []
         package_json = self.project_root / "package.json"
 
         if not package_json.exists():
@@ -311,7 +313,7 @@ class ProjectSummaryAnalyzer:
 
     def _detect_rust_stack(self) -> List[str]:
         """Detect Rust technologies."""
-        stack = []
+        stack: list = []
         cargo = self.project_root / "Cargo.toml"
         if not cargo.exists():
             return stack
@@ -334,7 +336,7 @@ class ProjectSummaryAnalyzer:
 
     def _detect_java_stack(self) -> List[str]:
         """Detect Java technologies."""
-        stack = []
+        stack: list = []
         pom = self.project_root / "pom.xml"
         gradle = self.project_root / "build.gradle"
         gradle_kts = self.project_root / "build.gradle.kts"
@@ -539,7 +541,7 @@ class ProjectSummaryAnalyzer:
                         entry_points.append(str(rel_path))
 
         seen = set()
-        deduped = []
+        deduped: list = []
         for entry in entry_points:
             if entry not in seen:
                 deduped.append(entry)
@@ -549,7 +551,7 @@ class ProjectSummaryAnalyzer:
 
     def _extract_coding_patterns(self) -> List[str]:
         """Extract common coding patterns from the codebase."""
-        patterns = []
+        patterns: list = []
 
         # Check for dataclass usage
         if self._check_pattern(r'@dataclass'):
@@ -587,7 +589,8 @@ class ProjectSummaryAnalyzer:
                     content = py_file.read_text()
                     if re.search(regex, content):
                         return True
-                except:
+                except Exception as e:
+                    logger.debug(f"Error reading file {py_file}: {e}")
                     continue
         return False
 

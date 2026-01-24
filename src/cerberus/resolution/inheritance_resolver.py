@@ -190,7 +190,7 @@ class InheritanceResolver:
         source_code: str
     ) -> List[InheritanceRelation]:
         """Extract base classes from Python class definition."""
-        relations = []
+        relations: list = []
 
         # Find the class definition node
         class_node = self._find_class_node(root_node, class_name, start_line, "python")
@@ -201,7 +201,7 @@ class InheritanceResolver:
         # Look for argument_list in class_definition
         for child in class_node.children:
             if child.type == "argument_list":
-                base_classes = []
+                base_classes: list = []
                 for arg in child.children:
                     if arg.type in ("identifier", "attribute"):
                         base_name = source_code[arg.start_byte:arg.end_byte]
@@ -230,7 +230,7 @@ class InheritanceResolver:
         language: str
     ) -> List[InheritanceRelation]:
         """Extract base classes from JavaScript/TypeScript class definition."""
-        relations = []
+        relations: list = []
 
         # Find the class definition node
         class_node = self._find_class_node(root_node, class_name, start_line, language)
@@ -238,7 +238,7 @@ class InheritanceResolver:
             return relations
 
         # JS/TS: class Foo extends Bar implements Baz
-        base_classes = []
+        base_classes: list = []
 
         # Look for class_heritage
         for child in class_node.children:

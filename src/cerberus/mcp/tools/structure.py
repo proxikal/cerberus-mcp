@@ -79,7 +79,7 @@ def register(mcp):
                 }
 
             # Directory listing
-            items = []
+            items: list = []
             try:
                 for item in sorted(target_path.iterdir()):
                     # Skip hidden files and common ignore patterns

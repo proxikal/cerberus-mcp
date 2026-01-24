@@ -161,7 +161,7 @@ class MutationFacade:
             )
 
         # 3. Analyze dependencies (placeholder for now)
-        required_imports = []
+        required_imports: list = []
         if auto_imports:
             required_imports = self.import_manager.analyze_dependencies(
                 new_code,
@@ -740,24 +740,36 @@ class MutationFacade:
             if verify_command:
                 logger.info(f"Running verification command: {verify_command}")
                 import subprocess
-                result_code = subprocess.run(
-                    verify_command,
-                    shell=True,
-                    capture_output=True,
-                    text=True
-                )
+                import shlex
 
-                if result_code.returncode != 0:
-                    error_msg = f"Verification failed (exit code {result_code.returncode})"
+                # Security: Use shlex.split() to safely parse command and shell=False to prevent injection
+                try:
+                    command_args = shlex.split(verify_command)
+                except ValueError as e:
+                    error_msg = f"Invalid verification command syntax: {e}"
                     all_errors.append(error_msg)
-                    all_errors.append(f"Stdout: {result_code.stdout}")
-                    all_errors.append(f"Stderr: {result_code.stderr}")
+                    logger.error(error_msg)
+                    command_args = None
+
+                if command_args:
+                    result_code = subprocess.run(
+                        command_args,
+                        shell=False,
+                        capture_output=True,
+                        text=True
+                    )
+
+                    if result_code.returncode != 0:
+                        error_msg = f"Verification failed (exit code {result_code.returncode})"
+                        all_errors.append(error_msg)
+                        all_errors.append(f"Stdout: {result_code.stdout}")
+                        all_errors.append(f"Stderr: {result_code.stderr}")
                     logger.error(error_msg)
                     raise RuntimeError(error_msg)
 
             # Phase 12.5: Record transaction for undo (skip in preview mode)
             if not preview:
-                reverse_patches = []
+                reverse_patches: list = []
                 for file_path, original_content in original_contents.items():
                     reverse_patches.append({
                         "file_path": file_path,

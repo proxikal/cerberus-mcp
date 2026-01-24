@@ -153,7 +153,7 @@ class ChurnAnalyzer:
             List of (line_num, commit_date, author) tuples
         """
         lines = porcelain_output.split('\n')
-        result = []
+        result: list = []
 
         i = 0
         while i < len(lines):

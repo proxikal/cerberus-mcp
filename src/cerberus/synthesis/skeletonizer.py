@@ -310,7 +310,7 @@ class Skeletonizer:
 
     def _find_nodes_by_type(self, node: 'Node', types: List[str]) -> List['Node']:
         """Recursively find all nodes of given types."""
-        result = []
+        result: list = []
         if node.type in types:
             result.append(node)
         for child in node.children:

@@ -52,6 +52,6 @@ class IndexLimitExceeded(CerberusError):
 class PreflightError(CerberusError):
     """Raised when pre-flight checks fail."""
 
-    def __init__(self, message: str, checks: list = None):
+    def __init__(self, message: str, checks: list | None = None):
         self.checks = checks or []
         super().__init__(message)

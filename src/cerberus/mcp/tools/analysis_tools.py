@@ -663,7 +663,7 @@ def register(mcp):
             # Add result hint
             if result.circular_chains:
                 # Count by severity
-                by_severity = {}
+                by_severity: dict = {}
                 for chain in result.circular_chains:
                     sev = chain["severity"]
                     by_severity[sev] = by_severity.get(sev, 0) + 1

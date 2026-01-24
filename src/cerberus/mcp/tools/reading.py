@@ -64,8 +64,8 @@ def register(mcp):
 
         # Handle bulk mode
         if ranges:
-            all_results = []
-            errors = []
+            all_results: list = []
+            errors: list = []
             total_tokens = 0
             processed_files = set()
             estimated_full_file_tokens = 0
@@ -131,7 +131,8 @@ def register(mcp):
                                 with open(file_path_obj) as f:
                                     total_lines = sum(1 for _ in f)
                                 estimated_full_file_tokens += estimate_file_tokens(r_file_path, total_lines)
-                        except:
+                        except Exception:
+                            # Silently skip files we can't read for token estimation
                             pass
 
                 except Exception as e:
@@ -210,7 +211,8 @@ def register(mcp):
                 estimated_full_file_tokens = estimate_file_tokens(file_path, total_lines)
             else:
                 estimated_full_file_tokens = None
-        except:
+        except Exception:
+            # If we can't estimate tokens, just continue without the estimate
             estimated_full_file_tokens = None
 
         response = {
@@ -373,8 +375,8 @@ def register(mcp):
                             f"Reduce request size or adjust 'limits.bulk_file_info_max_files' in config."
                 }
 
-            results = []
-            errors = []
+            results: list = []
+            errors: list = []
 
             for file_path_str in paths:
                 info = _get_file_info(file_path_str)

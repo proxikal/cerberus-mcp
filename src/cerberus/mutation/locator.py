@@ -257,7 +257,7 @@ class SymbolLocator:
 
         Reused from synthesis/skeletonizer.py:311-318.
         """
-        result = []
+        result: list = []
         if node.type in types:
             result.append(node)
         for child in node.children:

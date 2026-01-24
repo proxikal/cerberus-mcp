@@ -42,7 +42,7 @@ class StyleGuard:
             Tuple of (fixed_content, fixes_applied)
         """
         language = self._detect_language(file_path)
-        fixes_applied = []
+        fixes_applied: list = []
 
         if language == "python":
             content, py_fixes = self._fix_python_issues(content, changed_line_numbers)
@@ -97,7 +97,7 @@ class StyleGuard:
             Tuple of (fixed_content, fixes_applied)
         """
         lines = content.split('\n')
-        fixes = []
+        fixes: list = []
 
         # Auto-fix: Remove trailing whitespace on changed lines
         for i in changed_lines:
@@ -111,7 +111,7 @@ class StyleGuard:
             fixes.append("EOF: Added final newline")
 
         # Auto-fix: Remove multiple consecutive blank lines (max 2)
-        cleaned_lines = []
+        cleaned_lines: list = []
         blank_count = 0
 
         for i, line in enumerate(lines):
@@ -144,7 +144,7 @@ class StyleGuard:
             Tuple of (fixed_content, fixes_applied)
         """
         lines = content.split('\n')
-        fixes = []
+        fixes: list = []
 
         # Auto-fix: Remove trailing whitespace on changed lines
         for i in changed_lines:

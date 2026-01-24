@@ -14,7 +14,7 @@ class BlueprintFormatter:
     """Formats blueprints for different output modes."""
 
     @staticmethod
-    def format_as_tree(blueprint: Blueprint, options: TreeRenderOptions = None) -> str:
+    def format_as_tree(blueprint: Blueprint, options: TreeRenderOptions | None = None) -> str:
         """
         Format blueprint as ASCII tree.
 
@@ -110,7 +110,7 @@ class BlueprintFormatter:
         Returns one symbol per line: "type:name (line X)"
         Ideal for quick overview with ~200 tokens.
         """
-        lines = []
+        lines: list = []
 
         if isinstance(blueprint, AggregatedBlueprint):
             for node in blueprint.nodes:

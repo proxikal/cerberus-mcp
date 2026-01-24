@@ -85,8 +85,8 @@ def register(mcp):
         # Handle bulk operation
         if bulk_memories:
             storage = MemoryStorage()
-            results = []
-            errors = []
+            results: list = []
+            errors: list = []
 
             for idx, mem in enumerate(bulk_memories):
                 try:
@@ -258,7 +258,7 @@ def register(mcp):
         try:
             # Build query with filters
             query = "SELECT id, category, scope, metadata, created_at, last_accessed, access_count, details, relevance_decay_days FROM memory_store WHERE 1=1"
-            params = []
+            params: list = []
 
             if category:
                 query += " AND category = ?"
@@ -274,7 +274,7 @@ def register(mcp):
             rows = cursor.fetchall()
 
             # Also get content from FTS table
-            memories = []
+            memories: list = []
             for row in rows:
                 content_cursor = conn.execute(
                     "SELECT content FROM memory_fts WHERE id = ?",
@@ -444,9 +444,9 @@ def register(mcp):
             db_path = Path.home() / ".cerberus" / "memory.db"
             conn = sqlite3.connect(str(db_path))
 
-            deleted = []
-            not_found = []
-            errors = []
+            deleted: list = []
+            not_found: list = []
+            errors: list = []
 
             try:
                 for memory_id in ids:
@@ -654,7 +654,7 @@ def register(mcp):
             ORDER BY m.created_at
         """)
 
-        memories = []
+        memories: list = []
         counts = {"preference": 0, "decision": 0, "correction": 0}
 
         for row in cursor.fetchall():
@@ -911,8 +911,8 @@ def register(mcp):
 
         # Handle bulk mode
         if queries:
-            all_results = []
-            errors = []
+            all_results: list = []
+            errors: list = []
             total_found = 0
 
             for idx, q_spec in enumerate(queries):

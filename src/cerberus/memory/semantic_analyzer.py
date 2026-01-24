@@ -333,7 +333,7 @@ class SemanticAnalyzer:
         """
         n = similarity_matrix.shape[0]
         visited = [False] * n
-        clusters = []
+        clusters: list = []
 
         for i in range(n):
             if visited[i]:

@@ -150,7 +150,7 @@ def read_range(
     )
 
 
-def estimate_tokens(text: str, chars_per_token: int = None) -> int:
+def estimate_tokens(text: str, chars_per_token: int | None = None) -> int:
     """
     Estimate the token count for a given text.
 

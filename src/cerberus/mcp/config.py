@@ -21,7 +21,7 @@ def load_config() -> Optional[Dict[str, Any]]:
     Returns:
         Configuration dict or None if no config found
     """
-    config_paths = []
+    config_paths: list = []
 
     env_config = os.environ.get("CERBERUS_CONFIG")
     if env_config:
@@ -38,7 +38,7 @@ def load_config() -> Optional[Dict[str, Any]]:
     return None
 
 
-def get_config_value(key: str, default: Any = None) -> Any:
+def get_config_value(key: str, default: Any | None = None) -> Any:
     """
     Get a configuration value by dot-notation key.
 

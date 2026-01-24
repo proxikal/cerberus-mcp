@@ -5,7 +5,7 @@ Provides high-level functions for resolving imports, types, and references.
 """
 
 from pathlib import Path
-from typing import List, Tuple, Dict, Optional
+from typing import List, Tuple, Dict, Optional, Any
 
 from cerberus.logging_config import logger
 from cerberus.storage.sqlite_store import SQLiteIndexStore
@@ -174,7 +174,7 @@ def get_overridden_methods(
     store: SQLiteIndexStore,
     class_name: str,
     file_path: Optional[str] = None
-) -> Dict[str, List[Dict[str, any]]]:
+) -> Dict[str, List[Dict[str, Any]]]:
     """
     Find methods that override base class methods.
 

@@ -42,7 +42,8 @@ def estimate_json_tokens(data: Any) -> int:
     try:
         json_str = json.dumps(data)
         return estimate_tokens(json_str)
-    except:
+    except Exception:
+        # Intentionally broad - if we can't serialize, we can't estimate tokens
         return 0
 
 

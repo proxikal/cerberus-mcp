@@ -189,7 +189,7 @@ class PatternChecker:
         consistency_score = conforming_count / total_files if total_files > 0 else 0.0
 
         # Extract examples if requested
-        examples = []
+        examples: list = []
         if show_examples and conforming_files:
             examples = self._extract_examples(pattern, conforming_files[:3])
 
@@ -218,7 +218,7 @@ class PatternChecker:
 
     def _get_files_in_scope(self, scope_path: Path) -> List[Path]:
         """Get all relevant files in scope."""
-        files = []
+        files: list = []
 
         if scope_path.is_file():
             if scope_path.suffix in self.extensions:
@@ -242,7 +242,7 @@ class PatternChecker:
         files: List[Path]
     ) -> List[Path]:
         """Find files that conform to the pattern."""
-        conforming = []
+        conforming: list = []
 
         for file_path in files:
             try:
@@ -269,7 +269,7 @@ class PatternChecker:
         limit: int
     ) -> List[PatternViolation]:
         """Find pattern violations."""
-        violations = []
+        violations: list = []
 
         for file_path in files:
             if len(violations) >= limit:
@@ -337,7 +337,7 @@ class PatternChecker:
         conforming_files: List[Path]
     ) -> List[PatternExample]:
         """Extract examples of correct pattern usage."""
-        examples = []
+        examples: list = []
 
         for file_path in conforming_files[:3]:  # Max 3 examples
             try:

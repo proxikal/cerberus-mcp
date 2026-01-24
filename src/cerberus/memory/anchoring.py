@@ -119,7 +119,7 @@ class AnchorEngine:
             return None
 
         # Score candidates
-        scored = []
+        scored: list = []
         for candidate in candidates:
             try:
                 # Relevance: TF-IDF similarity between rule and file content
@@ -191,7 +191,7 @@ class AnchorEngine:
 
         Uses Cerberus index manager for efficient search.
         """
-        candidates = []
+        candidates: list = []
 
         try:
             # Import here to avoid circular dependency
@@ -237,7 +237,7 @@ class AnchorEngine:
 
         # Deduplicate by file path
         seen = set()
-        unique_candidates = []
+        unique_candidates: list = []
         for candidate in candidates:
             if candidate['file_path'] not in seen:
                 seen.add(candidate['file_path'])

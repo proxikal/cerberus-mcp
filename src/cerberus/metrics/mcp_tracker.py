@@ -240,7 +240,7 @@ class MCPMetricsTracker:
         Returns:
             List of recommendation strings
         """
-        recommendations = []
+        recommendations: list = []
 
         # Check for expensive blueprint usage
         blueprint_events = [e for e in self.session_events if e.tool_name == "blueprint"]

@@ -168,7 +168,7 @@ class TypeInference:
 
             calls_with_types = cursor.fetchall()
 
-            new_inferences = []
+            new_inferences: list = []
             for caller_file, line, callee, return_type in calls_with_types:
                 # This call returns a typed value
                 # We could track assignments: result = some_function()

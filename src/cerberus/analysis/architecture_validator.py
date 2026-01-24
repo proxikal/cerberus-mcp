@@ -116,7 +116,7 @@ class ArchitectureValidator:
         files = self._get_python_files(scope_path)
 
         # Check each rule
-        all_violations = []
+        all_violations: list = []
         for rule_name in rules_to_check:
             rule = self.rules[rule_name]
             violations = self._check_rule(rule, files, limit - len(all_violations))
@@ -192,7 +192,7 @@ class ArchitectureValidator:
 
     def _get_python_files(self, scope_path: Path) -> List[Path]:
         """Get all Python files in scope."""
-        files = []
+        files: list = []
 
         if scope_path.is_file():
             if scope_path.suffix == '.py':
@@ -216,7 +216,7 @@ class ArchitectureValidator:
         limit: int
     ) -> List[ArchitectureViolation]:
         """Check a single rule across files."""
-        violations = []
+        violations: list = []
 
         # If rule has custom check function, use it
         if rule.check_function:
@@ -269,7 +269,7 @@ class ArchitectureValidator:
         limit: int
     ) -> List[ArchitectureViolation]:
         """Check for type annotation coverage on public functions."""
-        violations = []
+        violations: list = []
 
         for file_path in files:
             if len(violations) >= limit:
@@ -326,7 +326,7 @@ class ArchitectureValidator:
         limit: int
     ) -> List[ArchitectureViolation]:
         """Check for docstring coverage on public classes and functions."""
-        violations = []
+        violations: list = []
 
         for file_path in files:
             if len(violations) >= limit:
@@ -381,7 +381,7 @@ class ArchitectureValidator:
         limit: int
     ) -> List[ArchitectureViolation]:
         """Check for circular imports (simplified detection)."""
-        violations = []
+        violations: list = []
 
         # Build import graph
         import_graph = {}
@@ -391,7 +391,7 @@ class ArchitectureValidator:
                 tree = ast.parse(content)
 
                 module_name = self._get_module_name(file_path)
-                imports = []
+                imports: list = []
 
                 for node in ast.walk(tree):
                     if isinstance(node, ast.Import):
@@ -520,11 +520,11 @@ class ArchitectureValidator:
         if not violations:
             return f"✓ All {len(rules_checked)} architectural rules passed"
 
-        by_severity = {}
+        by_severity: dict = {}
         for v in violations:
             by_severity[v.severity] = by_severity.get(v.severity, 0) + 1
 
-        parts = []
+        parts: list = []
         for severity in ["critical", "high", "medium", "low"]:
             if severity in by_severity:
                 parts.append(f"{by_severity[severity]} {severity}")

@@ -233,7 +233,7 @@ class AnchorMetadata:
         Returns:
             Formatted string with box-drawing characters
         """
-        lines = []
+        lines: list = []
         lines.append("╭─ GPS ──────────────────────────────────────────────╮")
         lines.append(f"│ File: {self.gps.file:<45} │")
         lines.append(f"│ Symbol: {self.gps.symbol:<43} │")

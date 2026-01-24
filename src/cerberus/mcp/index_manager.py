@@ -243,7 +243,7 @@ class IndexManager:
         def on_changes(changed_files):
             """Handle debounced file changes."""
             # Filter out index files and non-watched extensions
-            filtered = []
+            filtered: list = []
             for file_path in changed_files:
                 p = Path(file_path)
 

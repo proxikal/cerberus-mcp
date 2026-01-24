@@ -106,7 +106,7 @@ def register(mcp):
 
             if fix_preview and issues:
                 # Preview fixes for fixable issues on files we checked
-                fixable = []
+                fixable: list = []
                 files_seen = {vi["file"] for vi in issues if vi.get("fixable")}
                 for fpath in files_seen:
                     success, fixes = fixer.fix_file(fpath, preview=True)
@@ -175,11 +175,11 @@ def register(mcp):
 
         # Handle bulk mode
         if paths:
-            all_fixes = []
+            all_fixes: list = []
             files_modified_count = 0
             total_violations = 0
-            errors = []
-            processed_files = []
+            errors: list = []
+            processed_files: list = []
 
             for idx, file_path in enumerate(paths):
                 try:

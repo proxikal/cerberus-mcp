@@ -15,7 +15,7 @@ import json
 import uuid
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Any
 
 # Phase 14: Dynamic Anchoring
 from .anchoring import AnchorEngine, extract_language_from_scope, extract_project_from_scope
@@ -70,7 +70,7 @@ class MemoryStorage:
 
         # Track statistics
         total_stored = 0
-        by_scope = {}
+        by_scope: dict = {}
 
         try:
             for proposal in proposals:
@@ -227,7 +227,7 @@ class MemoryStorage:
             manager = MemoryIndexManager(self.base_dir)
             # Schema is created automatically in __init__
 
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> Dict[str, Any]:
         """
         Get storage statistics from SQLite.
 
@@ -246,7 +246,7 @@ class MemoryStorage:
             total = cursor.fetchone()["count"]
 
             # By scope
-            by_scope = {}
+            by_scope: dict = {}
             cursor = conn.execute("""
                 SELECT scope, COUNT(*) as count
                 FROM memory_store
@@ -257,7 +257,7 @@ class MemoryStorage:
                 by_scope[row["scope"]] = row["count"]
 
             # By category
-            by_category = {}
+            by_category: dict = {}
             cursor = conn.execute("""
                 SELECT category, COUNT(*) as count
                 FROM memory_store
@@ -295,7 +295,7 @@ def store_proposals(
     return storage.store_batch(proposals)
 
 
-def get_storage_stats(base_dir: Optional[Path] = None) -> Dict[str, any]:
+def get_storage_stats(base_dir: Optional[Path] = None) -> Dict[str, Any]:
     """
     Get storage statistics.
 

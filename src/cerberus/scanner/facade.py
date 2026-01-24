@@ -46,7 +46,7 @@ def scan(
         if incremental:
             logger.info(f"Incremental mode enabled with {len(previous_files)} cached files.")
 
-    all_patterns = []
+    all_patterns: list = []
     if respect_gitignore:
         all_patterns.extend(DEFAULT_IGNORE_PATTERNS)
         gitignore_path = directory / ".gitignore"
@@ -71,7 +71,7 @@ def scan(
     calls: List[CallReference] = []
     type_infos: List[TypeInfo] = []
     import_links: List[ImportLink] = []
-    method_calls = []  # Phase 5.1
+    method_calls: list = []  # Phase 5.1
     
     # Use a set for faster extension checking
     allowed_extensions = set(extensions) if extensions else None

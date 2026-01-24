@@ -102,8 +102,8 @@ def register(mcp):
             return {
                 "enabled": not tracker.is_disabled(),
                 "storage_path": str(store.metrics_file) if hasattr(store, "metrics_file") else None,
-                "session_start": tracker._session_started,  # type: ignore[attr-defined]
-                "commands_this_session": tracker._session_commands,  # type: ignore[attr-defined]
+                "session_start": tracker._session_started,
+                "commands_this_session": tracker._session_commands,
             }
         except Exception as exc:
             return {"status": "error", "message": str(exc)}

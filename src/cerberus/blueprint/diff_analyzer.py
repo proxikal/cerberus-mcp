@@ -248,7 +248,7 @@ class DiffAnalyzer:
         Returns:
             List of StructuralChange objects
         """
-        changes = []
+        changes: list = []
 
         old_keys = set(old_symbols.keys())
         new_keys = set(new_symbols.keys())

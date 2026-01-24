@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Any, Set
 import re
 
+from cerberus.logging_config import logger
 from cerberus.resolution.call_graph_builder import CallGraphBuilder
 
 
@@ -122,7 +123,7 @@ class TestCoverageMapper:
 
     def _find_test_files(self, symbol_name: str, file_path: str) -> List[str]:
         """Find test files that might test this symbol."""
-        test_files = []
+        test_files: list = []
 
         # Convert file path to potential test names
         path_obj = Path(file_path)
@@ -148,7 +149,8 @@ class TestCoverageMapper:
                             rel_path = str(test_file.relative_to(self.project_root))
                             if rel_path not in test_files:
                                 test_files.append(rel_path)
-                    except:
+                    except Exception as e:
+                        logger.debug(f"Error reading test file {test_file}: {e}")
                         continue
 
         return test_files
@@ -160,7 +162,7 @@ class TestCoverageMapper:
         test_files: List[str]
     ) -> List[str]:
         """Find specific test functions that exercise this symbol."""
-        covering_tests = []
+        covering_tests: list = []
 
         for test_file_rel in test_files:
             test_file = self.project_root / test_file_rel
@@ -184,7 +186,8 @@ class TestCoverageMapper:
                         # Check if symbol is called or referenced
                         if symbol_name in func_body:
                             covering_tests.append(f"{test_file_rel}::{func}")
-            except:
+            except Exception as e:
+                logger.debug(f"Error analyzing test file {test_file}: {e}")
                 continue
 
         # Also check call graph - are any test functions calling this symbol?
@@ -206,7 +209,7 @@ class TestCoverageMapper:
         covered_by: List[str]
     ) -> List[str]:
         """Find potentially uncovered branches."""
-        uncovered = []
+        uncovered: list = []
 
         try:
             with open(file_path) as f:
@@ -247,8 +250,8 @@ class TestCoverageMapper:
                                 if not any('error' in test.lower() or 'exception' in test.lower() for test in covered_by):
                                     uncovered.append(f"line {i}: Error path")
 
-        except:
-            pass
+        except Exception as e:
+            logger.debug(f"Error finding uncovered branches in {file_path}: {e}")
 
         return uncovered[:5]  # Limit to top 5
 
@@ -280,7 +283,7 @@ class TestCoverageMapper:
 
     def _generate_recommendations(self, report: TestCoverageReport) -> List[str]:
         """Generate recommendations for improving coverage."""
-        recommendations = []
+        recommendations: list = []
 
         if report.coverage_quality == "none":
             recommendations.append(

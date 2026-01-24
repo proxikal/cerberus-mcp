@@ -175,7 +175,7 @@ class SummarizationFacade:
 
         try:
             # Collect code from files
-            code_snippets = []
+            code_snippets: list = []
             for file_path in files[:10]:  # Limit to first 10 files
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:

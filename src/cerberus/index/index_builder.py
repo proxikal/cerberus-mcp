@@ -217,13 +217,13 @@ def _build_sqlite_index(
 
     total_files = 0
     total_symbols = 0
-    file_batch = []
-    symbol_batch = []
-    import_batch = []
-    call_batch = []
-    type_info_batch = []
-    import_link_batch = []
-    method_call_batch = []  # Phase 5.1
+    file_batch: list = []
+    symbol_batch: list = []
+    import_batch: list = []
+    call_batch: list = []
+    type_info_batch: list = []
+    import_link_batch: list = []
+    method_call_batch: list = []  # Phase 5.1
 
     BATCH_SIZE = 100  # Process 100 files at a time for optimal performance
 

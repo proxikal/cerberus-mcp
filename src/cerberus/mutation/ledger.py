@@ -178,7 +178,7 @@ class DiffLedger:
             logger.error(f"Failed to record mutation: {e}")
             return None
 
-    def get_statistics(self) -> Dict[str, any]:
+    def get_statistics(self) -> Dict[str, Any]:
         """
         Get overall statistics from ledger.
 
@@ -251,7 +251,7 @@ class DiffLedger:
             rows = cursor.fetchall()
             conn.close()
 
-            metrics = []
+            metrics: list = []
             for row in rows:
                 metric = DiffMetric(
                     timestamp=row[0],
@@ -359,7 +359,7 @@ class DiffLedger:
             """, (limit,))
             rows = cursor.fetchall()
 
-            all_predicted = []
+            all_predicted: list = []
             for row in rows:
                 symbols = json.loads(row[0])
                 all_predicted.extend(symbols)
@@ -475,7 +475,7 @@ class DiffLedger:
 
             total_prediction_count = 0
             followed_count = 0
-            time_deltas = []
+            time_deltas: list = []
 
             for pred_row in predictions:
                 pred_id, pred_timestamp, edited_symbol, edited_file, predicted_symbols_json, confidence_scores_json = pred_row

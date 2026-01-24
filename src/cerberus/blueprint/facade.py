@@ -222,7 +222,7 @@ class BlueprintGenerator:
                 paths_to_try
             )
 
-            symbols = []
+            symbols: list = []
             seen = set()
             for row in cursor.fetchall():
                 (
@@ -256,7 +256,7 @@ class BlueprintGenerator:
 
             # Deduplicate symbols (SQLite may have duplicates from indexing)
             seen = set()
-            unique_symbols = []
+            unique_symbols: list = []
             for sym in symbols:
                 key = (sym.name, sym.type, sym.start_line, sym.parent_class or '')
                 if key not in seen:
@@ -281,7 +281,7 @@ class BlueprintGenerator:
             List of top-level BlueprintNode objects with children
         """
         # Separate top-level symbols from methods
-        top_level = []
+        top_level: list = []
         methods_by_class = {}
 
         for symbol in symbols:
@@ -295,7 +295,7 @@ class BlueprintGenerator:
                 top_level.append(symbol)
 
         # Build nodes
-        nodes = []
+        nodes: list = []
         for symbol in top_level:
             node = self._symbol_to_node(symbol)
 
@@ -578,7 +578,7 @@ class BlueprintGenerator:
 
             # Generate mini-blueprints for each hydrated file
             # (structure only, no overlays except deps for consistency)
-            hydrated_files = []
+            hydrated_files: list = []
 
             for file_path in files_to_hydrate:
                 try:

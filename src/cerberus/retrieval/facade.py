@@ -139,7 +139,7 @@ def _hybrid_search_streaming(
 
         # Use SQLite FTS5 for zero-memory keyword search
         # No need to load symbols into memory - SQLite handles everything
-        fts5_results = []
+        fts5_results: list = []
         for symbol, score in store.fts5_search(query, top_k=top_k_per_method):
             snippet = CodeSnippet(
                 file_path=symbol.file_path,
@@ -188,7 +188,7 @@ def _hybrid_search_streaming(
             if not bm25_results:
                 # Need to run keyword search since it wasn't done
                 logger.info(f"Performing FTS5 keyword search for fallback")
-                fts5_results = []
+                fts5_results: list = []
                 for symbol, score in store.fts5_search(query, top_k=top_k_per_method):
                     snippet = CodeSnippet(
                         file_path=symbol.file_path,
@@ -256,7 +256,7 @@ def _hybrid_search_legacy(
     Maintains backward compatibility with existing code.
     """
     # Build document snippets (legacy full-load approach)
-    snippets = []
+    snippets: list = []
     for symbol in scan_result.symbols:
         snippet_obj = read_range(
             Path(symbol.file_path),
@@ -405,7 +405,7 @@ def _finalize_results(
     Returns:
         List of HybridSearchResult objects
     """
-    hybrid_results = []
+    hybrid_results: list = []
     seen = set()
     for idx, r in enumerate(results):
         key = (r.symbol.file_path, r.symbol.name, r.symbol.start_line, r.symbol.end_line, r.symbol.type)

@@ -183,7 +183,7 @@ class SmartMerge:
         Returns:
             List of changed node descriptors
         """
-        changed_nodes = []
+        changed_nodes: list = []
 
         # Simple approach: compare top-level function/class definitions
         base_root = base_tree.root_node
@@ -244,7 +244,7 @@ class SmartMerge:
         Returns:
             List of top-level nodes
         """
-        top_level = []
+        top_level: list = []
         target_types = {
             "function_definition",
             "class_definition",
@@ -293,7 +293,7 @@ class SmartMerge:
         Returns:
             List of conflicts
         """
-        conflicts = []
+        conflicts: list = []
 
         for local in local_changes:
             for remote in remote_changes:

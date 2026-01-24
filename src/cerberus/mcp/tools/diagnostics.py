@@ -55,7 +55,7 @@ def register(mcp):
         """
         from ..index_manager import get_index_manager
 
-        recommendations = []
+        recommendations: list = []
         is_project = _is_project_context()
         context = "project" if is_project else "general"
 
