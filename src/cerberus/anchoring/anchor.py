@@ -137,7 +137,7 @@ class ContextAnchorV2:
         # Format based on mode
         if self.mode == AnchorMode.TEXT:
             # Human-readable box format
-            result = {
+            result: Dict[str, Any] = {
                 "anchor_text": anchor.to_human_string(),
             }
             if body:

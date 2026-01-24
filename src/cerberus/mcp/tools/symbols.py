@@ -1,6 +1,6 @@
 """Symbol retrieval tools."""
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from cerberus.retrieval.utils import find_symbol_fts, read_range
 
@@ -14,45 +14,11 @@ from cerberus.mcp.tools.token_utils import (
 def register(mcp):
     @mcp.tool()
     def get_symbol(
-        name: str = None,
+        name: Optional[str] = None,
         context_lines: int = 5,
-        symbols: List[str] = None,
+        symbols: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """
-        Retrieve symbol(s) by exact name with surrounding code context.
-
-        Supports both single and bulk operations:
-        - Single: Provide name parameter
-        - Bulk: Provide symbols list (name parameter ignored)
-
-        Use search() for fuzzy discovery, then get_symbol() for exact retrieval.
-        This enforces Cerberus's efficient workflow and prevents token bloat.
-
-        TOKEN EFFICIENCY:
-        - Single method: ~400 tokens with default context_lines=5.
-        - Bulk: ~400 tokens per symbol (saves MCP round-trip overhead)
-        - context_lines controls cost:
-          - 0: ~300 tokens
-          - 5: ~400 tokens (recommended)
-          - 10: ~500 tokens
-          - 20: ~700 tokens
-        - Increase context_lines only if more surrounding code is required.
-
-        Args:
-            name: Exact symbol name to find (single mode)
-            context_lines: Lines of context before/after symbol
-            symbols: List of exact symbol names for bulk retrieval
-
-        Returns:
-            Dict with result list and token info
-
-        Examples:
-            # Single symbol
-            get_symbol(name="UserConfig")
-
-            # Bulk symbols
-            get_symbol(symbols=["UserConfig", "SystemConfig", "GlobalConfig"])
-        """
+        """Retrieve symbol(s) by exact name with surrounding code context."""
         # Validate inputs
         if not name and not symbols:
             return {

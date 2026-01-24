@@ -4,7 +4,7 @@ CodeValidator: Four Pillars of Integrity validation.
 Phase 11: Pillars 2-4 - Syntax, Semantic, Import validation.
 """
 
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Dict, Any
 
 try:
     from tree_sitter import Parser, Language, Node
@@ -38,7 +38,7 @@ class CodeValidator:
             store: SQLite index store for semantic checks
         """
         self.store = store
-        self.parsers = {}
+        self.parsers: Dict[str, Any] = {}
         if TREE_SITTER_AVAILABLE:
             self._init_parsers()
         else:

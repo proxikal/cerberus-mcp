@@ -14,33 +14,7 @@ def register(mcp):
         include_bases: bool = True,
         include_deps: bool = True,
     ) -> dict:
-        """
-        Assemble complete context for understanding/modifying a symbol.
-
-        Returns target code + skeletonized base classes + callers/callees + imports.
-        Replaces: search → get_symbol → deps → skeletonize workflow.
-
-        Token savings: 70-90% vs reading full inheritance chain.
-
-        Args:
-            symbol_name: Name of the symbol (function, class, method)
-            file_path: Optional file path to disambiguate if multiple symbols share the name
-            include_bases: Include skeletonized base classes for classes (default: True)
-            include_deps: Include callers/callees information (default: True)
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - target_symbol: The symbol name
-            - target_file: Path where symbol was found
-            - target_code: Full implementation of the symbol
-            - base_classes: List of {name, file, depth, code, skeletonized} for inheritance chain
-            - related_symbols: List of imports and type dependencies
-            - callers: List of {name, file, line} for functions that call this symbol (if include_deps)
-            - callees: List of {name, file, line} for functions this symbol calls (if include_deps)
-            - total_lines: Total lines of context returned
-            - compression_ratio: Ratio compared to reading full files
-        """
+        """Assemble complete context for symbol with bases, deps, and imports."""
         manager = get_index_manager()
 
         try:

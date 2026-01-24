@@ -108,7 +108,7 @@ class HydrationAnalyzer:
         Returns:
             Counter mapping file paths to reference counts
         """
-        file_refs = Counter()
+        file_refs: Counter[str] = Counter()
         
         def count_node_refs(node: BlueprintNode):
             """Recursively count references in node and children."""

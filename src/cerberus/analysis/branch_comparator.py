@@ -64,7 +64,7 @@ class FileChange:
     binary: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
-        data = {
+        data: Dict[str, Any] = {
             "file": self.file,
             "change_type": self.change_type,
             "symbols_changed": [s.to_dict() for s in self.symbols_changed],
@@ -97,7 +97,7 @@ class BranchComparisonResult:
     error: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        data = {
+        data: Dict[str, Any] = {
             "status": self.status,
             "branch_a": self.branch_a,
             "branch_b": self.branch_b,
@@ -515,10 +515,10 @@ class BranchComparator:
 
             symbol_changes: List[SymbolChange] = []
             if binary:
-                symbol_changes: list = []
+                symbol_changes = []
             elif change_type == "deleted":
                 # Can't map deleted symbols without base index; represent file-level change only
-                symbol_changes: list = []
+                symbol_changes = []
             elif change_type == "renamed" and not ranges:
                 # Pure rename - mark all symbols as renamed
                 for symbol in symbols:
@@ -832,9 +832,9 @@ class BranchComparator:
             return None
 
         # Fallback: search by name anywhere
-        for node in ast.walk(module):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == name:
-                return node
+        for any_node in ast.walk(module):
+            if isinstance(any_node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and any_node.name == name:
+                return any_node
         return None
 
     def _normalize_node(self, node: ast.AST) -> str:

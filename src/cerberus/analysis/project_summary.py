@@ -133,7 +133,7 @@ class ProjectSummaryAnalyzer:
 
     def _detect_languages(self) -> List[str]:
         """Detect languages present using markers and file extensions."""
-        counts = Counter()
+        counts: Counter[str] = Counter()
         counts.update(self._detect_languages_by_markers())
         counts.update(self._detect_languages_by_files())
 
@@ -596,7 +596,7 @@ class ProjectSummaryAnalyzer:
 
     def _parse_dependencies(self) -> Dict[str, List[str]]:
         """Parse project dependencies."""
-        deps = {"core": [], "dev": [], "optional": []}
+        deps: Dict[str, List[str]] = {"core": [], "dev": [], "optional": []}
 
         # Parse pyproject.toml
         pyproject = self.project_root / "pyproject.toml"

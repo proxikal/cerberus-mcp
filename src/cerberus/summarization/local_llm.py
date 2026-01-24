@@ -147,7 +147,7 @@ class SummaryParser:
         Returns:
             Dict with parsed fields: purpose, key_points, dependencies, complexity
         """
-        parsed = {
+        parsed: Dict[str, Any] = {
             "purpose": "",
             "key_points": [],
             "dependencies": [],

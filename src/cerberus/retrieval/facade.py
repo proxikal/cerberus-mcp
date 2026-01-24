@@ -162,8 +162,8 @@ def _hybrid_search_streaming(
         logger.info(f"Performing streaming vector search for '{query}'")
 
         # Check if FAISS store is available
-        if store._faiss_store and len(store._faiss_store) > 0:  # type: ignore[unreachable]
-            logger.debug("Using FAISS direct query (streaming)")  # type: ignore[unreachable]
+        if store._faiss_store and len(store._faiss_store) > 0:
+            logger.debug("Using FAISS direct query (streaming)")
             has_embeddings = True
             vector_results = vector_search_faiss(
                 query=query,

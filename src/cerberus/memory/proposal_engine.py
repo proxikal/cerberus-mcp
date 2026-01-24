@@ -13,6 +13,11 @@ from typing import List, Optional
 import uuid
 import re
 
+from .session_continuity import detect_project_from_content
+from .quality_filter import MemoryQualityFilter
+
+from cerberus.logging_config import logger
+
 
 @dataclass
 class MemoryProposal:
@@ -131,6 +136,7 @@ class ProposalEngine:
         """
         self.use_llm = use_llm
         self.max_proposals = max_proposals
+        self.quality_filter = MemoryQualityFilter()
 
     def generate_proposals(
         self,
@@ -190,7 +196,7 @@ class ProposalEngine:
         priority: int
     ) -> Optional[MemoryProposal]:
         """
-        Create proposal using template-based rules.
+        Create proposal using template-based rules with quality filtering.
         LLM only used for optional refinement if enabled.
 
         Args:
@@ -199,16 +205,32 @@ class ProposalEngine:
             priority: Priority level (1=critical, 2=high, 3=medium)
 
         Returns:
-            MemoryProposal or None if generation fails
+            MemoryProposal or None if content fails quality checks
         """
-        # PRIMARY: Template-based proposal generation
+        # Generate content (semantic code or transformed text)
+        content = self._generate_content(cluster)
+
+        # QUALITY GATE: Check if content passes quality filters
+        quality_score = self.quality_filter.assess_quality(content)
+
+        # Reject if quality check fails
+        if not (quality_score.is_actionable or quality_score.is_semantic_code):
+            logger.debug(
+                f"Rejected proposal: {content[:80]}... "
+                f"Reason: {quality_score.rejection_reason}"
+            )
+            return None
+
+        # If content is semantic code, keep as-is (don't transform)
+        # If it's natural language that passed quality check, it's already transformed
+
+        # Infer scope and category
         scope = self._infer_scope(cluster, project)
         category = self._infer_category(cluster)
-        content = self._generate_content(cluster)
         rationale = self._generate_rationale(cluster)
 
-        # OPTIONAL: LLM refinement
-        if self.use_llm:
+        # OPTIONAL: LLM refinement (only for non-semantic-code content)
+        if self.use_llm and not quality_score.is_semantic_code:
             refined = self._try_llm_refinement(content, cluster)
             if refined:
                 content = refined
@@ -228,7 +250,7 @@ class ProposalEngine:
         """
         Infer scope from correction content.
 
-        Hierarchy: project > language > universal
+        Hierarchy: Explicit/path-based > project > language > universal
 
         Args:
             cluster: CorrectionCluster
@@ -237,19 +259,25 @@ class ProposalEngine:
         Returns:
             Scope string: "universal", "language:X", or "project:X"
         """
+        # PRIORITY 1: Content-based project detection (prevents cross-project contamination)
+        # Checks for explicit statements ("this is about X") and absolute paths
+        detected_project = detect_project_from_content(cluster.canonical_text)
+        if detected_project:
+            return detected_project
+
         text_lower = cluster.canonical_text.lower()
 
-        # Check for language-specific content
+        # PRIORITY 2: Check for language-specific content
         for lang, keywords in self.LANG_KEYWORDS.items():
             if any(kw in text_lower for kw in keywords):
                 return f"language:{lang}"
 
-        # Check for project-specific indicators
+        # PRIORITY 3: Check for project-specific indicators (default project)
         if project:
             if any(ind in text_lower for ind in self.PROJECT_INDICATORS):
                 return f"project:{project}"
 
-        # Check for universal patterns (applies everywhere)
+        # PRIORITY 4: Check for universal patterns (applies everywhere)
         if any(kw in text_lower for kw in self.UNIVERSAL_KEYWORDS):
             return "universal"
 
@@ -290,20 +318,32 @@ class ProposalEngine:
 
     def _generate_content(self, cluster) -> str:
         """
-        Generate content from canonical text using templates.
+        Generate content from canonical text.
 
-        Transforms user correction into imperative form.
+        PRIORITY 1: If already semantic code (pref:X, decision:Y) → keep as-is
+        PRIORITY 2: If actionable imperative → keep as-is or capitalize
+        PRIORITY 3: Transform common patterns to imperative form
 
         Args:
             cluster: CorrectionCluster
 
         Returns:
-            Content string in imperative form
+            Content string (semantic code or imperative form)
         """
         canonical = cluster.canonical_text.strip()
+
+        # CRITICAL: Preserve semantic codes (already perfect format)
+        # Examples: "pref:concise_output", "decision:sqlite_storage[cerberus]"
+        SEMANTIC_CODE_PATTERN = re.compile(
+            r'^(pref|preference|decision|correction|rule|impl|next):[a-z0-9_]+',
+            re.IGNORECASE
+        )
+        if SEMANTIC_CODE_PATTERN.match(canonical):
+            return canonical  # Keep semantic codes as-is
+
         words = canonical.lower().split()
 
-        # Already in good form?
+        # Already in good imperative form?
         GOOD_STARTERS = {
             'use', 'keep', 'avoid', 'never', 'always', 'prefer',
             'write', 'split', 'plan', 'test', 'log', 'limit',

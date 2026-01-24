@@ -62,7 +62,7 @@ def get_config_value(key: str, default: Any | None = None) -> Any:
     return value
 
 
-DEFAULTS = {
+DEFAULTS: Dict[str, Dict[str, Any]] = {
     "index": {
         "path": ".cerberus/cerberus.db",
         "auto_update": True,  # Auto-update index on file changes

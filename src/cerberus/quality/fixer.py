@@ -107,7 +107,7 @@ class StyleFixer:
         recursive: bool = False,
         preview: bool = False,
         force: bool = False,
-        extensions: List[str] = None
+        extensions: Optional[List[str]] = None
     ) -> dict[str, Tuple[bool, List[StyleFix]]]:
         """
         Fix style issues in all files in a directory.
@@ -165,15 +165,11 @@ class StyleFixer:
             Risk level: "SAFE", "MEDIUM", or "HIGH"
         """
         try:
-            # Phase 14.1: Import Symbol Guard for risk checking
-            from cerberus.mutation.guard import SymbolGuard
-
-            guard = SymbolGuard()
-
+            # Phase 14.1: Symbol Guard risk checking
             # Get stability metrics for the file
             # This integrates with Phase 13.2 stability scoring
             # For now, we'll use a simple heuristic
-            # TODO: Full integration with stability scoring system
+            # TODO: Full integration with stability scoring system and SymbolGuard
 
             # Check if file is in critical paths
             critical_paths = [
@@ -259,7 +255,7 @@ class StyleFixer:
     def format_fixes(
         self,
         fixes: List[StyleFix],
-        file_path: str = None,
+        file_path: Optional[str] = None,
         mode: str = "text"
     ) -> str:
         """

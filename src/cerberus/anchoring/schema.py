@@ -141,7 +141,7 @@ class TemporalInfo:
 
     def to_compact_dict(self) -> Dict[str, Any]:
         """Compact representation."""
-        result = {}
+        result: Dict[str, Any] = {}
         if self.last_modified:
             result["m"] = self.last_modified
         if self.days_since_last_edit is not None:
@@ -203,7 +203,7 @@ class AnchorMetadata:
             Dictionary representation
         """
         if compact:
-            result = {"gps": self.gps.to_compact_dict()}
+            result: Dict[str, Any] = {"gps": self.gps.to_compact_dict()}
             if self.dependencies:
                 result["deps"] = [d.to_compact_dict() for d in self.dependencies]
             if self.risk:

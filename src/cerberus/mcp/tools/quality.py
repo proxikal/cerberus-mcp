@@ -39,34 +39,7 @@ def register(mcp):
 
     @mcp.tool()
     def style_check(path: str, rules: Optional[List[str]] = None, fix_preview: bool = False) -> dict:
-        """
-        Check code for style violations.
-
-        **AI WORKFLOW (Iterative):**
-        1. Run style_check on file/directory
-        2. Review the first 30 violations shown
-        3. Call style_fix to fix them automatically (or fix manually)
-        4. Re-run style_check to see remaining violations
-        5. Repeat until clean
-
-        This iterative approach is token-efficient and prevents overwhelming
-        output on messy codebases.
-
-        Args:
-            path: File or directory to check
-            rules: Optional list of specific rules to check (default: all rules)
-            fix_preview: If True, include preview of auto-fixes for fixable issues
-
-        Returns:
-            dict with:
-            - status: "checked" or "error"
-            - path: Path that was checked
-            - violation_count: Total number of violations found
-            - violations_shown: Number of violations in response (limited)
-            - violations: List of {file, line, type, message, suggestion, fixable}
-            - truncated: True if more violations exist beyond the limit
-            - fix_preview: (if requested) List of proposed fixes
-        """
+        """Detect code style violations and optionally preview fixes."""
         target = Path(path)
         if not target.exists():
             return {
@@ -125,46 +98,13 @@ def register(mcp):
 
     @mcp.tool()
     def style_fix(
-        path: str = None,
+        path: Optional[str] = None,
         rules: Optional[List[str]] = None,
         dry_run: bool = False,
         create_backup: bool = True,
         paths: Optional[List[str]] = None,
     ) -> dict:
-        """
-        Auto-fix style violations.
-
-        Supports both single and bulk operations:
-        - Single: Provide path parameter
-        - Bulk: Provide paths list (path parameter ignored)
-
-        Automatically applies fixes for fixable style violations.
-        Use dry_run=True to preview changes without modifying files.
-
-        Args:
-            path: File or directory to fix (single mode)
-            rules: Optional list of specific rules to fix (default: all fixable rules)
-            dry_run: If True, only preview fixes without applying them
-            create_backup: If True, create backup before modifying files
-            paths: List of file/directory paths for bulk fixing
-
-        Returns:
-            dict with:
-            - status: "fixed", "bulk_fixed", "dry_run", or "error"
-            - files_modified: Number of files changed (0 if dry_run)
-            - violations_fixed: Total fixes applied or would be applied
-            - applied_fixes: List of {file, type, line, before, after, description}
-
-        Examples:
-            # Single file
-            style_fix(path="src/main.py")
-
-            # Bulk files
-            style_fix(paths=["src/config.py", "src/utils.py", "src/models.py"])
-
-            # Dry run bulk
-            style_fix(paths=["src/config.py", "src/utils.py"], dry_run=True)
-        """
+        """Apply style fixes to file(s) with optional dry-run."""
         # Validate inputs
         if not path and not paths:
             return {
@@ -287,24 +227,7 @@ def register(mcp):
 
     @mcp.tool()
     def related_changes(file_path: str, symbol_name: Optional[str] = None) -> dict:
-        """
-        Suggest related changes based on current modification.
-
-        Uses code relationships and historical patterns to predict other
-        files or symbols that might need updating when you change this code.
-
-        Args:
-            file_path: Path to the file being modified
-            symbol_name: Optional specific symbol being modified (uses filename stem if not provided)
-
-        Returns:
-            dict with:
-            - status: "analyzed" or "error"
-            - file: The file being analyzed
-            - symbol: The symbol being analyzed
-            - stats: Analysis statistics
-            - suggestions: List of {file, symbol, line, reason, confidence, score, relationship, command}
-        """
+        """Predict related changes needed after modifying symbol."""
         from cerberus.quality.predictor import PredictionEngine
 
         # Use IndexManager to get the current index path

@@ -9,22 +9,7 @@ from cerberus.metrics.mcp_tracker import get_mcp_tracker, reset_mcp_tracker
 def register(mcp):
     @mcp.tool()
     def metrics_report(period: str = "session", detailed: bool = False) -> dict:
-        """
-        Get efficiency metrics report.
-
-        Provides insights into code retrieval patterns and tool usage
-        to help optimize workflows.
-
-        Args:
-            period: Time period - "session" (current), "today", "week", or "all" (30 days)
-            detailed: Include detailed breakdowns (flag usage, command counts)
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - period_days: Number of days covered
-            - report: Efficiency metrics including retrieval counts, patterns, and suggestions
-        """
+        """Get tool usage metrics and efficiency patterns."""
         try:
             days = {
                 "session": 1,
@@ -51,20 +36,7 @@ def register(mcp):
 
     @mcp.tool()
     def metrics_clear(confirm: bool = False) -> dict:
-        """
-        Clear metrics data.
-
-        Resets all collected efficiency metrics. Requires explicit confirmation
-        to prevent accidental data loss.
-
-        Args:
-            confirm: Must be True to actually clear data (safety check)
-
-        Returns:
-            dict with:
-            - status: "cleared" if successful, "confirmation_required" if confirm=False
-            - message: Description of result
-        """
+        """Clear stored metrics data."""
         if not confirm:
             return {
                 "status": "confirmation_required",
@@ -84,18 +56,7 @@ def register(mcp):
 
     @mcp.tool()
     def metrics_status() -> dict:
-        """
-        Get current metrics collection status.
-
-        Shows whether metrics collection is enabled and provides session information.
-
-        Returns:
-            dict with:
-            - enabled: Whether metrics collection is active
-            - storage_path: Path to metrics storage file
-            - session_start: When current session began
-            - commands_this_session: Number of commands in current session
-        """
+        """Check metrics collection status."""
         try:
             tracker = get_efficiency_tracker()
             store = tracker.store
@@ -110,18 +71,7 @@ def register(mcp):
 
     @mcp.tool()
     def mcp_metrics_session() -> dict:
-        """
-        Get MCP tool usage metrics for current session.
-
-        Returns detailed statistics about MCP tool usage, token efficiency,
-        and optimization opportunities.
-
-        Returns:
-            dict with:
-            - session_summary: Overview of session metrics
-            - tool_statistics: Per-tool usage statistics
-            - recommendations: Efficiency recommendations
-        """
+        """Get MCP tool usage metrics for current session."""
         try:
             tracker = get_mcp_tracker()
             summary = tracker.get_session_summary()
@@ -143,15 +93,7 @@ def register(mcp):
 
     @mcp.tool()
     def mcp_metrics_tool(tool_name: str) -> dict:
-        """
-        Get metrics for a specific MCP tool.
-
-        Args:
-            tool_name: Name of the tool to get metrics for
-
-        Returns:
-            dict with tool-specific statistics
-        """
+        """Get detailed metrics for specific MCP tool."""
         try:
             tracker = get_mcp_tracker()
             stats = tracker.get_tool_statistics(tool_name)
@@ -170,17 +112,7 @@ def register(mcp):
 
     @mcp.tool()
     def mcp_metrics_export(output_path: Optional[str] = None) -> dict:
-        """
-        Export current session metrics to JSON file.
-
-        Args:
-            output_path: Optional path for output file (auto-generated if not provided)
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - output_path: Path where metrics were exported
-        """
+        """Export MCP metrics to JSON file."""
         try:
             tracker = get_mcp_tracker()
             from pathlib import Path
@@ -202,14 +134,7 @@ def register(mcp):
 
     @mcp.tool()
     def mcp_metrics_reset() -> dict:
-        """
-        Reset MCP session metrics.
-
-        Clears current session data and starts fresh tracking.
-
-        Returns:
-            dict with status message
-        """
+        """Reset MCP metrics collection."""
         try:
             reset_mcp_tracker()
             return {

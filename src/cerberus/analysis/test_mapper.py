@@ -123,7 +123,7 @@ class TestCoverageMapper:
 
     def _find_test_files(self, symbol_name: str, file_path: str) -> List[str]:
         """Find test files that might test this symbol."""
-        test_files: list = []
+        test_files: List[str] = []
 
         # Convert file path to potential test names
         path_obj = Path(file_path)
@@ -162,7 +162,7 @@ class TestCoverageMapper:
         test_files: List[str]
     ) -> List[str]:
         """Find specific test functions that exercise this symbol."""
-        covering_tests: list = []
+        covering_tests: List[str] = []
 
         for test_file_rel in test_files:
             test_file = self.project_root / test_file_rel

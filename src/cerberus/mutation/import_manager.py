@@ -4,7 +4,7 @@ ImportManager: Auto-inject missing imports.
 Phase 11: Pillar 4 - Import Guardian.
 """
 
-from typing import List, Set, Optional, Tuple
+from typing import List, Set, Optional, Tuple, Dict, Any
 from pathlib import Path
 
 try:
@@ -39,7 +39,7 @@ class ImportManager:
             store: SQLite index store for symbol resolution
         """
         self.store = store
-        self.parsers = {}
+        self.parsers: Dict[str, Any] = {}
         if TREE_SITTER_AVAILABLE:
             self._init_parsers()
         else:

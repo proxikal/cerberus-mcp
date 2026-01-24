@@ -5,7 +5,7 @@ Optimized for Phase 4: Direct FAISS queries for streaming SQLite indices.
 """
 
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 import numpy as np
 from loguru import logger
 
@@ -22,7 +22,7 @@ def vector_search(
     scan_result: ScanResult,
     snippets: List[Dict],  # List of {symbol, snippet_text}
     top_k: int = 10,
-    model_name: str = None,
+    model_name: Optional[str] = None,
     backend: str = "memory",
 ) -> List[SearchResult]:
     """
@@ -51,7 +51,7 @@ def vector_search(
             logger.debug(f"Using {len(scan_result.embeddings)} precomputed embeddings")
 
             # Build vector documents from precomputed embeddings
-            vector_docs: list = []
+            vector_docs = []
             for embed_entry in scan_result.embeddings:
                 # Find matching symbol
                 symbol = next(
@@ -107,7 +107,7 @@ def vector_search(
             embeddings = embed_texts(texts, model_name=model_name)
             query_vec = embed_texts([query], model_name=model_name)[0]
 
-            vector_docs: list = []
+            vector_docs = []
             for i, doc in enumerate(snippets):
                 symbol = doc["symbol"]
                 snippet = CodeSnippet(
@@ -148,7 +148,7 @@ def vector_search_faiss(
     sqlite_store: SQLiteIndexStore,
     faiss_store: FAISSVectorStore,
     top_k: int = 10,
-    model_name: str = None,
+    model_name: Optional[str] = None,
     padding: int = 3,
 ) -> List[SearchResult]:
     """

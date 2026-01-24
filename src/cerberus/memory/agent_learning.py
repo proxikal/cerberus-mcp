@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from cerberus.logging_config import logger
+from .session_continuity import detect_project_from_content
 
 
 # ============================================================================
@@ -55,6 +56,12 @@ class AgentProposal:
 def _infer_scope(observations: List[AgentObservation]) -> str:
     """
     Infer scope from observation context.
+
+    Priority:
+    1. Content-based detection (explicit mentions, paths)
+    2. Context project/language
+    3. File extensions
+
     If all observations from same project → project scope
     If all observations same language → language scope
     Otherwise → universal
@@ -62,6 +69,18 @@ def _infer_scope(observations: List[AgentObservation]) -> str:
     projects = set()
     languages = set()
 
+    # PRIORITY 1: Check observation content for project overrides
+    for obs in observations:
+        # Check action and outcome text for project mentions/paths
+        combined_text = f"{obs.action} {obs.outcome}"
+        detected_project = detect_project_from_content(combined_text, obs.context)
+        if detected_project:
+            # Extract project name from scope string
+            if detected_project.startswith("project:"):
+                project_name = detected_project.split(":", 1)[1]
+                projects.add(project_name)
+
+    # PRIORITY 2: Extract from context
     for obs in observations:
         ctx = obs.context
         if "project" in ctx:
@@ -151,7 +170,7 @@ def detect_success_pattern(observations: List[AgentObservation]) -> Optional[Age
     Trigger: Action repeated 3+ times, user approved all
     """
     # Group by action type
-    by_action = {}
+    by_action: Dict[str, List[Any]] = {}
     for obs in observations:
         action = obs.action_taken
         if action not in by_action:
@@ -190,7 +209,7 @@ def detect_failure_pattern(observations: List[AgentObservation]) -> Optional[Age
     Trigger: Action caused correction 2+ times
     """
     # Group by action type
-    by_action = {}
+    by_action: Dict[str, List[Any]] = {}
     for obs in observations:
         if obs.observation_type == "failure":
             action = obs.action_taken

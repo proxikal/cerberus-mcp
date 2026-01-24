@@ -1,7 +1,7 @@
 import os
 import time
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 import pathspec
 
@@ -38,7 +38,7 @@ def scan(
     logger.info(f"Starting scan on directory: '{directory}'")
     
     previous_files = {}
-    previous_symbols_by_file = {}
+    previous_symbols_by_file: Dict[str, List[Any]] = {}
     if previous_index:
         previous_files = {f.path: f.last_modified for f in previous_index.files}
         for symbol in previous_index.symbols:

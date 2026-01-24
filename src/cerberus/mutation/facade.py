@@ -709,7 +709,8 @@ class MutationFacade:
                             dry_run=preview
                         )
                     else:
-                        result = MutationResult(
+                        # Defensive: handle unknown operations gracefully
+                        result = MutationResult(  # type: ignore[unreachable]
                             success=False,
                             operation=op.operation,
                             file_path=op.file_path,

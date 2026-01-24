@@ -246,7 +246,7 @@ def _extract_theme(proposals: List[MemoryProposal]) -> str:
     }
 
     # Count keywords
-    keyword_counts = Counter()
+    keyword_counts: Counter[str] = Counter()
     for proposal in proposals:
         content_lower = proposal.content.lower()
         for keyword in THEME_KEYWORDS.keys():
@@ -359,7 +359,7 @@ def run_optimized_approval(
             "auto": len(auto_ids),
             "approved": 0,
             "rejected": 0,
-            "skipped": len(skipped_proposals)
+            "skipped": len(result.skipped)
         }
         return result
 
@@ -443,6 +443,9 @@ def _show_individual_approval(proposals: List[MemoryProposal]) -> List[str]:
     from cerberus.memory.approval_cli import ApprovalCLI
     cli = ApprovalCLI()
     result = cli.run(proposals, optimize=False)  # Disable optimization to prevent recursion
+    # When optimize=False, result is always ApprovalResult
+    if isinstance(result, list):
+        return result
     return result.approved_ids
 
 

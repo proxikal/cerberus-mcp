@@ -36,7 +36,7 @@ class MemoryStorage:
     - memory_fts: FTS5 virtual table for full-text search
     """
 
-    def __init__(self, base_dir: Optional[Path] = None, enable_anchoring: bool = True):
+    def __init__(self, base_dir: Optional[Union[str, Path]] = None, enable_anchoring: bool = True):
         """
         Args:
             base_dir: Base directory for storage (default: ~/.cerberus)
@@ -53,7 +53,7 @@ class MemoryStorage:
         self._anchor_engine = AnchorEngine() if enable_anchoring else None
         self._ensure_database()
 
-    def store_batch(self, proposals: List) -> Dict[str, int]:
+    def store_batch(self, proposals: List) -> Dict[str, Any]:
         """
         Store batch of approved proposals to SQLite.
 

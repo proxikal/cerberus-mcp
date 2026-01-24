@@ -15,25 +15,7 @@ from cerberus.mcp.tools.token_utils import (
 def register(mcp):
     @mcp.tool()
     def deps(symbol_name: str, file_path: Optional[str] = None) -> dict:
-        """
-        Get callers and callees for a symbol.
-
-        Analyzes the call graph to find what functions call this symbol
-        (callers) and what functions this symbol calls (callees).
-
-        Args:
-            symbol_name: Name of the function/method to analyze
-            file_path: Optional file path to disambiguate if multiple symbols share the name
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - symbol: The symbol name
-            - file: Path where symbol was found
-            - callers: List of {name, file, line} for functions that call this symbol
-            - callees: List of {name, file, line} for functions this symbol calls
-            - imports: List of imports used by this symbol
-        """
+        """Get callers and callees for symbol."""
         manager = get_index_manager()
         index = manager.get_index()
         if not hasattr(index, "_store"):
@@ -71,38 +53,7 @@ def register(mcp):
 
     @mcp.tool()
     def call_graph(symbol_name: str, depth: int = 2, direction: str = "both") -> dict:
-        """
-        Build recursive call graph from a symbol.
-
-        **TOKEN EFFICIENCY NOTE:**
-        - Filters out built-in functions (print, len, str, etc.)
-        - Limited to 100 nodes and 200 edges to prevent token explosion
-        - Use depth=1 for immediate relationships only (~100-500 tokens)
-        - Use depth=2 for broader context (~500-2000 tokens)
-        - Depth >2 rarely needed for most analysis tasks
-
-        **AI WORKFLOW:**
-        Start with deps() for quick callers/callees. Only use call_graph
-        when you need to understand multi-level call chains.
-
-        Args:
-            symbol_name: Starting symbol for the graph
-            depth: How many levels deep to traverse (default: 2, max recommended: 3)
-            direction: "callers" (who calls this), "callees" (what this calls), or "both"
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - root: The starting symbol name
-            - direction: The traversal direction used
-            - graphs: List of graph objects, each containing:
-              - root_symbol: Starting point
-              - root_file: File containing root
-              - nodes: List of {name, file, line, depth, type}
-              - edges: List of {from, to} relationships
-              - max_depth_reached: Whether depth limit was hit
-              - truncated: Whether graph was truncated (hit node/edge limits)
-        """
+        """Build recursive call graph from symbol."""
         manager = get_index_manager()
         index = manager.get_index()
         if not hasattr(index, "_store"):
@@ -157,30 +108,7 @@ def register(mcp):
         focus: str | None = None,
         include_conflicts: bool = True
     ) -> dict:
-        """
-        Compare code changes between two git branches at symbol level.
-
-        Returns symbol-level changes (which functions/classes modified) rather
-        than raw line diffs. Useful for reviewing feature branches before merge.
-
-        Args:
-            branch_a: Base branch (e.g., "main")
-            branch_b: Compare branch (e.g., "feature/auth")
-            focus: Optional filter - matches paths and symbol names (e.g., "auth")
-            include_conflicts: Whether to detect potential conflicts
-
-        Returns:
-            Dict with changes, risk assessment, and token cost
-
-        Example:
-            >>> diff_branches("main", "feature/auth", focus="authentication")
-            {
-                "status": "success",
-                "symbols_changed": 12,
-                "changes": [...],
-                "risk_assessment": "medium"
-            }
-        """
+        """Compare code changes between two git branches at symbol level."""
         try:
             index = get_index_manager().get_index()
             comparator = BranchComparator(Path.cwd(), index)
@@ -200,21 +128,7 @@ def register(mcp):
         focus: str | None = None,
         include_conflicts: bool = True
     ) -> dict:
-        """
-        Compare multiple branches to a base branch at symbol level.
-
-        Aggregates symbol-level diffs across all target branches and reports
-        conflicts per branch when requested.
-
-        Args:
-            base_branch: Branch used as baseline (e.g., main)
-            branches: List of target branches to compare
-            focus: Optional substring filter across paths/symbols
-            include_conflicts: Whether to detect potential conflicts
-
-        Returns:
-            Dict with aggregated stats and per-branch results.
-        """
+        """Compare multiple branches to base branch at symbol level."""
         try:
             index = get_index_manager().get_index()
             comparator = MultiBranchComparator(Path.cwd(), index)

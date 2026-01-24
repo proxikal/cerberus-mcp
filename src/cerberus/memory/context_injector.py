@@ -19,7 +19,7 @@ import os
 import re
 import json
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Any
 from dataclasses import dataclass
 import tiktoken
 
@@ -376,7 +376,7 @@ class ContextInjector:
         lines.append("")
 
         # Group by category
-        by_category = {
+        by_category: Dict[str, List[Any]] = {
             "preference": [],
             "rule": [],
             "decision": [],
@@ -489,7 +489,7 @@ class ContextInjector:
             return memories
 
         # Build context dict for mode detection
-        mode_context = {
+        mode_context: Dict[str, Any] = {
             "modified_files": [],  # Would come from session tracking
             "tools_used": [],      # Would come from session tracking
         }
@@ -507,7 +507,8 @@ class ContextInjector:
                 try:
                     if isinstance(memory.valid_modes, str):
                         valid_modes = json.loads(memory.valid_modes)
-                    elif isinstance(memory.valid_modes, list):
+                    elif isinstance(memory.valid_modes, list):  # type: ignore[unreachable]
+                        # Defensive: handle legacy data that might have lists
                         valid_modes = memory.valid_modes
                 except (json.JSONDecodeError, TypeError):
                     # Failed to parse - include memory (backward compat)

@@ -110,6 +110,88 @@ def detect_session_scope() -> tuple[str, Optional[str]]:
     return "universal", None
 
 
+def detect_project_from_content(content: str, context: Optional[dict] = None) -> Optional[str]:
+    """
+    Detect project override from content (prevents cross-project contamination).
+
+    Priority:
+    1. Explicit statements: "this is about X", "switching to X", "not about Y"
+    2. Absolute paths: /path/to/project-name/... → project-name
+    3. Context hints: file paths in context dict
+
+    Args:
+        content: The text content to analyze
+        context: Optional context dict with file/project hints
+
+    Returns:
+        Project scope override (e.g., "project:hydra") or None (use default)
+
+    Examples:
+        >>> detect_project_from_content("this is about hydra")
+        "project:hydra"
+        >>> detect_project_from_content("working on /Users/me/dev/my-app/src/file.py")
+        "project:my-app"
+        >>> detect_project_from_content("fix the bug")
+        None  # Use default from detect_session_scope()
+    """
+    import re
+
+    if not content:
+        return None
+
+    content_lower = content.lower()
+
+    # 1. EXPLICIT STATEMENTS (highest priority)
+    # Patterns: "this is about X", "switching to X", "talking about X", "working on X"
+    explicit_patterns = [
+        r"this\s+is\s+about\s+([a-z0-9\-_]+)",
+        r"switching\s+to\s+(?:project\s+)?([a-z0-9\-_]+)",
+        r"talking\s+about\s+([a-z0-9\-_]+)",
+        r"working\s+on\s+(?:project\s+)?([a-z0-9\-_]+)",
+        r"(?:not|isn't)\s+(?:about|related\s+to)\s+([a-z0-9\-_]+)",  # Negative signal
+    ]
+
+    for pattern in explicit_patterns:
+        match = re.search(pattern, content_lower)
+        if match:
+            project_name = match.group(1)
+            # Filter out common non-project words
+            if project_name not in {"the", "this", "that", "a", "an", "it", "code", "file", "bug"}:
+                return f"project:{project_name}"
+
+    # 2. ABSOLUTE PATHS (extract project from directory structure)
+    # Match paths like /Users/name/dev/projects/hydra/src/file.py → hydra
+    # Common patterns: /path/to/projects/<name>/, ~/dev/<name>/, /home/user/<name>/
+    path_patterns = [
+        r"/(?:dev|projects|work|code|src)/([a-z0-9\-_]+)/",  # /dev/hydra/
+        r"~/(?:dev|projects|work|code)/([a-z0-9\-_]+)/",     # ~/dev/hydra/
+        r"/Users/[^/]+/(?:dev|projects|work)/([a-z0-9\-_]+)/",  # /Users/x/dev/hydra/
+        r"/home/[^/]+/(?:dev|projects|work)/([a-z0-9\-_]+)/",   # /home/x/dev/hydra/
+    ]
+
+    for pattern in path_patterns:
+        match = re.search(pattern, content)
+        if match:
+            project_name = match.group(1)
+            # Verify it looks like a project name (not a generic dir like "src", "lib")
+            if project_name not in {"src", "lib", "bin", "docs", "tests", "test", "examples"}:
+                return f"project:{project_name}"
+
+    # 3. CONTEXT HINTS (if provided)
+    if context and "file" in context:
+        file_path = context["file"]
+        # Try to extract project from file path
+        for pattern in path_patterns:
+            match = re.search(pattern, file_path)
+            if match:
+                project_name = match.group(1)
+                if project_name not in {"src", "lib", "bin", "docs", "tests", "test", "examples"}:
+                    return f"project:{project_name}"
+
+    # No override detected → use default
+    return None
+
+
 # ============================================================================
 # Context Capture
 # ============================================================================

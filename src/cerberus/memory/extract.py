@@ -13,10 +13,13 @@ Key features:
 import re
 import subprocess
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from datetime import datetime, timedelta
 
 from cerberus.logging_config import logger
+
+if TYPE_CHECKING:
+    from cerberus.memory.storage import MemoryStorage
 
 
 @dataclass

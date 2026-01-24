@@ -247,7 +247,7 @@ class MemoryIndexManager:
 
         return count > 0
 
-    def migrate_from_json(self) -> Dict[str, int]:
+    def migrate_from_json(self) -> Dict[str, Any]:
         """
         One-time migration from JSON to SQLite.
 

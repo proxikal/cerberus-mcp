@@ -635,6 +635,7 @@ def execute_resolution(resolution: ConflictResolution, conflict: MemoryConflict)
             category=conflict.memory_a.category,
             scope=conflict.memory_a.scope,
             content=resolution.merged_content,
+            rationale=f"Merged from conflicting memories: {conflict.memory_a.id} and {conflict.memory_b.id}",
             confidence=max(conflict.memory_a.confidence, conflict.memory_b.confidence),
             priority=max(conflict.memory_a.priority, conflict.memory_b.priority)
         )

@@ -267,7 +267,7 @@ class CycleDetector:
                 FROM symbol_references
                 WHERE target_file IS NOT NULL
             """
-            params = ()
+            params: Tuple[str, ...] = ()
 
             if file_path:
                 query += " AND (source_file = ? OR target_file = ?)"
@@ -303,7 +303,7 @@ class CycleDetector:
                 FROM symbol_references
                 WHERE reference_type IN ('method_call', 'function_call')
             """
-            params = ()
+            params: Tuple[str, ...] = ()
 
             if file_path:
                 query += " AND source_file = ?"
@@ -340,7 +340,7 @@ class CycleDetector:
                 FROM symbol_references
                 WHERE reference_type = 'inherits_from'
             """
-            params = ()
+            params: Tuple[str, ...] = ()
 
             if file_path:
                 query += " AND source_file = ?"

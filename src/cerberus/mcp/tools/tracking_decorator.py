@@ -77,7 +77,7 @@ def track_mcp_tool(func: Callable) -> Callable:
         params = {k: v for k, v in bound_args.arguments.items() if k != 'self'}
 
         # Sanitize parameters (convert to JSON-serializable types)
-        safe_params = {}
+        safe_params: Dict[str, Any] = {}
         for key, value in params.items():
             try:
                 if isinstance(value, (str, int, float, bool, type(None))):

@@ -110,7 +110,7 @@ class BlueprintCache:
         file_path: str,
         flags: Dict[str, Any],
         blueprint: Blueprint,
-        ttl: int = None
+        ttl: Optional[int] = None
     ) -> None:
         """
         Store blueprint in cache with TTL.

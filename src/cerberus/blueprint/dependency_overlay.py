@@ -4,7 +4,7 @@ Phase 13.1: Integrates Phase 5 confidence scores to show symbol dependencies.
 Phase 13.5: Adds dependency classification (internal/external/stdlib).
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pathlib import Path
 import sqlite3
 
@@ -119,13 +119,13 @@ class DependencyOverlay:
         try:
             # Build query with multiple symbols
             # Group by file_path for efficiency
-            file_symbols = {}
+            file_symbols: Dict[str, List[Any]] = {}
             for symbol in symbols:
                 if symbol.file_path not in file_symbols:
                     file_symbols[symbol.file_path] = []
                 file_symbols[symbol.file_path].append(symbol.name)
 
-            result = {}
+            result: Dict[str, Any] = {}
 
             # Query for each file
             for file_path, symbol_names in file_symbols.items():

@@ -17,16 +17,26 @@ from cerberus.memory.proposal_engine import MemoryProposal
 # Phase 6 (Version 2): SQLite Retrieval
 from cerberus.memory.retrieval import MemoryRetrieval
 
+# Quality filtering
+from cerberus.memory.quality_filter import MemoryQualityFilter
+
 
 def register(mcp):
     # Lazy singleton for GitExtractor
     _extractor: Optional[GitExtractor] = None
+    _quality_filter: Optional[MemoryQualityFilter] = None
 
     def get_extractor() -> GitExtractor:
         nonlocal _extractor
         if _extractor is None:
             _extractor = GitExtractor(storage=MemoryStorage())
         return _extractor
+
+    def get_quality_filter() -> MemoryQualityFilter:
+        nonlocal _quality_filter
+        if _quality_filter is None:
+            _quality_filter = MemoryQualityFilter()
+        return _quality_filter
 
     @mcp.tool()
     def memory_learn(
@@ -38,47 +48,7 @@ def register(mcp):
         relevance_decay_days: int = 90,
         bulk_memories: Optional[List[Dict[str, Any]]] = None,
     ) -> dict:
-        """
-        Teach Session Memory something new (hybrid format).
-
-        Supports both single and bulk operations:
-        - Single: Provide category, content, etc. parameters
-        - Bulk: Provide bulk_memories list, other params ignored
-
-        Args:
-            category: Type of memory - "preference", "decision", "correction"
-            content: Semantic code (compressed identifier)
-            project: Project name (required for decisions, auto-detected if not provided)
-            metadata: Additional structured data (topic, rationale, etc.)
-            details: Structured explanations (why/how/where) - optional but recommended
-            relevance_decay_days: Auto-deprioritize after N days (default: 90)
-            bulk_memories: List of memory dicts for bulk insertion (each with same keys as single params)
-
-        Returns:
-            Confirmation with memory ID(s)
-
-        Examples:
-            # Single memory
-            memory_learn(
-                category="decision",
-                content="config_hierarchical_defaults_global_local",
-                details="Root: User needed per-project config override\\nFix: Added .cerberus/ local config\\nFiles: src/cerberus/mcp/config.py:45"
-            )
-
-            # Bulk memories
-            memory_learn(bulk_memories=[
-                {
-                    "category": "decision",
-                    "content": "use_sqlite_for_storage",
-                    "details": "Root: Need fast queries\\nFix: Migrated to SQLite\\nFiles: storage.py"
-                },
-                {
-                    "category": "preference",
-                    "content": "prefer_compact_output",
-                    "details": "User prefers concise results"
-                }
-            ])
-        """
+        """Store preference, decision, or correction in session memory."""
         import uuid
         from datetime import datetime
 
@@ -103,9 +73,14 @@ def register(mcp):
                         errors.append(f"Memory {idx}: Content too long (max 500 chars)")
                         continue
 
-                    conversational_markers = ["now i want", "let me know", "can you", "should i"]
-                    if any(marker in mem_content.lower() for marker in conversational_markers):
-                        errors.append(f"Memory {idx}: Content appears conversational")
+                    # Advanced quality check (spaCy + textblob)
+                    quality_filter = get_quality_filter()
+                    quality_score = quality_filter.assess_quality(mem_content)
+
+                    if not (quality_score.is_actionable or quality_score.is_semantic_code):
+                        # Use simplified reason from quality_filter
+                        reason = quality_score.rejection_reason or "rejected"
+                        errors.append(f"Memory {idx}: {reason}")
                         continue
 
                     # Determine scope
@@ -165,13 +140,16 @@ def register(mcp):
                 "message": "Content too long (max 500 chars). Use 'details' for explanations."
             }
 
-        # Quality filter: Reject conversational fragments
-        conversational_markers = ["now i want", "let me know", "can you", "should i"]
-        content_lower = content.lower()
-        if any(marker in content_lower for marker in conversational_markers):
+        # Advanced quality check (spaCy)
+        quality_filter = get_quality_filter()
+        quality_score = quality_filter.assess_quality(content)
+
+        if not (quality_score.is_actionable or quality_score.is_semantic_code):
+            # Compact error for agents (low token cost)
+            # rejection_reason already simplified in quality_filter.py
             return {
-                "status": "error",
-                "message": "Content appears conversational. Memories should be factual decisions/rules/corrections."
+                "status": "rejected",
+                "reason": quality_score.rejection_reason or "not_actionable"
             }
 
         # Determine scope based on category and project
@@ -234,16 +212,7 @@ def register(mcp):
         category: Optional[str] = None,
         project: Optional[str] = None,
     ) -> dict:
-        """
-        Display stored memory.
-
-        Args:
-            category: Filter by type - "preference", "decision", "correction", or None for all
-            project: Project name for decisions (auto-detected if not provided)
-
-        Returns:
-            Stored memory contents from SQLite
-        """
+        """Display stored memories with optional filtering."""
         import sqlite3
         from pathlib import Path
 
@@ -312,22 +281,7 @@ def register(mcp):
         include_preferences: bool = True,
         include_corrections: bool = True,
     ) -> dict:
-        """
-        Generate context for prompt injection.
-
-        Phase 7: NEW Adaptive Memory System
-        - Auto-injects at session start (1200 tokens)
-        - On-demand queries during work (500 tokens per query)
-
-        Args:
-            query: Optional query string for on-demand retrieval
-            project: Optional project name (auto-detected if None)
-            compact: Compact format (accepted for backwards compat)
-            include_*: Filter flags (accepted for backwards compat)
-
-        Returns:
-            dict with memory context string
-        """
+        """Generate context for prompt injection from session memory."""
         from pathlib import Path
 
         # Determine base directory
@@ -351,19 +305,7 @@ def register(mcp):
 
     @mcp.tool()
     def memory_extract(path: str = ".", lookback_days: int = 30) -> dict:
-        """
-        Extract patterns from git history.
-
-        Analyzes git commits to automatically learn coding patterns,
-        naming conventions, and project-specific decisions.
-
-        Args:
-            path: Path to git repository (default: current directory)
-            lookback_days: How many days of history to analyze (default: 30)
-
-        Returns:
-            dict with extraction results including learned patterns and statistics
-        """
+        """Extract memories from git commit history."""
         import os
         from pathlib import Path
         from cerberus.memory.storage import MemoryStorage
@@ -397,36 +339,11 @@ def register(mcp):
     @mcp.tool()
     def memory_forget(
         category: str,
-        identifier: str = None,
+        identifier: Optional[str] = None,
         project: Optional[str] = None,
         ids: Optional[List[str]] = None,
     ) -> dict:
-        """
-        Remove memory entries (single or bulk).
-
-        Supports both single and bulk deletion:
-        - Single: Provide category and identifier
-        - Bulk: Provide ids list (category optional for validation)
-
-        Args:
-            category: Type of memory - "preference", "decision", "correction", or "rule"
-            identifier: The content or ID of the entry to remove (can be memory ID or content text)
-            project: Project name (required for decisions, auto-detected if not provided)
-            ids: List of memory IDs for bulk deletion
-
-        Returns:
-            dict with:
-            - status: "forgotten", "bulk_forgotten", "not_found", or "error"
-            - deleted_count: Number of memories deleted (bulk mode)
-            - errors: List of errors encountered (bulk mode)
-
-        Examples:
-            # Single deletion
-            memory_forget(category="preference", identifier="prop-123abc")
-
-            # Bulk deletion
-            memory_forget(ids=["prop-123abc", "dec-456def", "corr-789ghi"])
-        """
+        """Remove memory entries by ID or filter criteria."""
         # Validate category
         valid_categories = ["preference", "decision", "correction", "rule"]
         if category and category not in valid_categories:
@@ -547,22 +464,7 @@ def register(mcp):
 
     @mcp.tool()
     def memory_stats() -> dict:
-        """
-        Get memory storage statistics.
-
-        Shows counts of stored preferences, decisions, and corrections,
-        along with storage paths.
-
-        Returns:
-            dict with:
-            - preferences: Count of stored preferences
-            - decisions: Count of stored decisions
-            - decision_projects: Number of projects with decisions
-            - corrections: Count of stored corrections
-            - total_entries: Total memory entries
-            - database_path: Path to SQLite database
-            - database_size_kb: Size of database file
-        """
+        """Show memory storage statistics."""
         import sqlite3
         from pathlib import Path
 
@@ -610,21 +512,7 @@ def register(mcp):
 
     @mcp.tool()
     def memory_export(output_path: Optional[str] = None) -> dict:
-        """
-        Export all memory for backup or sharing.
-
-        Creates a JSON file containing all memories from SQLite database.
-        Useful for backup or sharing between machines.
-
-        Args:
-            output_path: Path for export file (default: cerberus-memory-export-YYYYMMDD.json)
-
-        Returns:
-            dict with:
-            - status: "exported" on success
-            - path: Path where export was saved
-            - entries: Count of exported memories by category
-        """
+        """Export memories to JSON file."""
         import json
         import sqlite3
         from datetime import datetime
@@ -693,22 +581,7 @@ def register(mcp):
 
     @mcp.tool()
     def memory_import(input_path: str, merge: bool = True) -> dict:
-        """
-        Import memory from backup.
-
-        Restores previously exported memory into SQLite database.
-        Can either merge with existing memory or replace it entirely.
-
-        Args:
-            input_path: Path to the export JSON file to import
-            merge: If True, merge with existing memory. If False, replace existing.
-
-        Returns:
-            dict with:
-            - status: "imported" on success
-            - merged: Whether merge mode was used
-            - counts: Number of imported memories by category
-        """
+        """Import memories from JSON file."""
         import json
         import sqlite3
         from pathlib import Path
@@ -787,50 +660,7 @@ def register(mcp):
         interactive: bool = True,
         batch_threshold: float = 0.9
     ) -> dict:
-        """
-        Propose and store memories from current session (manual trigger).
-
-        Runs the COMPLETE memory collection pipeline:
-
-        STEP 1: Save Session Summary
-        - Reads entire transcript
-        - Extracts semantic codes (done:, next:, impl:, fix:, etc.)
-        - Extracts structured details (bugs fixed, investigations, files modified)
-        - Saves to SQLite sessions table for session continuity
-
-        STEP 2: Detect & Store Corrections (Memory Proposals)
-        - Detects correction patterns ("don't do X", "never Y")
-        - Clusters similar corrections
-        - Generates memory proposals
-        - CLI approval (interactive or batch)
-        - Stores approved memories to memory_store table
-
-        This is the SAME process that runs automatically at session end via hook.
-        Use this to:
-        - Manually trigger memory collection mid-session
-        - Test memory collection without ending session
-        - Recover from hook failures
-
-        Args:
-            interactive: Use interactive CLI approval (default: True)
-            batch_threshold: Auto-approve threshold for batch mode (default: 0.9)
-
-        Returns:
-            dict with:
-            - status: "completed" or "error"
-            - session_summary_saved: Whether session context was saved
-            - proposals_generated: Number of memory proposals created
-            - proposals_approved: Number approved by user
-            - stored_count: Number stored to database
-            - session_stats: Candidate/cluster/proposal counts
-
-        Example:
-            # Interactive approval (default)
-            memory_propose()
-
-            # Batch mode (auto-approve high confidence)
-            memory_propose(interactive=False, batch_threshold=0.85)
-        """
+        """Manually trigger batch memory collection from conversation."""
         from cerberus.memory.hooks import propose_hook
 
         try:
@@ -855,43 +685,13 @@ def register(mcp):
 
     @mcp.tool()
     def memory_search(
-        query: str = None,
+        query: Optional[str] = None,
         scope: Optional[str] = None,
         category: Optional[str] = None,
         limit: int = 10,
         queries: Optional[List[Dict[str, Any]]] = None,
     ) -> dict:
-        """
-        Search memories by text query using FTS5 full-text search.
-
-        Supports both single and bulk operations:
-        - Single: Provide query parameter
-        - Bulk: Provide queries list (query parameter ignored)
-
-        Phase 13: Adaptive Learning Memory System
-        Uses SQLite FTS5 for efficient text search across memories.
-
-        Args:
-            query: Text to search for (single mode)
-            scope: Filter by scope (universal, language:X, project:Y)
-            category: Filter by category (preference, rule, correction, decision)
-            limit: Max results per query (default 10)
-            queries: List of search query dicts for bulk search (each with query, optional scope/category/limit)
-
-        Returns:
-            Search results with relevance scores
-
-        Examples:
-            # Single search
-            memory_search(query="config", category="decision")
-
-            # Bulk search (multiple queries with different filters)
-            memory_search(queries=[
-                {"query": "config", "category": "decision"},
-                {"query": "prefer", "category": "preference"},
-                {"query": "sqlite", "scope": "project:cerberus"}
-            ])
-        """
+        """Search memories using FTS5 full-text search."""
         db_path = Path.home() / ".cerberus" / "memory.db"
 
         if not db_path.exists():
@@ -1004,3 +804,104 @@ def register(mcp):
                 "status": "error",
                 "message": f"Search failed: {str(e)}"
             }
+
+    @mcp.tool()
+    def memory_migrate(
+        memory_ids: List[str],
+        target_project: str,
+        dry_run: bool = True
+    ) -> dict:
+        """
+        Migrate memories between project scopes (prevents cross-project contamination).
+
+        Use when memories were stored in wrong project scope.
+
+        Args:
+            memory_ids: List of memory IDs to migrate
+            target_project: Target project name (e.g., "hydra", "my-app")
+            dry_run: If True, preview changes without applying (default: True)
+
+        Returns:
+            Migration report with preview/results
+
+        Examples:
+            # Preview migration
+            memory_migrate(["abc123", "def456"], "hydra", dry_run=True)
+
+            # Execute migration
+            memory_migrate(["abc123", "def456"], "hydra", dry_run=False)
+        """
+        import sqlite3
+        from pathlib import Path
+
+        db_path = Path.home() / ".cerberus" / "memory.db"
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+
+        migrated: list = []
+        not_found: list = []
+        errors: list = []
+
+        try:
+            for memory_id in memory_ids:
+                try:
+                    # Fetch current memory
+                    cursor = conn.execute(
+                        "SELECT id, category, scope, content FROM memory_store WHERE id = ?",
+                        (memory_id,)
+                    )
+                    row = cursor.fetchone()
+
+                    if not row:
+                        not_found.append(memory_id)
+                        continue
+
+                    old_scope = row["scope"]
+                    new_scope = f"project:{target_project}"
+
+                    # Skip if already in target scope
+                    if old_scope == new_scope:
+                        errors.append(f"{memory_id}: already in {new_scope}")
+                        continue
+
+                    migration_info = {
+                        "id": memory_id,
+                        "category": row["category"],
+                        "content": row["content"],
+                        "old_scope": old_scope,
+                        "new_scope": new_scope
+                    }
+
+                    if not dry_run:
+                        # Execute migration
+                        conn.execute(
+                            "UPDATE memory_store SET scope = ? WHERE id = ?",
+                            (new_scope, memory_id)
+                        )
+                        conn.commit()
+
+                    migrated.append(migration_info)
+
+                except Exception as e:
+                    errors.append(f"{memory_id}: {str(e)}")
+
+            return {
+                "status": "preview" if dry_run else "migrated",
+                "dry_run": dry_run,
+                "target_project": target_project,
+                "migrated_count": len(migrated),
+                "not_found_count": len(not_found),
+                "error_count": len(errors),
+                "migrations": migrated,
+                "not_found_ids": not_found if not_found else None,
+                "errors": errors if errors else None,
+                "hint": "Set dry_run=False to execute migration" if dry_run and migrated else None
+            }
+
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Migration failed: {str(e)}"
+            }
+        finally:
+            conn.close()

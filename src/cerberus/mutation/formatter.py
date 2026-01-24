@@ -7,7 +7,7 @@ Phase 11: Pillar 1 - Auto-Indentation.
 import subprocess
 import shutil
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 from cerberus.logging_config import logger
 from .config import FORMATTERS, INDENT_DETECTION
@@ -109,13 +109,13 @@ class CodeFormatter:
             return None
 
         # Sample first N lines
-        max_lines = INDENT_DETECTION["max_sample_lines"]
+        max_lines: int = INDENT_DETECTION["max_sample_lines"]
         sample_lines = lines[:max_lines]
 
         # Count tabs vs spaces
         tab_count = 0
         space_count = 0
-        space_widths = {}
+        space_widths: Dict[int, int] = {}
 
         for line in sample_lines:
             if not line.strip():

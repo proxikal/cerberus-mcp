@@ -1,6 +1,6 @@
 """File reading tools."""
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 import subprocess
 from datetime import datetime
@@ -18,44 +18,13 @@ from cerberus.mcp.config import get_config_value
 def register(mcp):
     @mcp.tool()
     def read_range(
-        file_path: str = None,
-        start_line: int = None,
-        end_line: int = None,
+        file_path: Optional[str] = None,
+        start_line: Optional[int] = None,
+        end_line: Optional[int] = None,
         context_lines: int = 0,
-        ranges: List[Dict[str, Any]] = None,
+        ranges: Optional[List[Dict[str, Any]]] = None,
     ) -> dict:
-        """
-        Read line ranges or entire files with Cerberus metadata.
-
-        Supports single, bulk, and full-file modes:
-        - Single range: Provide file_path, start_line, end_line
-        - Full file: Provide file_path only (omit start_line/end_line)
-        - Bulk: Provide ranges list
-
-        Args:
-            file_path: Path to file (single mode)
-            start_line: Starting line number, 1-indexed (optional - omit for full file)
-            end_line: Ending line number, 1-indexed (optional - omit for full file)
-            context_lines: Additional context lines before/after (default: 0)
-            ranges: List of range dicts for bulk reading (each with file_path, optional start_line/end_line)
-
-        Returns:
-            Dict with result(s) and token info
-
-        Examples:
-            # Full file (NEW - entire file with metadata)
-            read_range(file_path="src/config.py")
-
-            # Single range
-            read_range(file_path="src/main.py", start_line=10, end_line=20)
-
-            # Bulk ranges (multiple ranges from same or different files)
-            read_range(ranges=[
-                {"file_path": "src/config.py", "start_line": 10, "end_line": 30},
-                {"file_path": "src/utils.py"},  # Full file in bulk
-                {"file_path": "src/models.py", "start_line": 100, "end_line": 120}
-            ])
-        """
+        """Read line ranges or entire files with metadata."""
         # Validate inputs
         if not file_path and not ranges:
             return {
@@ -201,19 +170,18 @@ def register(mcp):
             padding=context_lines,
         )
 
-        # Calculate token metadata
+        # Calculate token metadata for single file mode
+        single_file_token_estimate: Optional[int] = None
         try:
             # Estimate full file tokens (assuming average file size)
             file_path_obj = Path(file_path)
             if file_path_obj.exists():
                 with open(file_path_obj) as f:
                     total_lines = sum(1 for _ in f)
-                estimated_full_file_tokens = estimate_file_tokens(file_path, total_lines)
-            else:
-                estimated_full_file_tokens = None
+                single_file_token_estimate = estimate_file_tokens(file_path, total_lines)
         except Exception:
             # If we can't estimate tokens, just continue without the estimate
-            estimated_full_file_tokens = None
+            pass
 
         response = {
             "file": snippet.file_path,
@@ -223,7 +191,7 @@ def register(mcp):
         }
 
         # Add token info
-        if estimated_full_file_tokens:
+        if single_file_token_estimate:
             add_token_metadata(
                 response,
                 snippet.content,
@@ -235,40 +203,10 @@ def register(mcp):
 
     @mcp.tool()
     def file_info(
-        path: str = None,
-        paths: List[str] = None,
+        path: Optional[str] = None,
+        paths: Optional[List[str]] = None,
     ) -> dict:
-        """
-        Get file metadata without reading content.
-
-        Provides lightweight file information for quick checks:
-        - File size (bytes and human-readable)
-        - Line count (for text files)
-        - File type/extension
-        - Last modified time
-        - Git tracking status
-        - Permissions
-
-        Token cost: ~50-100 tokens per file (vs 1000s for reading content)
-
-        Supports single and bulk modes:
-        - Single: Provide path parameter
-        - Bulk: Provide paths list
-
-        Args:
-            path: File path (single mode)
-            paths: List of file paths (bulk mode)
-
-        Returns:
-            File metadata dict or list of metadata dicts
-
-        Examples:
-            # Single file
-            file_info(path="src/main.py")
-
-            # Bulk files
-            file_info(paths=["src/config.py", "src/utils.py", "README.md"])
-        """
+        """Get file metadata without reading content."""
         def _get_file_info(file_path_str: str) -> Dict[str, Any]:
             """Helper to get info for a single file."""
             file_path = Path(file_path_str).resolve()

@@ -10,42 +10,12 @@ from cerberus.mcp.config import get_config_value
 def register(mcp):
     @mcp.tool()
     def skeletonize(
-        path: str = None,
+        path: Optional[str] = None,
         preserve_symbols: Optional[List[str]] = None,
         format: str = "code",
         files: Optional[List[str]] = None,
     ) -> dict:
-        """
-        Generate code skeleton - signatures and structure without implementation.
-
-        Supports single and bulk modes:
-        - Single: Provide path parameter
-        - Bulk: Provide files list (path parameter ignored)
-
-        Removes function/method bodies while preserving:
-        - Class/function signatures
-        - Type annotations
-        - Docstrings (first line only)
-        - Import statements
-
-        Token savings: typically 70-90% reduction vs full file.
-
-        Args:
-            path: File path to skeletonize (single mode)
-            preserve_symbols: Symbol names to keep full implementation (not skeletonize)
-            format: Output format - "code" (skeleton source), "json" (structured)
-            files: List of file paths for bulk skeletonization
-
-        Returns:
-            Skeletonized code with compression stats
-
-        Examples:
-            # Single file
-            skeletonize(path="src/config.py")
-
-            # Bulk files
-            skeletonize(files=["src/config.py", "src/utils.py", "src/models.py"])
-        """
+        """Generate code skeleton without implementation bodies."""
         # Validate inputs
         if not path and not files:
             return {"error": "Must provide either path for single file or files for bulk skeletonization"}
@@ -171,25 +141,7 @@ def register(mcp):
         path: str = ".",
         pattern: str = "**/*.py"
     ) -> dict:
-        """
-        Get a summary of all skeletonizable files in a directory.
-
-        **AI WORKFLOW:**
-        1. Use this tool to survey a directory/module
-        2. Review the file list and identify relevant files
-        3. Call skeletonize() on specific files you need
-
-        **DO NOT** try to get all file contents at once - work file-by-file
-        for token efficiency and context control.
-
-        Args:
-            path: Directory path to scan
-            pattern: Glob pattern for files (default: **/*.py)
-
-        Returns:
-            Summary with file list, compression stats, and token savings estimate.
-            Use the file paths to selectively call skeletonize() on specific files.
-        """
+        """Get summary of skeletonizable files in directory."""
         dir_path = Path(path).resolve()
 
         if not dir_path.exists():

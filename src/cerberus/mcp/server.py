@@ -14,6 +14,7 @@ from .tools import (
     search,
     structure,
     summarization,
+    summary,
     symbols,
     synthesis,
 )
@@ -54,8 +55,9 @@ def create_server():
     quality.register(mcp)
     metrics.register(mcp)
 
-    # Diagnostics
+    # Diagnostics & summary
     diagnostics.register(mcp)
+    summary.register(mcp)
 
     return mcp
 

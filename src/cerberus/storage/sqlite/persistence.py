@@ -7,12 +7,15 @@ Handles connection management, transactions, metadata, and database lifecycle.
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union, TYPE_CHECKING
 
 from cerberus.logging_config import logger
 from cerberus.exceptions import IndexCorruptionError
 from cerberus.storage.sqlite.schema import init_schema
 from cerberus.storage.sqlite.config import DEFAULT_TIMEOUT, ENABLE_WAL_MODE
+
+if TYPE_CHECKING:
+    from cerberus.storage.faiss_store import FAISSVectorStore
 
 
 class SQLitePersistence:
@@ -26,7 +29,7 @@ class SQLitePersistence:
     - Database statistics
     """
 
-    def __init__(self, index_path: Path):
+    def __init__(self, index_path: Union[str, Path]):
         """
         Initialize persistence layer with automatic schema creation.
 
@@ -48,7 +51,7 @@ class SQLitePersistence:
         self._init_schema()
 
         # FAISS store will be initialized by consumer (lazy initialization)
-        self._faiss_store = None
+        self._faiss_store: Optional['FAISSVectorStore'] = None
 
     def _get_connection(self) -> sqlite3.Connection:
         """

@@ -18,49 +18,7 @@ def register(mcp):
         show_meta: bool = False,
         format: Literal["tree", "json", "json-compact", "flat", "list"] = "tree",
     ):
-        """
-        Generate structural blueprint of a file or directory.
-
-        Provides a high-level view of code structure including classes,
-        functions, and their relationships.
-
-        TOKEN EFFICIENCY:
-
-        Format costs (approx):
-        - list: ~100 tokens (NEW - simple file/dir listing, lightest)
-        - flat: ~200 tokens (symbol list)
-        - tree: ~350 tokens (recommended for LLM consumption; names only, no signatures)
-        - json-compact: ~800 tokens (minified structured data)
-        - json: ~1,800 tokens (≈5x more expensive; use only for programmatic parsing)
-
-        Metadata costs:
-        - Basic (show_deps=False, show_meta=False): ~350 tokens
-        - With deps/meta: up to ~1,500 tokens (≈4x increase)
-
-        Best practices:
-        - Use format="list" for quick directory exploration (what files exist?)
-        - Prefer format="tree" for code structure (compact, names-only view)
-        - Use format="json" or "json-compact" if you need full signatures
-        - Enable show_deps/show_meta only when necessary
-
-        Defaults that protect tokens:
-        - max_depth=10 prevents deep trees
-        - max_width=120 truncates long lines
-        - show_signatures=False keeps tree format compact
-
-        Args:
-            path: File or directory path to analyze
-            show_deps: Include dependency information (imports, calls); adds ~1k tokens
-            show_meta: Include metadata (docstrings, line counts); adds ~1k tokens
-            format: Output format - "list" (simple listing), "tree" (efficient), "json" (verbose), "json-compact" (minified), "flat" (symbols)
-
-        Returns:
-            Formatted blueprint showing code structure. Format depends on 'format' parameter:
-            - list: Simple file/directory listing (NEW - no symbols, just paths)
-            - tree: ASCII tree visualization (bounded by max_depth/width)
-            - json: Structured dict with symbols and metadata
-            - flat: Simple list of symbols
-        """
+        """Generate structural blueprint of file or directory."""
         # Handle simple list format (no index required)
         if format == "list":
             target_path = Path(path).resolve()

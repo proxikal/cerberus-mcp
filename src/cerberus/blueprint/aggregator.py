@@ -6,7 +6,7 @@ Phase 13.3: Aggregates blueprints across multiple files in a package.
 import json
 import sqlite3
 from pathlib import Path
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Any
 from collections import defaultdict
 
 from cerberus.logging_config import logger
@@ -53,7 +53,7 @@ class AggregatedBlueprint:
 
     def _node_to_dict(self, node: BlueprintNode) -> Dict:
         """Convert BlueprintNode to dict recursively."""
-        result = {
+        result: Dict[str, Any] = {
             "name": node.name,
             "type": node.type,
             "file": node.file_path,
@@ -121,7 +121,7 @@ class BlueprintAggregator:
             # Aggregate symbols across all files
             all_nodes: list = []
             total_symbols = 0
-            cross_file_refs = defaultdict(list)
+            cross_file_refs: Dict[str, List[str]] = defaultdict(list)
 
             for file_path in files:
                 # Get symbols for this file

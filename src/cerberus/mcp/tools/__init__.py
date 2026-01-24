@@ -15,4 +15,5 @@ __all__ = [
     "analysis_tools",
     "context",
     "diagnostics",
+    "summary",
 ]

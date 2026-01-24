@@ -5,7 +5,7 @@ Phase 13.1: Calculate cyclomatic complexity, line count, nesting depth, and bran
 
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, List, Any
 
 from cerberus.logging_config import logger
 from cerberus.schemas import CodeSymbol
@@ -219,7 +219,7 @@ class ComplexityAnalyzer:
         result = {}
 
         # Group by file for efficient reading
-        by_file = {}
+        by_file: Dict[str, List[Any]] = {}
         for symbol in symbols:
             if symbol.file_path not in by_file:
                 by_file[symbol.file_path] = []

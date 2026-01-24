@@ -4,7 +4,7 @@ StyleDetector - Phase 14.1: Style Issue Detection
 Detects style issues without making changes (style-check operation).
 """
 
-from typing import List
+from typing import List, Optional
 from pathlib import Path
 
 from cerberus.quality.style_guard import StyleGuardV2, StyleIssue
@@ -49,7 +49,7 @@ class StyleDetector:
         self,
         directory: str,
         recursive: bool = False,
-        extensions: List[str] = None
+        extensions: Optional[List[str]] = None
     ) -> dict[str, List[StyleIssue]]:
         """
         Check all files in a directory.
@@ -90,7 +90,7 @@ class StyleDetector:
     def format_issues(
         self,
         issues: List[StyleIssue],
-        file_path: str = None,
+        file_path: Optional[str] = None,
         mode: str = "text"
     ) -> str:
         """

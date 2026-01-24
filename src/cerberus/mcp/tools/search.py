@@ -1,5 +1,5 @@
 """Search tool - hybrid keyword + semantic search."""
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Set, Tuple
 from pathlib import Path
 import re
 
@@ -96,37 +96,7 @@ def register(mcp):
         mode: str = "auto",
         filter_type: str = "symbols",
     ) -> Dict[str, Any]:
-        """
-        Search codebase for symbols, imports, or relationships.
-
-        TOKEN EFFICIENCY:
-        - Each result: ~80-100 tokens.
-        - Recommended limit: 5-10 results (~400-1,000 tokens).
-        - limit directly scales tokens: limit=5 (~500), limit=10 (~1,000), limit=20 (~2,000).
-        - Avoid high limits unless necessary.
-
-        SAFEGUARDS:
-        - Default limit reduced to 5 (from 10) for token safety
-        - Maximum limit: 50 results
-        - Warnings when estimated tokens > 2000
-
-        Args:
-            query: Search query (keyword or natural language)
-            limit: Maximum results to return (default: 5, max: 50)
-            mode: Search mode - "auto", "keyword", "semantic", "balanced"
-            filter_type: What to search for - "symbols" (default), "imports" (files importing module)
-
-        Returns:
-            List of matching symbols/imports with file paths and line numbers
-
-        Examples:
-            # Search for symbols (default)
-            search(query="UserConfig")
-
-            # Find files that import a module
-            search(query="pathlib", filter_type="imports")
-            search(query="cerberus.retrieval", filter_type="imports")
-        """
+        """Search codebase for symbols, imports, or relationships."""
         # SAFEGUARD: Hard limit enforcement
         MAX_LIMIT = 50
         if limit > MAX_LIMIT:
@@ -156,8 +126,8 @@ def register(mcp):
                     (f"%{query}%", query, limit)
                 )
 
-                import_results: list = []
-                seen = set()
+                import_results: List[Dict[str, Any]] = []
+                seen: Set[Tuple[str, str]] = set()
 
                 for row in cursor.fetchall():
                     # Normalize path to relative
@@ -179,7 +149,7 @@ def register(mcp):
                         "type": "import"
                     })
 
-                response = {
+                response: Dict[str, Any] = {
                     "result": import_results,
                     "filter_type": "imports",
                     "query": query
@@ -215,7 +185,7 @@ def register(mcp):
 
         # Deduplicate results by normalizing paths to relative
         seen = set()
-        result_list: list = []
+        result_list: List[Dict[str, Any]] = []
 
         for r in results:
             # Normalize path to relative for deduplication

@@ -11,7 +11,7 @@ import sqlite3
 import json
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
 from dataclasses import dataclass
 import tiktoken
 
@@ -81,7 +81,7 @@ class MemoryRetrieval:
         "project": 1.0       # Project-specific highly relevant
     }
 
-    def __init__(self, base_dir: Optional[Path] = None, encoding: str = "cl100k_base"):
+    def __init__(self, base_dir: Optional[Union[str, Path]] = None, encoding: str = "cl100k_base"):
         """
         Args:
             base_dir: Base directory for storage (default: ~/.cerberus)

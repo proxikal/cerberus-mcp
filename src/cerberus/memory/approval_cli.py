@@ -8,7 +8,7 @@ Zero token cost (pure UI).
 """
 
 from dataclasses import dataclass
-from typing import List, Set, Union
+from typing import List, Set, Union, Optional
 from datetime import datetime
 
 
@@ -45,7 +45,7 @@ class ApprovalCLI:
     def run(
         self,
         user_proposals: List,
-        agent_proposals: List = None,
+        agent_proposals: Optional[List] = None,
         interactive: bool = True,
         optimize: bool = True
     ) -> Union[ApprovalResult, List[str]]:
@@ -215,17 +215,39 @@ class ApprovalCLI:
 
     def _display_proposal(self, index: int, proposal) -> None:
         """
-        Display a single proposal.
+        Display a single proposal with semantic code formatting.
 
         Args:
             index: Proposal number (1-indexed)
             proposal: MemoryProposal or AgentProposal
         """
-        print(f"\n[{index}] {proposal.content}")
+        # Format semantic codes for readability
+        content_display = self._format_semantic_code(proposal.content)
+
+        print(f"\n[{index}] {content_display}")
         print(f"    Scope:      {proposal.scope}")
         print(f"    Category:   {proposal.category}")
         print(f"    Confidence: {proposal.confidence:.0%}")
         print(f"    Rationale:  {proposal.rationale}")
+
+    def _format_semantic_code(self, content: str) -> str:
+        """
+        Format semantic codes for display (optional readability enhancement).
+
+        Examples:
+            pref:concise_output → pref:concise_output (kept as-is, semantic codes are clear)
+            decision:sqlite_storage[cerberus] → decision:sqlite_storage[cerberus]
+            Use X instead of Y → Use X instead of Y (natural language kept as-is)
+
+        Args:
+            content: Memory content (semantic code or natural language)
+
+        Returns:
+            Formatted content for display
+        """
+        # Keep content as-is for now - semantic codes are already clear
+        # Future enhancement: could add color formatting or expandable details
+        return content
 
         # Show source variants if available (MemoryProposal only)
         if hasattr(proposal, 'source_variants') and proposal.source_variants:
@@ -296,7 +318,7 @@ class ApprovalCLI:
 
 def approve_proposals(
     user_proposals: List,
-    agent_proposals: List = None,
+    agent_proposals: Optional[List] = None,
     interactive: bool = True,
     auto_approve_threshold: float = 0.9,
     optimize: bool = True

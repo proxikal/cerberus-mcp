@@ -36,7 +36,7 @@ def collect_context_data() -> Dict[str, Any]:
     - command_count: number of CLI commands
     - aegis_compliance: dict of aegis layer checks
     """
-    data = {}
+    data: Dict[str, Any] = {}
 
     # Get version
     data["version"] = _get_version()

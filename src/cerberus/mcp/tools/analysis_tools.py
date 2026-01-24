@@ -27,31 +27,7 @@ def register(mcp):
 
     @mcp.tool()
     def project_summary() -> dict:
-        """
-        Generate comprehensive project onboarding summary.
-
-        **Use Case:**
-        Perfect for AI agents starting a new session - provides 80/20 value
-        in ~800 tokens instead of 5,000+ tokens of exploration.
-
-        **What It Includes:**
-        - Tech stack detection
-        - Architecture overview
-        - Key module purposes
-        - Entry points
-        - Coding patterns
-        - Dependencies
-        - Testing approach
-
-        **Token Efficiency:**
-        ~800 tokens vs ~5,000+ tokens for manual exploration (84% savings)
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - summary: ProjectSummary object with all fields
-            - _token_info: Token cost metadata
-        """
+        """Generate high-level project overview with 80/20 analysis."""
         try:
             # Get project root (where .cerberus/ index is)
             manager = get_index_manager()
@@ -93,38 +69,7 @@ def register(mcp):
 
     @mcp.tool()
     def analyze_impact(symbol_name: str, file_path: Optional[str] = None) -> dict:
-        """
-        Analyze the impact of changing a symbol.
-
-        **Use Case:**
-        Before refactoring, understand what code and tests would be affected.
-        Makes safe modification decisions with confidence.
-
-        **What It Analyzes:**
-        - Direct callers (immediate impact)
-        - Transitive callers (ripple effects)
-        - Affected tests (what needs updating)
-        - Risk score (low, medium, high, critical)
-        - Breaking change warnings
-        - Safety assessment
-        - Actionable recommendations
-
-        **Risk Scoring:**
-        - Low: < 5 callers, good test coverage
-        - Medium: 5-15 callers, moderate coverage
-        - High: 15+ callers or poor coverage
-        - Critical: Heavy usage + poor coverage
-
-        Args:
-            symbol_name: Name of symbol to analyze (function, class, method)
-            file_path: Optional file path to disambiguate if multiple symbols share name
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - analysis: ImpactAnalysis object with complete assessment
-            - _token_info: Token cost metadata
-        """
+        """Analyze impact of changing a symbol."""
         try:
             manager = get_index_manager()
             index = manager.get_index()
@@ -179,38 +124,7 @@ def register(mcp):
 
     @mcp.tool()
     def test_coverage(symbol_name: str, file_path: Optional[str] = None) -> dict:
-        """
-        Map test coverage for a symbol.
-
-        **Use Case:**
-        Understand what tests exist for code you're about to modify.
-        Identifies coverage gaps and suggests improvements.
-
-        **What It Provides:**
-        - Test functions that exercise this symbol
-        - Coverage percentage estimate
-        - Uncovered branches/paths
-        - Coverage quality assessment
-        - Safety for modification
-        - Specific recommendations
-
-        **Coverage Quality:**
-        - excellent: 90%+ coverage, 3+ tests
-        - good: 70%+ coverage, 2+ tests
-        - fair: 50%+ coverage, 1+ test
-        - poor: Some coverage but insufficient
-        - none: No test coverage found
-
-        Args:
-            symbol_name: Name of symbol to analyze
-            file_path: Optional file path to disambiguate
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - coverage: TestCoverageReport with analysis
-            - _token_info: Token cost metadata
-        """
+        """Find tests covering specific code."""
         try:
             manager = get_index_manager()
             index = manager.get_index()
@@ -276,43 +190,7 @@ def register(mcp):
         show_examples: bool = True,
         limit: int = 20
     ) -> dict:
-        """
-        Check if code follows established project patterns.
-
-        **Use Case:**
-        When writing new code, check how this project handles common patterns.
-        Ensures consistency and helps maintain code quality.
-
-        **Available Patterns:**
-        - dataclass: Use dataclasses for data structures
-        - type_hints: Type hints on function parameters and returns
-        - async_await: Async/await for I/O operations
-        - error_handling: Proper try/except with logging
-        - import_style: Absolute vs relative imports
-        - docstring_style: Google-style vs Sphinx-style docstrings
-
-        **What It Provides:**
-        - Conforming file count
-        - Violations with file:line and snippets
-        - Examples of correct usage (2-3 files)
-        - Consistency score (0.0-1.0)
-        - Actionable suggestions
-
-        **Token Efficiency:**
-        ~800-1500 tokens with bounded results (limit violations to 20)
-
-        Args:
-            pattern: Pattern to check (see Available Patterns above)
-            scope: Optional path to scope check (file or directory). None = entire project
-            show_examples: Include 2-3 examples of correct usage (default: True)
-            limit: Max violations to return (default: 20, prevents token explosion)
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - result: PatternCheckResult with analysis
-            - _token_info: Token cost metadata
-        """
+        """Verify code follows project patterns."""
         try:
             manager = get_index_manager()
             index = manager.get_index()
@@ -391,41 +269,7 @@ def register(mcp):
         scope: Optional[str] = None,
         limit: int = 30
     ) -> dict:
-        """
-        Validate code against architectural rules.
-
-        **Use Case:**
-        Enforce structural boundaries and design constraints.
-        Catches architectural violations before they become problems.
-
-        **Available Rules:**
-        - layer_separation: MCP tools must use index_manager (not direct store access)
-        - type_coverage: All public functions must have type hints
-        - docstring_coverage: All public classes/functions must have docstrings
-        - async_boundaries: MCP tools must be async functions
-        - import_restrictions: No circular imports between modules
-
-        **What It Provides:**
-        - Violations with file:line and severity
-        - Code snippets showing the issue
-        - Actionable suggestions for fixes
-        - Conformance score (0.0-1.0)
-        - Status: pass, warnings, or fail
-
-        **Token Efficiency:**
-        ~800-1500 tokens with bounded results (limit violations to 30)
-
-        Args:
-            rules: List of rule names to check. None = all rules
-            scope: Optional path scope (file or directory). None = entire project
-            limit: Max violations to return (default: 30)
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - result: ArchitectureValidationResult with violations
-            - _token_info: Token cost metadata
-        """
+        """Enforce architectural rules."""
         try:
             manager = get_index_manager()
             index = manager.get_index()
@@ -497,47 +341,7 @@ def register(mcp):
         scope: Optional[str] = None,
         limit: int = 15
     ) -> dict:
-        """
-        Search code by behavior/purpose using natural language.
-
-        **Use Case:**
-        Find code by what it does, not just what it's named.
-        Perfect for "show me how this project does X" questions.
-
-        **Example Queries:**
-        - "functions that make HTTP calls"
-        - "error handlers"
-        - "database queries"
-        - "file I/O operations"
-        - "async functions"
-        - "logging operations"
-        - "data validation"
-
-        **How It Works:**
-        Uses AST analysis to detect behavioral patterns:
-        - HTTP calls: Detects httpx, requests, urllib usage
-        - Error handlers: Finds try/except blocks with logging
-        - Database queries: Detects SQL keywords and .execute() calls
-        - File I/O: Finds open(), Path read/write operations
-        - Async operations: Finds async def and await usage
-        - Logging: Detects logger method calls
-        - Data validation: Finds @dataclass, pydantic, validators
-
-        **Token Efficiency:**
-        ~800-1700 tokens with bounded results (limit matches to 15)
-
-        Args:
-            query: Natural language description of behavior to find
-                   (e.g., "functions that handle errors")
-            scope: Optional path scope (file or directory). None = entire project
-            limit: Max matches to return (default: 15)
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - result: SemanticSearchResult with matches
-            - _token_info: Token cost metadata
-        """
+        """Find code with specific runtime behavior."""
         try:
             manager = get_index_manager()
             index = manager.get_index()
@@ -602,39 +406,7 @@ def register(mcp):
         scope: Optional[str] = None,
         min_severity: str = "low"
     ) -> dict:
-        """
-        Find circular dependency chains in the project.
-
-        **Use Case:**
-        Detect circular imports that can cause runtime errors and maintenance issues.
-        Essential for maintaining clean architecture and preventing import deadlocks.
-
-        **What It Detects:**
-        - Direct cycles: A → B → A
-        - Three-way cycles: A → B → C → A
-        - Long chains: A → B → C → D → A
-        - Any length circular dependency chains
-
-        **Severity Levels:**
-        - critical: Long chains (4+) involving core modules
-        - high: 3+ modules or involving critical modules (main, server, core)
-        - medium: Direct cycles (2 modules) or 3-way cycles
-        - low: Simple cycles in utility modules
-
-        **Token Efficiency:**
-        ~500-1500 tokens with bounded results
-
-        Args:
-            scope: Optional path scope (directory). None = entire project
-            min_severity: Minimum severity to report (default: "low")
-                         Options: "low", "medium", "high", "critical"
-
-        Returns:
-            dict with:
-            - status: "ok" or "error"
-            - result: CircularDependencyResult with chains
-            - _token_info: Token cost metadata
-        """
+        """Detect circular import dependencies."""
         try:
             manager = get_index_manager()
             index = manager.get_index()

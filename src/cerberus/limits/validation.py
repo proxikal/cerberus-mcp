@@ -8,7 +8,7 @@ Phase: Bloat Protection System
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from collections import Counter
 
 from loguru import logger
@@ -33,7 +33,7 @@ class ValidationResult:
 
 
 def validate_index_health(
-    index_path: Path,
+    index_path: Union[str, Path],
     config: Optional[IndexLimitsConfig] = None,
 ) -> ValidationResult:
     """

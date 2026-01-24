@@ -139,7 +139,7 @@ class MCPMetricsTracker:
             e.tokens_saved for e in self.session_events if e.tokens_saved
         )
 
-        tool_usage = {}
+        tool_usage: Dict[str, int] = {}
         for event in self.session_events:
             tool_usage[event.tool_name] = tool_usage.get(event.tool_name, 0) + 1
 

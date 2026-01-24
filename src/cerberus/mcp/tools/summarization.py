@@ -11,23 +11,7 @@ def register(mcp):
         path: str,
         focus: Optional[str] = None
     ) -> dict:
-        """
-        Generate AI-powered summary of a file.
-
-        Uses local LLM (Ollama) to create concise summary including:
-        - Purpose and functionality
-        - Key components and patterns
-        - Dependencies and complexity
-
-        Requires: Ollama running locally with configured model.
-
-        Args:
-            path: File path to summarize
-            focus: Optional focus area (e.g., "error handling", "data flow")
-
-        Returns:
-            Summary with purpose, key points, and complexity score
-        """
+        """Generate summary of file or directory using local LLM."""
         file_path = Path(path).resolve()
 
         if not file_path.exists():
@@ -68,22 +52,7 @@ def register(mcp):
         name: str,
         paths: List[str]
     ) -> dict:
-        """
-        Summarize an architectural subsystem or module.
-
-        Analyzes multiple files together to understand their collective
-        purpose and relationships. Useful for understanding layers,
-        packages, or feature modules.
-
-        Requires: Ollama running locally.
-
-        Args:
-            name: Name of the subsystem (e.g., "authentication", "data layer")
-            paths: List of file paths in this subsystem
-
-        Returns:
-            Architectural summary with patterns and relationships
-        """
+        """Analyze codebase architecture patterns."""
         if not paths:
             return {"error": "No paths provided"}
 
@@ -126,14 +95,7 @@ def register(mcp):
 
     @mcp.tool()
     def summarize_status() -> dict:
-        """
-        Check summarization service status.
-
-        Verifies if local LLM is available and configured.
-
-        Returns:
-            Status info including model and availability
-        """
+        """Check local LLM summarization availability."""
         try:
             facade = get_summarization_facade()
             available = facade.llm_client.is_available()

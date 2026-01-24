@@ -175,7 +175,7 @@ def _detect_language(cwd: str) -> Optional[str]:
     Returns:
         Language name (e.g., "python", "go"), or None if not detected
     """
-    extensions = Counter()
+    extensions: Counter[str] = Counter()
 
     try:
         for file in Path(cwd).iterdir():
@@ -299,7 +299,10 @@ def propose_hook(interactive: bool = True, batch_threshold: float = 0.9) -> Prop
     result = cli.run(proposals, interactive=interactive, optimize=True)
 
     # Extract approved IDs from result
-    approved_ids = result.approved_ids
+    if isinstance(result, list):
+        approved_ids = result
+    else:
+        approved_ids = result.approved_ids
 
     # Phase 5: Store
     storage = MemoryStorage()

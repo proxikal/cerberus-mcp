@@ -1,5 +1,8 @@
 # Custom exceptions for Cerberus
 
+from typing import Any, Dict, List, Optional
+
+
 class CerberusError(Exception):
     """Base exception for all application-specific errors."""
     pass
@@ -52,6 +55,6 @@ class IndexLimitExceeded(CerberusError):
 class PreflightError(CerberusError):
     """Raised when pre-flight checks fail."""
 
-    def __init__(self, message: str, checks: list | None = None):
+    def __init__(self, message: str, checks: Optional[List[Dict[str, Any]]] = None):
         self.checks = checks or []
         super().__init__(message)
