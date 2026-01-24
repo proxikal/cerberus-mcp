@@ -855,25 +855,42 @@ def register(mcp):
 
     @mcp.tool()
     def memory_search(
-        query: str,
+        query: str = None,
         scope: Optional[str] = None,
         category: Optional[str] = None,
-        limit: int = 10
+        limit: int = 10,
+        queries: Optional[List[Dict[str, Any]]] = None,
     ) -> dict:
         """
         Search memories by text query using FTS5 full-text search.
+
+        Supports both single and bulk operations:
+        - Single: Provide query parameter
+        - Bulk: Provide queries list (query parameter ignored)
 
         Phase 13: Adaptive Learning Memory System
         Uses SQLite FTS5 for efficient text search across memories.
 
         Args:
-            query: Text to search for
+            query: Text to search for (single mode)
             scope: Filter by scope (universal, language:X, project:Y)
             category: Filter by category (preference, rule, correction, decision)
-            limit: Max results (default 10)
+            limit: Max results per query (default 10)
+            queries: List of search query dicts for bulk search (each with query, optional scope/category/limit)
 
         Returns:
             Search results with relevance scores
+
+        Examples:
+            # Single search
+            memory_search(query="config", category="decision")
+
+            # Bulk search (multiple queries with different filters)
+            memory_search(queries=[
+                {"query": "config", "category": "decision"},
+                {"query": "prefer", "category": "preference"},
+                {"query": "sqlite", "scope": "project:cerberus"}
+            ])
         """
         db_path = Path.home() / ".cerberus" / "memory.db"
 
@@ -883,8 +900,76 @@ def register(mcp):
                 "message": "Adaptive memory database not found. No memories have been stored yet."
             }
 
+        # Validate inputs
+        if not query and not queries:
+            return {
+                "status": "error",
+                "message": "Must provide either query for single search or queries for bulk search"
+            }
+
         search_engine = MemorySearchEngine(db_path)
 
+        # Handle bulk mode
+        if queries:
+            all_results = []
+            errors = []
+            total_found = 0
+
+            for idx, q_spec in enumerate(queries):
+                try:
+                    q_text = q_spec.get("query")
+                    q_scope = q_spec.get("scope")
+                    q_category = q_spec.get("category")
+                    q_limit = q_spec.get("limit", limit)
+
+                    if not q_text:
+                        errors.append(f"Query {idx}: Missing 'query' field")
+                        continue
+
+                    search_query = SearchQuery(
+                        text=q_text,
+                        scope=q_scope,
+                        category=q_category,
+                        limit=q_limit,
+                        order_by="relevance"
+                    )
+
+                    results = search_engine.search(search_query)
+                    total_found += len(results)
+
+                    all_results.append({
+                        "query": q_text,
+                        "scope": q_scope,
+                        "category": q_category,
+                        "result_count": len(results),
+                        "results": [
+                            {
+                                "content": r.content,
+                                "scope": r.scope,
+                                "category": r.category,
+                                "relevance": round(r.relevance_score, 2),
+                                "snippet": r.match_context,
+                                "confidence": r.confidence,
+                                "created_at": r.created_at,
+                                "access_count": r.access_count
+                            }
+                            for r in results
+                        ]
+                    })
+
+                except Exception as e:
+                    errors.append(f"Query {idx}: {str(e)}")
+
+            return {
+                "status": "bulk_search",
+                "requested_count": len(queries),
+                "successful_count": len(all_results),
+                "total_results": total_found,
+                "searches": all_results,
+                "errors": errors if errors else None
+            }
+
+        # Single mode (original logic)
         search_query = SearchQuery(
             text=query,
             scope=scope,

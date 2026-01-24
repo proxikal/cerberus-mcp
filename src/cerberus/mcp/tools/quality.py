@@ -125,30 +125,117 @@ def register(mcp):
 
     @mcp.tool()
     def style_fix(
-        path: str,
+        path: str = None,
         rules: Optional[List[str]] = None,
         dry_run: bool = False,
         create_backup: bool = True,
+        paths: Optional[List[str]] = None,
     ) -> dict:
         """
         Auto-fix style violations.
+
+        Supports both single and bulk operations:
+        - Single: Provide path parameter
+        - Bulk: Provide paths list (path parameter ignored)
 
         Automatically applies fixes for fixable style violations.
         Use dry_run=True to preview changes without modifying files.
 
         Args:
-            path: File or directory to fix
+            path: File or directory to fix (single mode)
             rules: Optional list of specific rules to fix (default: all fixable rules)
             dry_run: If True, only preview fixes without applying them
             create_backup: If True, create backup before modifying files
+            paths: List of file/directory paths for bulk fixing
 
         Returns:
             dict with:
-            - status: "fixed", "dry_run", or "error"
+            - status: "fixed", "bulk_fixed", "dry_run", or "error"
             - files_modified: Number of files changed (0 if dry_run)
             - violations_fixed: Total fixes applied or would be applied
             - applied_fixes: List of {file, type, line, before, after, description}
+
+        Examples:
+            # Single file
+            style_fix(path="src/main.py")
+
+            # Bulk files
+            style_fix(paths=["src/config.py", "src/utils.py", "src/models.py"])
+
+            # Dry run bulk
+            style_fix(paths=["src/config.py", "src/utils.py"], dry_run=True)
         """
+        # Validate inputs
+        if not path and not paths:
+            return {
+                "status": "error",
+                "error_type": "missing_path",
+                "message": "Must provide either path for single fix or paths for bulk fix"
+            }
+
+        # Handle bulk mode
+        if paths:
+            all_fixes = []
+            files_modified_count = 0
+            total_violations = 0
+            errors = []
+            processed_files = []
+
+            for idx, file_path in enumerate(paths):
+                try:
+                    target = Path(file_path)
+                    if not target.exists():
+                        errors.append(f"{file_path}: Path not found")
+                        continue
+
+                    if target.is_file():
+                        success, fixes = fixer.fix_file(str(target), preview=dry_run)
+                        if success and fixes:
+                            if not dry_run:
+                                files_modified_count += 1
+                            total_violations += len(fixes)
+                            all_fixes.extend([_serialize_fix(f, str(target)) for f in fixes])
+                            processed_files.append(str(target))
+                    else:
+                        # Handle directory
+                        results = fixer.fix_directory(str(target), preview=dry_run)
+                        for fpath, (ok, fx) in results.items():
+                            if ok and fx:
+                                if not dry_run:
+                                    files_modified_count += 1
+                                total_violations += len(fx)
+                                all_fixes.extend([_serialize_fix(fix, fpath) for fix in fx])
+                                processed_files.append(fpath)
+
+                except Exception as e:
+                    errors.append(f"{file_path}: {str(e)}")
+
+            # Invalidate index if files were modified
+            if files_modified_count > 0 and not dry_run:
+                from ..index_manager import get_index_manager
+                get_index_manager().invalidate()
+
+            # Build bulk response
+            if dry_run:
+                return {
+                    "status": "bulk_dry_run",
+                    "requested_count": len(paths),
+                    "processed_count": len(processed_files),
+                    "would_fix": total_violations,
+                    "violations": all_fixes,
+                    "errors": errors if errors else None
+                }
+
+            return {
+                "status": "bulk_fixed",
+                "requested_count": len(paths),
+                "files_modified": files_modified_count,
+                "violations_fixed": total_violations,
+                "applied_fixes": all_fixes,
+                "errors": errors if errors else None
+            }
+
+        # Single mode (original logic)
         target = Path(path)
         if not target.exists():
             return {
