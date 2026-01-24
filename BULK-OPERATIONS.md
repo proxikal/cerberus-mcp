@@ -1,6 +1,6 @@
-# Cerberus Bulk Operations Guide
+# Cerberus Bulk Operations & Tool Enhancements
 
-**Version:** 1.0
+**Version:** 2.0
 **Last Updated:** 2026-01-23
 
 ## Overview
@@ -302,6 +302,75 @@ read_range(ranges=[
 
 **Savings:** Read specific ranges from multiple files without full file reads
 
+**Enhancement: Full File Support**
+
+Omit `start_line` and `end_line` to read entire file:
+
+```python
+# Read full file
+read_range(file_path="src/config.py")
+
+# Bulk mode with full files
+read_range(ranges=[
+    {"file_path": "src/config.py"},  # Full file
+    {"file_path": "src/utils.py", "start_line": 10, "end_line": 20}  # Range
+])
+```
+
+**When to use:**
+- Quick file reads without counting lines first
+- More natural than "count lines then read 1-N"
+- Works in both single and bulk modes
+
+---
+
+### `skeletonize` - Bulk Skeletonization
+
+Generate code skeletons (signatures without implementations) for multiple files.
+
+**Single mode:**
+```python
+skeletonize(path="src/config.py")
+```
+
+**Bulk mode:**
+```python
+skeletonize(files=[
+    "src/config.py",
+    "src/utils.py",
+    "src/models.py"
+])
+```
+
+**Response:**
+```json
+{
+    "bulk_mode": true,
+    "requested_count": 3,
+    "success_count": 3,
+    "results": [
+        {
+            "file_path": "src/config.py",
+            "skeleton": "...",
+            "stats": {
+                "original_lines": 250,
+                "skeleton_lines": 30,
+                "compression_ratio": 0.12
+            }
+        },
+        ...
+    ],
+    "overall_stats": {
+        "total_original_lines": 750,
+        "total_skeleton_lines": 85,
+        "overall_compression": 0.113,
+        "tokens_saved_estimate": 6650
+    }
+}
+```
+
+**Savings:** 70-90% token reduction vs full file reads, bulk mode reduces round-trips by 67%
+
 ---
 
 ## Quality Operations
@@ -354,6 +423,161 @@ style_fix(paths=["src/config.py", "src/utils.py"], dry_run=True)
 Returns `status: "bulk_dry_run"` with preview of changes without modifying files.
 
 **Savings:** Fix multiple files in one call, index invalidated once
+
+---
+
+## Tool Enhancements (v2.0)
+
+### `blueprint` - Simple List Format
+
+NEW: Lightweight directory listing without full blueprint overhead.
+
+**Tree format (default):**
+```python
+blueprint(path="src/cerberus/mcp/tools", format="tree")
+# Returns: ASCII tree with symbols (~350 tokens)
+```
+
+**List format (NEW):**
+```python
+blueprint(path="src/cerberus/mcp/tools", format="list")
+# Returns: Simple file/dir listing (~100 tokens)
+```
+
+**Response:**
+```json
+{
+    "path": "/path/to/dir",
+    "items": [
+        {"name": "__init__.py", "type": "file", "path": "tools/__init__.py"},
+        {"name": "reading.py", "type": "file", "path": "tools/reading.py"},
+        {"name": "search.py", "type": "file", "path": "tools/search.py"}
+    ],
+    "count": 18,
+    "_token_info": {
+        "estimated_tokens": 100,
+        "format": "list"
+    }
+}
+```
+
+**Savings:** 65% fewer tokens vs tree format (~100 vs ~350)
+
+**When to use:**
+- Quick directory exploration ("what files are here?")
+- Don't need symbol-level detail
+- Lightweight alternative to `ls` command
+
+---
+
+### `search` - Import Relationship Filter
+
+NEW: Find files that import a specific module/package.
+
+**Symbol search (default):**
+```python
+search(query="UserConfig", filter_type="symbols")
+```
+
+**Import search (NEW):**
+```python
+search(query="pathlib", filter_type="imports", limit=10)
+```
+
+**Response:**
+```json
+{
+    "result": [
+        {
+            "module": "pathlib",
+            "file": "src/config.py",
+            "line": 15,
+            "type": "import"
+        },
+        {
+            "module": "pathlib.Path",
+            "file": "src/utils.py",
+            "line": 8,
+            "type": "import"
+        }
+    ],
+    "filter_type": "imports",
+    "query": "pathlib"
+}
+```
+
+**Supports partial matching:**
+- `"pathlib"` → matches `pathlib`, `pathlib.Path`, `pathlib.PurePath`
+- `"cerberus.retrieval"` → matches `cerberus.retrieval`, `cerberus.retrieval.utils`
+
+**When to use:**
+- Find all files using a specific library
+- Dependency analysis ("what uses this module?")
+- Impact analysis before refactoring shared code
+
+---
+
+### `file_info` - File Metadata Tool (NEW)
+
+Get file metadata without reading content.
+
+**Single mode:**
+```python
+file_info(path="src/config.py")
+```
+
+**Bulk mode:**
+```python
+file_info(paths=[
+    "src/config.py",
+    "src/utils.py",
+    "README.md"
+])
+```
+
+**Response:**
+```json
+{
+    "path": "src/config.py",
+    "name": "config.py",
+    "extension": ".py",
+    "size_bytes": 12500,
+    "size_human": "12.2 KB",
+    "modified": "2026-01-23 15:30:00",
+    "is_text": true,
+    "line_count": 250,
+    "permissions": "644",
+    "git_tracked": true,
+    "git_status": "tracked",
+    "_token_info": {
+        "estimated_tokens": 60,
+        "alternative": "Read file content",
+        "alternative_tokens": 2500
+    }
+}
+```
+
+**Bulk response:**
+```json
+{
+    "bulk_mode": true,
+    "requested_count": 3,
+    "success_count": 3,
+    "results": [...],
+    "_token_info": {
+        "estimated_tokens": 180,
+        "tokens_per_file": 60,
+        "alternative_tokens_per_file": 1000
+    }
+}
+```
+
+**Savings:** 95-98% token reduction vs reading full file content
+
+**When to use:**
+- Quick file checks ("how big is this?", "when was it modified?")
+- Filter files before reading (skip large/binary files)
+- More natural than `ls -la` + `wc -l` commands
 
 ---
 
@@ -455,7 +679,9 @@ All bulk operations follow consistent error handling:
 
 ---
 
-## Complete Bulk Operation Suite
+## Complete Tool Suite
+
+### Bulk Operations
 
 | Tool | Bulk Parameter | Use Case | Token Savings |
 |------|---------------|----------|---------------|
@@ -464,7 +690,18 @@ All bulk operations follow consistent error handling:
 | `memory_search` | `queries` | Multi-query searches | Consolidated results |
 | `get_symbol` | `symbols` | Fetch symbols after search | 50% fewer calls |
 | `read_range` | `ranges` | Read specific line ranges | 75% fewer calls |
+| `skeletonize` | `files` | Bulk skeletonization | 67% fewer calls |
 | `style_fix` | `paths` | Fix multiple files | Atomic transaction |
+| `file_info` | `paths` | Bulk file metadata | 67% fewer calls |
+
+### Tool Enhancements (v2.0)
+
+| Tool | Enhancement | Description | Benefit |
+|------|------------|-------------|---------|
+| `read_range` | Full file support | Omit start/end to read entire file | More natural API |
+| `blueprint` | `format="list"` | Simple directory listing | 65% token savings vs tree |
+| `search` | `filter_type="imports"` | Find files importing module | Direct relationship queries |
+| `file_info` | **NEW TOOL** | File metadata without content | 95-98% token savings |
 
 ---
 
@@ -481,12 +718,15 @@ All bulk operations follow consistent error handling:
 ## Future Enhancements
 
 Potential candidates for bulk operations:
-- `skeletonize` - Multiple files in one call
+- ~~`skeletonize` - Multiple files in one call~~ ✅ **DONE (v2.0)**
 - `deps` - Multiple symbols for dependency analysis
 - `blueprint` - Multiple directories simultaneously
+- `analyze_impact` - Multiple symbols for batch impact analysis
 
 ---
 
-**Implementation Status:** ✅ Production Ready
+**Implementation Status:** ✅ Production Ready (v2.0)
 **Test Coverage:** Comprehensive Python tests passed
+**Bulk Operations:** 8 tools with bulk support
+**Tool Enhancements:** 4 major improvements (v2.0)
 **MCP Integration:** Pending Hydra setup for full MCP testing
