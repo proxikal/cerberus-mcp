@@ -1,5 +1,5 @@
 """Synthesis tools for skeletonization and context building."""
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 
 from cerberus.synthesis.skeletonizer import Skeletonizer
@@ -9,12 +9,17 @@ from cerberus.synthesis.facade import get_synthesis_facade
 def register(mcp):
     @mcp.tool()
     def skeletonize(
-        path: str,
+        path: str = None,
         preserve_symbols: Optional[List[str]] = None,
-        format: str = "code"
+        format: str = "code",
+        files: Optional[List[str]] = None,
     ) -> dict:
         """
         Generate code skeleton - signatures and structure without implementation.
+
+        Supports single and bulk modes:
+        - Single: Provide path parameter
+        - Bulk: Provide files list (path parameter ignored)
 
         Removes function/method bodies while preserving:
         - Class/function signatures
@@ -25,13 +30,94 @@ def register(mcp):
         Token savings: typically 70-90% reduction vs full file.
 
         Args:
-            path: File path to skeletonize
+            path: File path to skeletonize (single mode)
             preserve_symbols: Symbol names to keep full implementation (not skeletonize)
             format: Output format - "code" (skeleton source), "json" (structured)
+            files: List of file paths for bulk skeletonization
 
         Returns:
             Skeletonized code with compression stats
+
+        Examples:
+            # Single file
+            skeletonize(path="src/config.py")
+
+            # Bulk files
+            skeletonize(files=["src/config.py", "src/utils.py", "src/models.py"])
         """
+        # Validate inputs
+        if not path and not files:
+            return {"error": "Must provide either path for single file or files for bulk skeletonization"}
+
+        # Handle bulk mode
+        if files:
+            all_results = []
+            errors = []
+            total_original_lines = 0
+            total_skeleton_lines = 0
+            skeletonizer = Skeletonizer()
+
+            for idx, file_path_str in enumerate(files):
+                try:
+                    file_path = Path(file_path_str).resolve()
+
+                    if not file_path.exists():
+                        errors.append(f"{file_path_str}: File not found")
+                        continue
+
+                    if not file_path.is_file():
+                        errors.append(f"{file_path_str}: Not a file")
+                        continue
+
+                    result = skeletonizer.skeletonize_file(str(file_path), preserve_symbols)
+
+                    total_original_lines += result.original_lines
+                    total_skeleton_lines += result.skeleton_lines
+
+                    if format == "json":
+                        all_results.append({
+                            "file_path": result.file_path,
+                            "original_lines": result.original_lines,
+                            "skeleton_lines": result.skeleton_lines,
+                            "compression_ratio": result.compression_ratio,
+                            "content": result.content
+                        })
+                    else:
+                        header = f"# Skeleton: {result.file_path}\n"
+                        header += f"# Lines: {result.skeleton_lines}/{result.original_lines} "
+                        header += f"({result.compression_ratio:.1%} of original)\n\n"
+                        all_results.append({
+                            "file_path": result.file_path,
+                            "skeleton": header + result.content,
+                            "stats": {
+                                "original_lines": result.original_lines,
+                                "skeleton_lines": result.skeleton_lines,
+                                "compression_ratio": result.compression_ratio
+                            }
+                        })
+
+                except Exception as e:
+                    errors.append(f"{file_path_str}: {str(e)}")
+
+            # Calculate overall stats
+            overall_compression = total_skeleton_lines / total_original_lines if total_original_lines > 0 else 0
+
+            return {
+                "bulk_mode": True,
+                "requested_count": len(files),
+                "success_count": len(all_results),
+                "error_count": len(errors),
+                "results": all_results,
+                "overall_stats": {
+                    "total_original_lines": total_original_lines,
+                    "total_skeleton_lines": total_skeleton_lines,
+                    "overall_compression": overall_compression,
+                    "tokens_saved_estimate": int(total_original_lines * 10 * (1 - overall_compression))
+                },
+                "errors": errors if errors else None
+            }
+
+        # Single mode (original logic)
         file_path = Path(path).resolve()
 
         if not file_path.exists():
