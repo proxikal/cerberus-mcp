@@ -15,6 +15,13 @@ except ImportError:
     REQUESTS_AVAILABLE = False
     logger.warning("requests library not available, LLM summarization disabled")
 
+try:
+    from llm_toolchain import OllamaSession
+    TOOLCHAIN_AVAILABLE = True
+except ImportError:
+    TOOLCHAIN_AVAILABLE = False
+    logger.info("llm-toolchain not installed - using direct file reads (tokens not optimized)")
+
 from .config import LLM_CONFIG, PROMPT_TEMPLATES, RESPONSE_PATTERNS
 
 
@@ -34,6 +41,7 @@ class LocalLLMClient:
         self.config = {**LLM_CONFIG, **(config or {})}
         self.backend = self.config["backend"]
         self.available = False
+        self.toolchain_session = None
 
         # Check if explicitly disabled via config
         if not self.config.get("enabled", True):
@@ -51,6 +59,19 @@ class LocalLLMClient:
         # Test connection
         if self.backend == "ollama":
             self.available = self._test_ollama_connection()
+            # Initialize tool-enabled session if available
+            if self.available and TOOLCHAIN_AVAILABLE:
+                try:
+                    self.toolchain_session = OllamaSession(
+                        model=self.config["model"],
+                        root=".",
+                        enabled_tools=["read_file"],  # Only enable file reading
+                        ollama_url=self.config["api_base"]
+                    )
+                    logger.info("llm-toolchain enabled - using zero-token file operations")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize llm-toolchain: {e}")
+                    self.toolchain_session = None
         else:
             logger.warning(f"Unsupported LLM backend: {self.backend}")
 
@@ -134,6 +155,43 @@ class LocalLLMClient:
     def is_available(self) -> bool:
         """Check if LLM is available."""
         return self.available
+
+    def has_toolchain(self) -> bool:
+        """Check if llm-toolchain is available."""
+        return self.toolchain_session is not None
+
+    def summarize_file_with_tools(self, file_path: str, language: str = "Python") -> Optional[str]:
+        """
+        Summarize a file using llm-toolchain (zero-token file operations).
+
+        Args:
+            file_path: Path to the file to summarize
+            language: Programming language
+
+        Returns:
+            Summary text or None if unavailable
+        """
+        if not self.has_toolchain():
+            return None
+
+        try:
+            prompt = f"""Read the file '{file_path}' and provide a concise summary.
+
+Focus on:
+1. Purpose: What this {language} code does
+2. Key components: Main functions/classes (list 3-5)
+3. Dependencies: What it imports/uses (list top 3-5)
+4. Complexity: Rate 1-10
+
+Keep the summary under 200 words."""
+
+            logger.debug(f"Using llm-toolchain to summarize {file_path}")
+            response = self.toolchain_session.chat(prompt, max_iterations=3)
+            return response
+
+        except Exception as e:
+            logger.error(f"llm-toolchain summarization failed: {e}")
+            return None
 
 
 class SummaryParser:

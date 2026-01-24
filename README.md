@@ -66,6 +66,56 @@ cp -r skill/* ~/.claude/skills/Cerberus/
 
 ---
 
+## 🤖 Optional: Local LLM Summarization
+
+Cerberus supports **zero-token file summarization** using local LLMs via [llm-toolchain](https://github.com/proxikal/llm-toolchain).
+
+### Why llm-toolchain?
+
+**Traditional approach** (summarizing a file):
+```
+1. Read entire file into context → 3,000 tokens
+2. Send to LLM → 3,000 tokens
+3. Get summary → 200 tokens
+Total: ~3,200 tokens per file
+```
+
+**With llm-toolchain**:
+```
+1. Prompt: "Summarize src/auth.py" → 50 tokens
+2. LLM reads file server-side → 0 tokens (tool layer handles it!)
+3. Summary → 200 tokens
+Total: ~250 tokens (92% savings!)
+```
+
+### Installation
+
+```bash
+# Install llm-toolchain (optional)
+pip install llm-toolchain
+
+# Requires Ollama running locally
+# Download from: https://ollama.ai
+```
+
+### Configuration
+
+Add to your `cerberus.toml`:
+
+```toml
+[summarization]
+enabled = true
+model = "deepseek-coder:6.7b"  # Or any Ollama model
+ollama_url = "http://localhost:11434"
+```
+
+**How it works:**
+- If `llm-toolchain` is installed → uses zero-token file operations
+- If not installed → falls back to direct file reads (standard behavior)
+- If Ollama unavailable → summarization gracefully disabled
+
+---
+
 ## 📚 Documentation Portal
 
 We maintain detailed documentation in our [Wiki](https://github.com/proxikal/cerberus-mcp/wiki).

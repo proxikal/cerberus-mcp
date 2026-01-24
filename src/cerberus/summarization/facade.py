@@ -49,6 +49,32 @@ class SummarizationFacade:
             return None
 
         try:
+            # Detect language
+            language = self._detect_language(Path(file_path).suffix)
+
+            # Try llm-toolchain first (zero-token file operations)
+            if self.llm_client.has_toolchain():
+                logger.debug(f"Using llm-toolchain for {file_path}")
+                response = self.llm_client.summarize_file_with_tools(file_path, language)
+
+                if response:
+                    # Parse the response
+                    parsed = self.parser.parse_summary_response(response)
+
+                    return CodeSummary(
+                        target=file_path,
+                        summary_type="file",
+                        summary_text=parsed["purpose"] if parsed["purpose"] else response[:500],
+                        key_points=parsed["key_points"],
+                        dependencies=parsed["dependencies"],
+                        complexity_score=parsed["complexity"],
+                        generated_at=time.time(),
+                        model_used=f"{self.llm_client.config['model']} (tool-enabled)"
+                    )
+
+            # Fallback to direct file reading (current behavior)
+            logger.debug(f"Using direct file read for {file_path}")
+
             # Read file
             with open(file_path, 'r', encoding='utf-8') as f:
                 code_content = f.read()
@@ -58,9 +84,6 @@ class SummarizationFacade:
             if line_count < self.config["min_lines_for_summary"]:
                 logger.info(f"File {file_path} too small to summarize ({line_count} lines)")
                 return self._create_simple_summary(file_path, code_content, "file")
-
-            # Detect language
-            language = self._detect_language(Path(file_path).suffix)
 
             # Format prompt
             prompt = self.parser.format_prompt(
