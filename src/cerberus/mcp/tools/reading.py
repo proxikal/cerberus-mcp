@@ -1,6 +1,9 @@
 """File reading tools."""
 from pathlib import Path
 from typing import List, Dict, Any
+import os
+import subprocess
+from datetime import datetime
 
 from cerberus.retrieval.utils import read_range as core_read_range
 from cerberus.mcp.tools.token_utils import (
@@ -206,3 +209,184 @@ def register(mcp):
             )
 
         return response
+
+    @mcp.tool()
+    def file_info(
+        path: str = None,
+        paths: List[str] = None,
+    ) -> dict:
+        """
+        Get file metadata without reading content.
+
+        Provides lightweight file information for quick checks:
+        - File size (bytes and human-readable)
+        - Line count (for text files)
+        - File type/extension
+        - Last modified time
+        - Git tracking status
+        - Permissions
+
+        Token cost: ~50-100 tokens per file (vs 1000s for reading content)
+
+        Supports single and bulk modes:
+        - Single: Provide path parameter
+        - Bulk: Provide paths list
+
+        Args:
+            path: File path (single mode)
+            paths: List of file paths (bulk mode)
+
+        Returns:
+            File metadata dict or list of metadata dicts
+
+        Examples:
+            # Single file
+            file_info(path="src/main.py")
+
+            # Bulk files
+            file_info(paths=["src/config.py", "src/utils.py", "README.md"])
+        """
+        def _get_file_info(file_path_str: str) -> Dict[str, Any]:
+            """Helper to get info for a single file."""
+            file_path = Path(file_path_str).resolve()
+
+            if not file_path.exists():
+                return {"error": f"File not found: {file_path_str}"}
+
+            if not file_path.is_file():
+                return {"error": f"Path is not a file: {file_path_str}"}
+
+            try:
+                # Basic file stats
+                stat = file_path.stat()
+                size_bytes = stat.st_size
+
+                # Human-readable size
+                if size_bytes < 1024:
+                    size_human = f"{size_bytes} B"
+                elif size_bytes < 1024 * 1024:
+                    size_human = f"{size_bytes / 1024:.1f} KB"
+                elif size_bytes < 1024 * 1024 * 1024:
+                    size_human = f"{size_bytes / (1024 * 1024):.1f} MB"
+                else:
+                    size_human = f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+                # Last modified
+                mtime = datetime.fromtimestamp(stat.st_mtime)
+                modified_str = mtime.strftime("%Y-%m-%d %H:%M:%S")
+
+                # Line count for text files
+                line_count = None
+                is_text = True
+                try:
+                    with open(file_path, 'r') as f:
+                        line_count = sum(1 for _ in f)
+                except (UnicodeDecodeError, PermissionError):
+                    is_text = False
+
+                # Git status
+                git_tracked = False
+                git_status = "untracked"
+                try:
+                    # Check if file is in a git repo
+                    result = subprocess.run(
+                        ["git", "ls-files", "--error-unmatch", str(file_path)],
+                        cwd=file_path.parent,
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    if result.returncode == 0:
+                        git_tracked = True
+                        # Check if modified
+                        status_result = subprocess.run(
+                            ["git", "status", "--porcelain", str(file_path)],
+                            cwd=file_path.parent,
+                            capture_output=True,
+                            text=True,
+                            timeout=2
+                        )
+                        if status_result.stdout.strip():
+                            git_status = "modified"
+                        else:
+                            git_status = "tracked"
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    pass
+
+                # Permissions (Unix-style)
+                mode = stat.st_mode
+                perms = oct(mode)[-3:]
+
+                info = {
+                    "path": str(file_path),
+                    "name": file_path.name,
+                    "extension": file_path.suffix or "none",
+                    "size_bytes": size_bytes,
+                    "size_human": size_human,
+                    "modified": modified_str,
+                    "is_text": is_text,
+                    "permissions": perms,
+                    "git_tracked": git_tracked,
+                    "git_status": git_status,
+                }
+
+                if line_count is not None:
+                    info["line_count"] = line_count
+
+                return info
+
+            except Exception as e:
+                return {"error": str(e), "path": file_path_str}
+
+        # Validate inputs
+        if not path and not paths:
+            return {"error": "Must provide either path for single file or paths for bulk mode"}
+
+        # Handle bulk mode
+        if paths:
+            results = []
+            errors = []
+
+            for file_path_str in paths:
+                info = _get_file_info(file_path_str)
+                if "error" in info:
+                    errors.append(info)
+                else:
+                    results.append(info)
+
+            response = {
+                "bulk_mode": True,
+                "requested_count": len(paths),
+                "success_count": len(results),
+                "error_count": len(errors),
+                "results": results,
+            }
+
+            if errors:
+                response["errors"] = errors
+
+            # Token info (metadata is lightweight)
+            estimated_tokens = len(results) * 60  # ~60 tokens per file metadata
+            response["_token_info"] = {
+                "estimated_tokens": estimated_tokens,
+                "tokens_per_file": 60,
+                "alternative": "Read file content",
+                "alternative_tokens_per_file": 1000,  # Rough estimate
+            }
+
+            return response
+
+        # Single mode
+        info = _get_file_info(path)
+
+        if "error" in info:
+            return info
+
+        # Add token info
+        info["_token_info"] = {
+            "estimated_tokens": 60,
+            "alternative": "Read file content",
+            "alternative_tokens": estimate_file_tokens(path, info.get("line_count", 100)),
+        }
+
+        return info
