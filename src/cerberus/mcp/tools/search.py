@@ -94,9 +94,10 @@ def register(mcp):
         query: str,
         limit: int = 5,  # SAFEGUARD: Reduced from 10 to 5 for safer default
         mode: str = "auto",
+        filter_type: str = "symbols",
     ) -> Dict[str, Any]:
         """
-        Search codebase for symbols matching query.
+        Search codebase for symbols, imports, or relationships.
 
         TOKEN EFFICIENCY:
         - Each result: ~80-100 tokens.
@@ -113,9 +114,18 @@ def register(mcp):
             query: Search query (keyword or natural language)
             limit: Maximum results to return (default: 5, max: 50)
             mode: Search mode - "auto", "keyword", "semantic", "balanced"
+            filter_type: What to search for - "symbols" (default), "imports" (files importing module)
 
         Returns:
-            List of matching symbols with file paths and line numbers
+            List of matching symbols/imports with file paths and line numbers
+
+        Examples:
+            # Search for symbols (default)
+            search(query="UserConfig")
+
+            # Find files that import a module
+            search(query="pathlib", filter_type="imports")
+            search(query="cerberus.retrieval", filter_type="imports")
         """
         # SAFEGUARD: Hard limit enforcement
         MAX_LIMIT = 50
@@ -126,6 +136,76 @@ def register(mcp):
         manager.get_index()  # Ensure index is loaded and cached
         index_path = manager._index_path or manager._discover_index_path()
 
+        # Handle import search separately
+        if filter_type == "imports":
+            import sqlite3
+            conn = sqlite3.connect(str(index_path))
+            conn.row_factory = sqlite3.Row
+
+            try:
+                # Search for files that import the specified module
+                # Support partial matching (e.g., "pathlib" matches "pathlib.Path")
+                cursor = conn.execute(
+                    """
+                    SELECT module, file_path, line
+                    FROM imports
+                    WHERE module LIKE ? OR module LIKE ?
+                    ORDER BY file_path, line
+                    LIMIT ?
+                    """,
+                    (f"%{query}%", query, limit)
+                )
+
+                import_results = []
+                seen = set()
+
+                for row in cursor.fetchall():
+                    # Normalize path to relative
+                    try:
+                        normalized_path = str(Path(row["file_path"]).relative_to(Path.cwd()))
+                    except ValueError:
+                        normalized_path = row["file_path"]
+
+                    # Deduplicate by file + module
+                    key = (normalized_path, row["module"])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+
+                    import_results.append({
+                        "module": row["module"],
+                        "file": normalized_path,
+                        "line": row["line"],
+                        "type": "import"
+                    })
+
+                response = {
+                    "result": import_results,
+                    "filter_type": "imports",
+                    "query": query
+                }
+
+                # Token estimation
+                estimated_tokens = len(import_results) * 60  # Imports are simpler than symbols
+                response["_token_info"] = {
+                    "estimated_tokens": estimated_tokens,
+                    "result_count": len(import_results),
+                    "tokens_per_result": 60,
+                    "filter_type": "imports"
+                }
+
+                if not import_results:
+                    add_warning(
+                        response,
+                        f"No files found importing '{query}'. Try searching for: module name, package path"
+                    )
+
+                return response
+
+            finally:
+                conn.close()
+
+        # Default: symbol search
         results = hybrid_search(
             query=query,
             index_path=index_path,
