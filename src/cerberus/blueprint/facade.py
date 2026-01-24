@@ -255,12 +255,12 @@ class BlueprintGenerator:
                 )
 
             # Deduplicate symbols (SQLite may have duplicates from indexing)
-            seen = set()
+            seen_symbols: set[tuple[str, str, int, str]] = set()
             unique_symbols: list = []
             for sym in symbols:
-                key = (sym.name, sym.type, sym.start_line, sym.parent_class or '')
-                if key not in seen:
-                    seen.add(key)
+                sym_key: tuple[str, str, int, str] = (sym.name, sym.type, sym.start_line, sym.parent_class or '')
+                if sym_key not in seen_symbols:
+                    seen_symbols.add(sym_key)
                     unique_symbols.append(sym)
 
             logger.debug(f"Queried {len(symbols)} symbols, {len(unique_symbols)} unique for {file_path}")
@@ -282,7 +282,7 @@ class BlueprintGenerator:
         """
         # Separate top-level symbols from methods
         top_level: list = []
-        methods_by_class = {}
+        methods_by_class: dict[str, list] = {}
 
         for symbol in symbols:
             if symbol.parent_class:
@@ -496,10 +496,10 @@ class BlueprintGenerator:
         package_path = Path(request.file_path).resolve()
 
         if not package_path.is_dir():
-            logger.warning(f"{package_path} is not a directory, treating as single file")
-            # Fall back to single file blueprint
-            request.aggregate = False
-            return self.generate(request)
+            raise ValueError(
+                f"Aggregated blueprint requires a directory, but got: {package_path}. "
+                "Use generate() instead for single file blueprints."
+            )
 
         return self.aggregator.aggregate_package(
             package_path=package_path,

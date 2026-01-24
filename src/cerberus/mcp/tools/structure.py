@@ -1,5 +1,6 @@
 """Structure and blueprint tools."""
 from pathlib import Path
+from typing import Literal
 
 from cerberus.blueprint import BlueprintGenerator, BlueprintRequest, TreeRenderOptions
 from ..index_manager import get_index_manager
@@ -15,7 +16,7 @@ def register(mcp):
         path: str,
         show_deps: bool = False,
         show_meta: bool = False,
-        format: str = "tree",
+        format: Literal["tree", "json", "json-compact", "flat", "list"] = "tree",
     ):
         """
         Generate structural blueprint of a file or directory.
@@ -150,8 +151,8 @@ def register(mcp):
                 except Exception:
                     # Fall back to raw string if parsing fails
                     response = {"result": output}
-            elif isinstance(output, dict):
-                response = output
+            elif isinstance(output, dict):  # type: ignore[unreachable]
+                response = output  # type: ignore[unreachable]
             else:
                 response = {"result": output}
 

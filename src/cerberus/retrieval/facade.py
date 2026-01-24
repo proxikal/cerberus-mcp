@@ -7,7 +7,7 @@ Optimized for Phase 4 Aegis-Scale with streaming support for SQLite indices.
 """
 
 from pathlib import Path
-from typing import List, Literal, Optional, Union
+from typing import List, Literal, Optional, Union, cast
 from loguru import logger
 
 from ..schemas import ScanResult, SearchResult, HybridSearchResult, CodeSymbol, CodeSnippet
@@ -32,9 +32,9 @@ def hybrid_search(
     query: str,
     index_path: Path,
     mode: Literal["keyword", "semantic", "balanced", "auto"] = "auto",
-    top_k: int = None,
-    keyword_weight: float = None,
-    semantic_weight: float = None,
+    top_k: Optional[int] = None,
+    keyword_weight: Optional[float] = None,
+    semantic_weight: Optional[float] = None,
     fusion_method: Literal["rrf", "weighted"] = "rrf",
     padding: int = 3,
 ) -> List[HybridSearchResult]:
@@ -59,13 +59,13 @@ def hybrid_search(
     """
     # Load config defaults
     if top_k is None:
-        top_k = HYBRID_SEARCH_CONFIG["final_top_k"]
+        top_k = cast(int, HYBRID_SEARCH_CONFIG["final_top_k"])
 
     if keyword_weight is None:
-        keyword_weight = HYBRID_SEARCH_CONFIG["keyword_weight"]
+        keyword_weight = cast(float, HYBRID_SEARCH_CONFIG["keyword_weight"])
 
     if semantic_weight is None:
-        semantic_weight = HYBRID_SEARCH_CONFIG["semantic_weight"]
+        semantic_weight = cast(float, HYBRID_SEARCH_CONFIG["semantic_weight"])
 
     # Auto-detect mode if needed
     if mode == "auto":
@@ -128,7 +128,7 @@ def _hybrid_search_streaming(
     Key optimization: Defer snippet loading until after we identify top candidates.
     """
     store = scan_result._store
-    top_k_per_method = HYBRID_SEARCH_CONFIG["top_k_per_method"]
+    top_k_per_method = cast(int, HYBRID_SEARCH_CONFIG["top_k_per_method"])
 
     bm25_results: List[SearchResult] = []
     vector_results: List[SearchResult] = []
@@ -162,15 +162,15 @@ def _hybrid_search_streaming(
         logger.info(f"Performing streaming vector search for '{query}'")
 
         # Check if FAISS store is available
-        if store._faiss_store and len(store._faiss_store) > 0:
-            logger.debug("Using FAISS direct query (streaming)")
+        if store._faiss_store and len(store._faiss_store) > 0:  # type: ignore[unreachable]
+            logger.debug("Using FAISS direct query (streaming)")  # type: ignore[unreachable]
             has_embeddings = True
             vector_results = vector_search_faiss(
                 query=query,
                 sqlite_store=store,
                 faiss_store=store._faiss_store,
                 top_k=top_k_per_method,
-                model_name=VECTOR_CONFIG["model"],
+                model_name=cast(str, VECTOR_CONFIG["model"]),
                 padding=padding,
             )
         else:
@@ -188,7 +188,7 @@ def _hybrid_search_streaming(
             if not bm25_results:
                 # Need to run keyword search since it wasn't done
                 logger.info(f"Performing FTS5 keyword search for fallback")
-                fts5_results: list = []
+                fallback_results: list = []
                 for symbol, score in store.fts5_search(query, top_k=top_k_per_method):
                     snippet = CodeSnippet(
                         file_path=symbol.file_path,
@@ -196,12 +196,12 @@ def _hybrid_search_streaming(
                         end_line=symbol.end_line,
                         content="",  # Loaded lazily later
                     )
-                    fts5_results.append(SearchResult(
+                    fallback_results.append(SearchResult(
                         symbol=symbol,
                         score=score,
                         snippet=snippet,
                     ))
-                bm25_results = fts5_results
+                bm25_results = fallback_results
             return _finalize_results(bm25_results[:top_k], "keyword_fallback", padding)
 
         return _finalize_results(vector_results[:top_k], "semantic", padding)
@@ -275,7 +275,7 @@ def _hybrid_search_legacy(
     bm25_results: List[SearchResult] = []
     vector_results: List[SearchResult] = []
 
-    top_k_per_method = HYBRID_SEARCH_CONFIG["top_k_per_method"]
+    top_k_per_method = cast(int, HYBRID_SEARCH_CONFIG["top_k_per_method"])
 
     if mode in ["keyword", "balanced"]:
         logger.info(f"Performing BM25 keyword search for '{query}'")
@@ -297,7 +297,7 @@ def _hybrid_search_legacy(
                 scan_result=scan_result,
                 snippets=snippets,
                 top_k=top_k_per_method,
-                model_name=VECTOR_CONFIG["model"],
+                model_name=cast(str, VECTOR_CONFIG["model"]),
             )
         else:
             logger.warning("No embeddings available in legacy index, skipping vector search")
@@ -391,7 +391,7 @@ def _hybrid_search_legacy(
 
 def _finalize_results(
     results: List[SearchResult],
-    match_type: str,
+    match_type: Literal["keyword", "semantic", "both", "keyword_fallback"],
     padding: int,
 ) -> List[HybridSearchResult]:
     """

@@ -70,6 +70,12 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 ignore_missing_imports = true  # Ignore third-party library stubs for now
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
 
 [[tool.mypy.overrides]]
 module = "tests.*"

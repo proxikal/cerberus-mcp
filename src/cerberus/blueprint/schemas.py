@@ -136,7 +136,7 @@ class BlueprintNode(BaseModel):
     """A node in the blueprint tree (represents a symbol)."""
 
     name: str = Field(description="Symbol name")
-    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct", "file"] = Field(
+    type: Literal["function", "class", "method", "variable", "interface", "enum", "struct", "section", "file"] = Field(
         description="Symbol type"
     )
     file_path: Optional[str] = Field(None, description="File path (for file nodes in aggregation)")
