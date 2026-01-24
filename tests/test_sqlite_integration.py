@@ -26,9 +26,9 @@ requires_faiss = pytest.mark.skipif(
 
 
 def test_build_sqlite_index(tmp_path):
-    """Test building a SQLite index from demo directory."""
+    """Test building a SQLite index from test files directory."""
     # Build SQLite index (not .json suffix triggers SQLite)
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
     output_path = tmp_path / "test_index"
 
     result = build_index(
@@ -58,7 +58,7 @@ def test_build_sqlite_index(tmp_path):
 def test_load_sqlite_index(tmp_path):
     """Test loading a SQLite index."""
     # Build first
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
     output_path = tmp_path / "test_index"
 
     build_index(
@@ -82,7 +82,7 @@ def test_load_sqlite_index(tmp_path):
 @requires_faiss
 def test_sqlite_index_with_embeddings(tmp_path):
     """Test building SQLite index with FAISS embeddings."""
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
     output_path = tmp_path / "test_index_with_embeddings"
 
     result = build_index(
@@ -105,7 +105,7 @@ def test_sqlite_index_with_embeddings(tmp_path):
 
 def test_json_compatibility(tmp_path):
     """Test that JSON format still works (backward compatibility)."""
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
     output_path = tmp_path / "test_index.json"  # .json triggers JSON format
 
     result = build_index(
@@ -126,7 +126,7 @@ def test_json_compatibility(tmp_path):
 
 def test_sqlite_query_symbols_streaming(tmp_path):
     """Test streaming symbol queries."""
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
     output_path = tmp_path / "test_index"
 
     result = build_index(
@@ -155,7 +155,7 @@ def test_sqlite_query_symbols_streaming(tmp_path):
 
 def test_sqlite_metadata(tmp_path):
     """Test metadata storage in SQLite."""
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
     output_path = tmp_path / "test_index"
 
     result = build_index(
@@ -178,7 +178,7 @@ def test_sqlite_metadata(tmp_path):
 
 def test_sqlite_adapter_cache_clear(tmp_path):
     """Test cache clearing in adapter."""
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
     output_path = tmp_path / "test_index"
 
     result = build_index(
@@ -204,7 +204,7 @@ def test_sqlite_adapter_cache_clear(tmp_path):
 
 def test_sqlite_transaction_integrity(tmp_path):
     """Test that SQLite transactions maintain integrity."""
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
     output_path = tmp_path / "test_index"
 
     # Build index
@@ -229,7 +229,7 @@ def test_sqlite_transaction_integrity(tmp_path):
 
 def test_format_detection(tmp_path):
     """Test automatic format detection."""
-    demo_dir = Path(__file__).parent.parent / "demo"
+    demo_dir = Path(__file__).parent / "test_files"
 
     # Build JSON
     json_path = tmp_path / "index.json"
@@ -247,5 +247,6 @@ def test_format_detection(tmp_path):
     sqlite_result = load_index(sqlite_path)
     assert isinstance(sqlite_result, ScanResultAdapter)
 
-    # Verify both have same data
-    assert len(json_result.symbols) == len(sqlite_result.symbols)
+    # Verify both have same data (excluding file-level symbols which SQLite doesn't store)
+    json_non_file_symbols = [s for s in json_result.symbols if s.type != 'file']
+    assert len(json_non_file_symbols) == len(sqlite_result.symbols)

@@ -1,6 +1,10 @@
 """
 Phase 16: Integration Specification - End-to-End Integration Tests
 
+OBSOLETE: These tests were written for JSON-based session storage.
+Session storage has been migrated to SQLite (memory.db).
+See tests/memory/test_session_continuity.py for modern session tests.
+
 Full session flow tests demonstrating:
 1. Session start → MCP auto-injection
 2. Correction detection during session
@@ -14,15 +18,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# Skip all tests in this file - they test obsolete JSON session storage
+pytestmark = pytest.mark.skip(reason="Obsolete: JSON session storage replaced by SQLite. See test_session_continuity.py")
+
 from cerberus.memory.approval_cli import ApprovalResult
 from cerberus.memory.hooks import (
-    start_session,
-    end_session,
     propose_hook,
     detect_context,
     install_hooks,
     verify_hooks,
-    SESSION_FILE,
 )
 
 

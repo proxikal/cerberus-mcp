@@ -55,7 +55,7 @@ def test_tool_usage_event_creation():
     assert event.content_after is not None
 
 
-@patch('cerberus.memory.session_lifecycle.update_session_activity')
+@patch('cerberus.memory.session_cli.update_session_activity')
 def test_track_tool_usage(mock_update):
     """Test tool usage tracking function."""
     track_tool_usage(

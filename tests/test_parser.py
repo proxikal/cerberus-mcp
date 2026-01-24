@@ -18,8 +18,9 @@ def test_parse_python_file():
     Tests that the regex parser can correctly identify symbols in a Python file.
     """
     symbols = parse_file(SAMPLE_PY)
-    
-    assert len(symbols) == 4
+
+    # Parser now includes file-level symbol: 4 code symbols + 1 file symbol = 5
+    assert len(symbols) == 5
     
     symbol_map = {s.name: s for s in symbols}
     
@@ -54,7 +55,8 @@ def test_parse_javascript_file():
     """
     symbols = parse_file(SAMPLE_JS)
 
-    assert len(symbols) == 2
+    # Parser now includes file-level symbol: 2 code symbols + 1 file symbol = 3
+    assert len(symbols) == 3
     symbol_map = {s.name: s for s in symbols}
 
     assert "MyJsClass" in symbol_map
@@ -95,7 +97,8 @@ def test_parse_go_file():
     Tests that the Go parser extracts structs and functions.
     """
     symbols = parse_file(SAMPLE_GO)
-    assert len(symbols) == 3
+    # Parser now includes file-level symbol: 3 code symbols + 1 file symbol = 4
+    assert len(symbols) == 4
     symbol_map = {s.name: s for s in symbols}
 
     assert "Widget" in symbol_map

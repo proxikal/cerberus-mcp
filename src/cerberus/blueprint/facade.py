@@ -196,9 +196,14 @@ class BlueprintGenerator:
         abs_path = Path(file_path).resolve()
         paths_to_try = [str(abs_path)]
 
+        # Also try the original unresolved path (for tests and symlinks)
+        if str(abs_path) != file_path:
+            paths_to_try.append(file_path)
+
         try:
             rel_path = abs_path.relative_to(self.repo_path)
-            paths_to_try.append(str(rel_path))
+            if str(rel_path) not in paths_to_try:
+                paths_to_try.append(str(rel_path))
         except ValueError:
             pass  # Path outside repo, only try absolute
 

@@ -74,7 +74,8 @@ class MemoryStorage:
 
         try:
             for proposal in proposals:
-                memory_id = str(uuid.uuid4())
+                # Use proposal's ID directly (MemoryProposal always has id)
+                memory_id = proposal.id
                 now = datetime.now().isoformat()
 
                 # Extract metadata
@@ -157,7 +158,8 @@ class MemoryStorage:
 
         return {
             "total_stored": total_stored,
-            "by_scope": by_scope
+            "by_scope": by_scope,
+            "memory_id": memory_id  # Return last stored ID for single store() calls
         }
 
     def store(self, proposal) -> str:
@@ -171,7 +173,7 @@ class MemoryStorage:
             Memory ID (UUID string)
         """
         result = self.store_batch([proposal])
-        return result.get("total_stored", 0) > 0
+        return result.get("memory_id")
 
     def delete_memory(self, memory_id: str) -> bool:
         """

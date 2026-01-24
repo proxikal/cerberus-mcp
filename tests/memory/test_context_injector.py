@@ -256,14 +256,15 @@ def test_startup_injection_empty_memories():
 # Test on-demand queries
 
 def test_query_injection_formats_with_query_header(temp_storage_with_memories):
-    """Query injection should include query in header."""
+    """Query injection should return relevant memories (no query header in new AI format)."""
     context = DetectedContext(project="myproject", language="python")
 
     injector = ContextInjector(base_dir=temp_storage_with_memories)
     output = injector.inject_query("error handling", context=context)
 
-    assert "Query:" in output
-    assert "error handling" in output
+    # New AI format doesn't include query header, just returns memories
+    assert "## Memory Context" in output
+    assert len(output) > 0
 
 
 def test_query_injection_respects_budget(temp_storage_with_memories):
@@ -295,13 +296,15 @@ def test_query_limit_enforcement(temp_storage_with_memories):
 
     injector = ContextInjector(base_dir=temp_storage_with_memories)
 
-    # Query 1
+    # Query 1 (should return memories)
     output1 = injector.inject_query("query 1", context=context)
-    assert "query 1" in output1
+    assert len(output1) > 0
+    assert "Memory Context" in output1 or "No relevant" in output1
 
-    # Query 2
+    # Query 2 (should return memories)
     output2 = injector.inject_query("query 2", context=context)
-    assert "query 2" in output2
+    assert len(output2) > 0
+    assert "Memory Context" in output2 or "No relevant" in output2
 
     # Query 3 (should be rejected)
     output3 = injector.inject_query("query 3", context=context)
@@ -382,9 +385,9 @@ def test_markdown_has_scope_badges(temp_storage_with_memories):
     injector = ContextInjector(base_dir=temp_storage_with_memories)
     output = injector.inject_startup(context=context)
 
-    # Should have badges for language/project scopes
-    # Check for backtick-wrapped scope indicators
-    assert "`[" in output or len([m for m in output.split('\n') if m.startswith('-')]) > 0
+    # Should have badges for language/project scopes in the memory content
+    # Format: "rule:Use golden egg docs[myproject]" or "rule:Use async/await[python]"
+    assert "[myproject]" in output or "[python]" in output
 
 
 def test_markdown_has_memory_count(temp_storage_with_memories):

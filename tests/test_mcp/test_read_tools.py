@@ -53,7 +53,7 @@ class TestGetSymbolTool:
         os.chdir(project)
 
         results = unwrap_result(
-            await mcp_client.call_tool("get_symbol", {"name": "hello", "exact": True})
+            await mcp_client.call_tool("get_symbol", {"name": "hello"})
         )
 
         assert len(results) == 1

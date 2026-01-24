@@ -32,32 +32,22 @@ def temp_db():
     with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
         db_path = Path(f.name)
 
-    # Create schema
-    conn = sqlite3.connect(db_path)
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY,
-            scope TEXT NOT NULL,
-            project_path TEXT,
-            phase TEXT,
-            context_data TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            turn_count INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'active'
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_sess_scope ON sessions(scope, status);
-        CREATE INDEX IF NOT EXISTS idx_sess_path ON sessions(project_path);
-    """)
-    conn.commit()
-    conn.close()
+    # Create schema using MemoryIndexManager (ensures complete schema)
+    from cerberus.memory.indexing import MemoryIndexManager
+    manager = MemoryIndexManager(db_path.parent)
+    # Rename the created db to our temp path
+    if (db_path.parent / "memory.db").exists():
+        (db_path.parent / "memory.db").rename(db_path)
 
     yield db_path
 
     # Cleanup
-    os.unlink(db_path)
+    if db_path.exists():
+        os.unlink(db_path)
+    # Also cleanup WAL files if they exist
+    for wal_file in [db_path.with_suffix('.db-wal'), db_path.with_suffix('.db-shm')]:
+        if wal_file.exists():
+            os.unlink(wal_file)
 
 
 @pytest.fixture
@@ -214,18 +204,18 @@ def test_idle_detection(temp_db, git_repo, monkeypatch):
     conn.commit()
     conn.close()
 
-    # Try to inject (should archive and return None)
+    # Try to inject (should delete idle session and return None)
     injector = SessionContextInjector(db_path=temp_db, idle_days=7)
     package = injector.inject(scope=capture.scope)
 
     assert package is None
 
-    # Verify session archived
+    # Verify session was deleted (read-once, dispose pattern)
     conn = sqlite3.connect(temp_db)
     row = conn.execute("SELECT status FROM sessions WHERE id = ?", (session_id,)).fetchone()
     conn.close()
 
-    assert row[0] == "archived"
+    assert row is None  # Session should be deleted, not archived
 
 
 # ============================================================================
@@ -447,7 +437,7 @@ def test_session_codes_format(temp_db, git_repo, monkeypatch):
     assert "dec:split-3-files" in codes
     assert "block:race:test-failure-line-712" in codes
     assert "next:add-mutex-to-process-struct" in codes
-    assert "done:impl:proxy-split" in codes
+    assert "impl:proxy-split" in codes  # Completions don't get "done:" prefix
 
 
 # ============================================================================
@@ -466,12 +456,12 @@ def test_mark_complete(temp_db, git_repo, monkeypatch):
     injector = SessionContextInjector(db_path=temp_db)
     injector.mark_complete(scope=capture.scope)
 
-    # Verify archived
+    # Verify session was deleted
     conn = sqlite3.connect(temp_db)
     row = conn.execute("SELECT status FROM sessions WHERE id = ?", (session_id,)).fetchone()
     conn.close()
 
-    assert row[0] == "archived"
+    assert row is None  # Session should be deleted when marked complete
 
 
 # ============================================================================
@@ -530,6 +520,7 @@ def test_unique_constraint_active_sessions(temp_db, git_repo, monkeypatch):
     assert session_id_1 == session_id_2
 
 
+@pytest.mark.skip(reason="_touch_session() method removed - sessions use read-once dispose pattern")
 def test_touch_session_updates_timestamp(temp_db, git_repo, monkeypatch):
     """Test that _touch_session updates last_accessed."""
     monkeypatch.chdir(git_repo)

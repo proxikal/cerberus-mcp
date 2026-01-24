@@ -60,11 +60,12 @@ class SessionAnalyzer:
     """
     Real-time session correction detector.
 
-    Detects 4 patterns:
+    Detects 5 patterns:
     1. Direct negation: "don't do X", "never Y"
     2. Repetition: Same correction 2+ times
     3. Post-action: Correction after AI action
     4. Multi-turn: Correction across multiple turns
+    5. Preference: "I prefer X over Y", "I like X"
 
     Zero token cost - uses regex and keywords only.
     """
@@ -134,6 +135,12 @@ class SessionAnalyzer:
 
         # Pattern 2: Repetition detection
         candidate = self._detect_repetition(user_msg, ai_response, turn_number)
+        if candidate:
+            self.candidates.append(candidate)
+            return candidate
+
+        # Pattern 5: Preference statements
+        candidate = self._detect_preference(user_msg, ai_response, turn_number)
         if candidate:
             self.candidates.append(candidate)
             return candidate
@@ -219,6 +226,65 @@ class SessionAnalyzer:
             )
 
         return None
+
+    def _detect_preference(
+        self,
+        user_msg: str,
+        ai_response: str,
+        turn_number: int
+    ) -> Optional[CorrectionCandidate]:
+        """
+        Pattern 5: Preference statements.
+
+        Examples:
+        - "I prefer Snowflake IDs over UUIDs"
+        - "I like using semantic versioning"
+        - "I want tests in separate files"
+        - "would rather use TypeScript than JavaScript"
+        """
+        msg_lower = user_msg.lower()
+
+        # Preference indicators
+        preference_patterns = [
+            ("i prefer", "over"),
+            ("i'd prefer", "over"),
+            ("i like", None),
+            ("i'd like", None),
+            ("i want", None),
+            ("i'd want", None),
+            ("would rather", "than"),
+            ("would prefer", "over"),
+            ("prefer to use", None),
+            ("like to use", None),
+        ]
+
+        # Check if message contains preference pattern
+        has_preference = False
+        for pattern, contrast_word in preference_patterns:
+            if pattern in msg_lower:
+                has_preference = True
+                break
+
+        if not has_preference:
+            return None
+
+        # Filter out questions
+        if msg_lower.strip().endswith("?"):
+            return None
+
+        # Filter out hypotheticals and conditionals
+        hypothetical_markers = ["if i", "what if", "suppose", "imagine", "let's say"]
+        if any(marker in msg_lower for marker in hypothetical_markers):
+            return None
+
+        return CorrectionCandidate(
+            turn_number=turn_number,
+            user_message=user_msg,
+            ai_response=ai_response,
+            correction_type="preference",
+            confidence=0.85,
+            context_before=self._get_context(3)
+        )
 
     def _detect_post_action(
         self,

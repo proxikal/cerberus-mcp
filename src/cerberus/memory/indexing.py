@@ -181,6 +181,9 @@ class MemoryIndexManager:
         Args:
             base_path: Base directory (e.g., ~/.cerberus)
         """
+        # Ensure base directory exists
+        base_path.mkdir(parents=True, exist_ok=True)
+
         self.db_path = base_path / "memory.db"
         self.json_path = base_path / "memory"
         self._init_db()

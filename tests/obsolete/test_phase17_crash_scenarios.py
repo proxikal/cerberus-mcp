@@ -1,6 +1,10 @@
 """
 Phase 17: Session Lifecycle & Recovery - Integration Tests
 
+OBSOLETE: These tests were written for JSON-based session storage and session_lifecycle.py module.
+The module was renamed to session_cli.py and session storage migrated to SQLite (memory.db).
+See tests/memory/test_session_continuity.py for modern session tests.
+
 End-to-end tests for crash detection, recovery, and lifecycle scenarios.
 """
 
@@ -13,19 +17,23 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from cerberus.memory.session_lifecycle import (
-    start_session,
-    end_session,
-    update_session_activity,
-    detect_crash,
-    auto_recover_crash,
-    check_idle_timeout,
-    recover_crashed_session,
-    SessionState,
-    SESSION_FILE,
-)
+# Skip all tests in this file - they test obsolete JSON session storage
+pytestmark = pytest.mark.skip(reason="Obsolete: session_lifecycle.py renamed to session_cli.py, JSON storage replaced by SQLite")
 
-from cerberus.memory.session_analyzer import CorrectionCandidate
+# Imports commented out - session_lifecycle module renamed to session_cli
+# from cerberus.memory.session_lifecycle import (
+#     start_session,
+#     end_session,
+#     update_session_activity,
+#     detect_crash,
+#     auto_recover_crash,
+#     check_idle_timeout,
+#     recover_crashed_session,
+#     SessionState,
+#     SESSION_FILE,
+# )
+
+# from cerberus.memory.session_analyzer import CorrectionCandidate
 
 
 # ============================================================================

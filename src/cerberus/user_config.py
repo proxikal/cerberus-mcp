@@ -12,6 +12,17 @@ Config structure:
     "interactive": true,        // Prompt for approval
     "batch_threshold": 0.9      // Auto-approve threshold
   },
+  "memory": {
+    "learning_mode": "batch",   // "batch", "dynamic", or "both"
+    "batch": {
+      "enabled": true,          // Batch learning at session end
+      "interactive": true,      // CLI approval for proposals
+      "threshold": 0.9          // Auto-approve confidence threshold
+    },
+    "dynamic": {
+      "enabled": false          // Real-time learning during session
+    }
+  },
   "index": {
     "auto_update": true,        // Enable file watcher (default: true)
     "extensions": [".py", ".ts", ".js", ".go"]
@@ -31,6 +42,17 @@ DEFAULT_CONFIG = {
         "enabled": True,
         "interactive": True,
         "batch_threshold": 0.9
+    },
+    "memory": {
+        "learning_mode": "batch",  # "batch", "dynamic", or "both"
+        "batch": {
+            "enabled": True,
+            "interactive": True,
+            "threshold": 0.9
+        },
+        "dynamic": {
+            "enabled": False
+        }
     },
     "index": {
         "auto_update": True,

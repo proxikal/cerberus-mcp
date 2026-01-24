@@ -27,7 +27,7 @@ def test_sqlite_store_initialization(tmp_path):
     store = SQLiteIndexStore(tmp_path / "test.db")
 
     assert store.db_path.exists()
-    assert store.get_metadata('schema_version') == '1.2.0'
+    assert store.get_metadata('schema_version') == '1.3.0'
 
 
 def test_write_and_query_files(tmp_path):

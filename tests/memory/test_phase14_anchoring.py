@@ -28,6 +28,7 @@ from cerberus.memory.anchoring import (
 )
 from cerberus.memory.storage import MemoryStorage
 from cerberus.memory.retrieval import MemoryRetrieval
+from cerberus.memory.proposal_engine import MemoryProposal
 from cerberus.memory.context_injector import ContextInjector, DetectedContext
 from cerberus.memory.indexing import MemoryIndexManager
 
@@ -287,15 +288,16 @@ class TestStorageIntegration:
         # Create storage with anchoring enabled
         storage = MemoryStorage(base_dir=temp_memory_dir, enable_anchoring=True)
 
-        # Create test proposal
-        proposal = Mock()
-        proposal.category = "rule"
-        proposal.scope = "language:python"
-        proposal.content = "Use Repository pattern"
-        proposal.confidence = 1.0
-        proposal.rationale = "Improves testability"
-        proposal.evidence = []
-        proposal.source_variants = []
+        # Create test proposal using real MemoryProposal
+        proposal = MemoryProposal(
+            id="test-123",
+            category="rule",
+            scope="language:python",
+            content="Use Repository pattern",
+            confidence=1.0,
+            rationale="Improves testability",
+            source_variants=[]
+        )
 
         # Store proposal
         result = storage.store_batch([proposal])
@@ -323,14 +325,15 @@ class TestStorageIntegration:
         """Test that anchoring can be disabled."""
         storage = MemoryStorage(base_dir=temp_memory_dir, enable_anchoring=False)
 
-        proposal = Mock()
-        proposal.category = "rule"
-        proposal.scope = "language:python"
-        proposal.content = "Use Repository pattern"
-        proposal.confidence = 1.0
-        proposal.rationale = "Improves testability"
-        proposal.evidence = []
-        proposal.source_variants = []
+        proposal = MemoryProposal(
+            id="test-124",
+            category="rule",
+            scope="language:python",
+            content="Use Repository pattern",
+            confidence=1.0,
+            rationale="Improves testability",
+            source_variants=[]
+        )
 
         result = storage.store_batch([proposal])
 
@@ -538,14 +541,15 @@ class TestEndToEnd:
         # Step 1: Store memory with anchor
         storage = MemoryStorage(base_dir=temp_memory_dir, enable_anchoring=True)
 
-        proposal = Mock()
-        proposal.category = "rule"
-        proposal.scope = "language:python"
-        proposal.content = "Use Repository pattern for data access"
-        proposal.confidence = 1.0
-        proposal.rationale = "Improves testability and maintainability"
-        proposal.evidence = []
-        proposal.source_variants = []
+        proposal = MemoryProposal(
+            id="test-125",
+            category="rule",
+            scope="language:python",
+            content="Use Repository pattern for data access",
+            confidence=1.0,
+            rationale="Improves testability and maintainability",
+            source_variants=[]
+        )
 
         result = storage.store_batch([proposal])
         assert result['total_stored'] == 1

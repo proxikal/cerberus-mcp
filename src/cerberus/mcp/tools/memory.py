@@ -114,16 +114,20 @@ def register(mcp):
         # Store to SQLite
         try:
             storage = MemoryStorage()
-            storage.store(proposal)
-            return {
+            stored_id = storage.store(proposal)
+            result = {
                 "status": "learned",
                 "category": category,
                 "scope": scope,
-                "memory_id": memory_id,
+                "memory_id": stored_id,
                 "content": content,
                 "details": details,
                 "relevance_decay_days": relevance_decay_days
             }
+            # Add project for decisions
+            if category == "decision" and project:
+                result["project"] = project
+            return result
         except Exception as e:
             return {
                 "status": "error",
@@ -318,6 +322,14 @@ def register(mcp):
             - category: The category that was searched
             - message: Description of result
         """
+        # Validate category
+        valid_categories = ["preference", "decision", "correction"]
+        if category not in valid_categories:
+            return {
+                "status": "error",
+                "message": f"Invalid category: {category}. Must be one of: {', '.join(valid_categories)}"
+            }
+
         try:
             storage = MemoryStorage()
 

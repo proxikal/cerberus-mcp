@@ -331,16 +331,28 @@ def propose_hook_with_error_handling(interactive: bool = True, batch_threshold: 
         interactive: Whether to use interactive CLI approval
         batch_threshold: Auto-approval threshold for batch mode
     """
-    # Check if session hooks are enabled in config
+    # Check if batch memory learning is enabled in config
     try:
         from cerberus.user_config import get_user_config
         config = get_user_config()
 
-        if not config.get("session_hooks.enabled", True):
-            # Hooks disabled - exit silently
+        # Check learning mode
+        learning_mode = config.get("memory.learning_mode", "batch")
+        if learning_mode not in ["batch", "both"]:
+            # Batch mode not enabled - exit silently
             return
 
-        # Override interactive/batch_threshold from config if specified
+        # Check if batch is explicitly disabled
+        if not config.get("memory.batch.enabled", True):
+            return
+
+        # Override interactive/batch_threshold from memory config
+        interactive = config.get("memory.batch.interactive", interactive)
+        batch_threshold = config.get("memory.batch.threshold", batch_threshold)
+
+        # Legacy: Also check session_hooks for backward compatibility
+        if not config.get("session_hooks.enabled", True):
+            return
         interactive = config.get("session_hooks.interactive", interactive)
         batch_threshold = config.get("session_hooks.batch_threshold", batch_threshold)
     except Exception as e:
