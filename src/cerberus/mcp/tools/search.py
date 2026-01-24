@@ -98,7 +98,7 @@ def register(mcp):
     ) -> Dict[str, Any]:
         """Search codebase for symbols, imports, or relationships."""
         # SAFEGUARD: Hard limit enforcement
-        MAX_LIMIT = 50
+        MAX_LIMIT = 20
         if limit > MAX_LIMIT:
             limit = MAX_LIMIT
 

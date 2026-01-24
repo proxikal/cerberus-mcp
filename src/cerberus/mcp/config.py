@@ -90,7 +90,7 @@ DEFAULTS: Dict[str, Dict[str, Any]] = {
         "max_project_age_days": 90,
     },
     "limits": {
-        "max_search_results": 100,
+        "max_search_results": 20,
         "max_file_size": 1_000_000,
         "max_symbols_per_file": 500,
         "max_skeleton_lines": 5000,  # Max lines for skeletonize output
