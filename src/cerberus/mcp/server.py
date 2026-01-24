@@ -63,4 +63,4 @@ def create_server():
 def run_server():
     """Run the MCP server."""
     server = create_server()
-    server.run()
+    server.run(show_banner=False)
