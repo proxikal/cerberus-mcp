@@ -4,6 +4,7 @@ from pathlib import Path
 
 from cerberus.synthesis.skeletonizer import Skeletonizer
 from cerberus.synthesis.facade import get_synthesis_facade
+from cerberus.mcp.config import get_config_value
 
 
 def register(mcp):
@@ -51,6 +52,14 @@ def register(mcp):
 
         # Handle bulk mode
         if files:
+            # Check bulk limit
+            max_files = get_config_value("limits.bulk_skeletonize_max_files", 20)
+            if len(files) > max_files:
+                return {
+                    "error": f"Requested {len(files)} files, exceeds bulk skeletonize limit of {max_files}. "
+                            f"Reduce request size or adjust 'limits.bulk_skeletonize_max_files' in config."
+                }
+
             all_results = []
             errors = []
             total_original_lines = 0

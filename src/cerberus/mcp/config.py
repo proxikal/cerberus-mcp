@@ -96,6 +96,10 @@ DEFAULTS = {
         "max_skeleton_lines": 5000,  # Max lines for skeletonize output
         "max_blueprint_depth": 10,  # Max directory depth for blueprint
         "max_style_violations": 30,  # Max violations to return from style_check (encourages iterative fixing)
+        # Token safety limits (v2.8)
+        "full_file_read_max_lines": 200,  # Max lines for read_range() full file mode (without start/end)
+        "bulk_skeletonize_max_files": 20,  # Max files in skeletonize(files=[])
+        "bulk_file_info_max_files": 50,  # Max files in file_info(paths=[])
     },
     "quality": {
         "style_rules": ["black", "isort"],

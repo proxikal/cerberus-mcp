@@ -12,6 +12,7 @@ from cerberus.mcp.tools.token_utils import (
     estimate_file_tokens,
     estimate_tokens,
 )
+from cerberus.mcp.config import get_config_value
 
 
 def register(mcp):
@@ -89,6 +90,16 @@ def register(mcp):
 
                         with open(file_path_obj) as f:
                             total_lines = sum(1 for _ in f)
+
+                        # Check line limit for full file reads
+                        max_lines = get_config_value("limits.full_file_read_max_lines", 200)
+                        if total_lines > max_lines:
+                            errors.append(
+                                f"Range {idx}: File has {total_lines} lines, exceeds full file read limit of {max_lines}. "
+                                f"Use start_line/end_line parameters to read specific ranges."
+                            )
+                            continue
+
                         r_start_line = 1
                         r_end_line = total_lines
 
@@ -169,6 +180,16 @@ def register(mcp):
 
             with open(file_path_obj) as f:
                 total_lines = sum(1 for _ in f)
+
+            # Check line limit for full file reads
+            max_lines = get_config_value("limits.full_file_read_max_lines", 200)
+            if total_lines > max_lines:
+                return {
+                    "error": f"File has {total_lines} lines, exceeds full file read limit of {max_lines}. "
+                            f"Use start_line/end_line parameters to read specific ranges, or adjust "
+                            f"'limits.full_file_read_max_lines' in config (./cerberus.toml or ~/.config/cerberus/config.toml)."
+                }
+
             start_line = 1
             end_line = total_lines
 
@@ -344,6 +365,14 @@ def register(mcp):
 
         # Handle bulk mode
         if paths:
+            # Check bulk limit
+            max_files = get_config_value("limits.bulk_file_info_max_files", 50)
+            if len(paths) > max_files:
+                return {
+                    "error": f"Requested {len(paths)} files, exceeds bulk limit of {max_files}. "
+                            f"Reduce request size or adjust 'limits.bulk_file_info_max_files' in config."
+                }
+
             results = []
             errors = []
 

@@ -1,0 +1,51 @@
+# Cerberus Configuration Example
+# Copy to cerberus.toml (project-level) or ~/.config/cerberus/config.toml (user-level)
+
+[index]
+path = ".cerberus/cerberus.db"
+auto_update = true
+debounce_seconds = 3.0
+watch_extensions = [".py", ".ts", ".js", ".go", ".tsx", ".jsx", ".rs", ".java"]
+
+[memory]
+global_store = "~/.cerberus/memory"
+# Size limits (bytes)
+max_profile_size = 4096
+max_context_size = 4096
+max_project_decisions_size = 10240
+max_total_memory_size = 262144
+# Count limits
+max_decisions_per_project = 10
+max_corrections = 20
+max_prompts_per_project = 5
+# Context generation limits
+max_profile_lines = 50
+max_context_lines = 150
+max_decisions_in_context = 5
+max_corrections_in_context = 5
+max_prompts_in_context = 3
+# Retention
+max_project_age_days = 90
+
+[limits]
+max_search_results = 100
+max_file_size = 1000000
+max_symbols_per_file = 500
+max_skeleton_lines = 5000
+max_blueprint_depth = 10
+max_style_violations = 30
+
+# Token safety limits (v2.8)
+# Prevent excessive token usage from AI agents
+full_file_read_max_lines = 200        # Max lines for read_range() without start/end
+bulk_skeletonize_max_files = 20       # Max files in skeletonize(files=[])
+bulk_file_info_max_files = 50         # Max files in file_info(paths=[])
+
+[quality]
+style_rules = ["black", "isort"]
+auto_fix_on_edit = false
+
+[summarization]
+ollama_url = "http://localhost:11434"
+model = "llama3.2"
+max_file_size_for_summary = 50000
