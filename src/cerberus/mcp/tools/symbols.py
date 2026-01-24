@@ -14,17 +14,23 @@ from cerberus.mcp.tools.token_utils import (
 def register(mcp):
     @mcp.tool()
     def get_symbol(
-        name: str,
+        name: str = None,
         context_lines: int = 5,
+        symbols: List[str] = None,
     ) -> Dict[str, Any]:
         """
-        Retrieve symbol by exact name with surrounding code context.
+        Retrieve symbol(s) by exact name with surrounding code context.
+
+        Supports both single and bulk operations:
+        - Single: Provide name parameter
+        - Bulk: Provide symbols list (name parameter ignored)
 
         Use search() for fuzzy discovery, then get_symbol() for exact retrieval.
         This enforces Cerberus's efficient workflow and prevents token bloat.
 
         TOKEN EFFICIENCY:
         - Single method: ~400 tokens with default context_lines=5.
+        - Bulk: ~400 tokens per symbol (saves MCP round-trip overhead)
         - context_lines controls cost:
           - 0: ~300 tokens
           - 5: ~400 tokens (recommended)
@@ -33,12 +39,123 @@ def register(mcp):
         - Increase context_lines only if more surrounding code is required.
 
         Args:
-            name: Exact symbol name to find
+            name: Exact symbol name to find (single mode)
             context_lines: Lines of context before/after symbol
+            symbols: List of exact symbol names for bulk retrieval
 
         Returns:
-            List of matching symbols with code snippets
+            Dict with result list and token info
+
+        Examples:
+            # Single symbol
+            get_symbol(name="UserConfig")
+
+            # Bulk symbols
+            get_symbol(symbols=["UserConfig", "SystemConfig", "GlobalConfig"])
         """
+        # Validate inputs
+        if not name and not symbols:
+            return {
+                "result": [],
+                "error": "Must provide either 'name' for single retrieval or 'symbols' for bulk retrieval"
+            }
+
+        # Handle bulk mode
+        if symbols:
+            manager = get_index_manager()
+            scan_result = manager.get_index()
+
+            all_results = []
+            all_seen = set()
+            total_tokens = 0
+            processed_files = set()
+            estimated_full_file_tokens = 0
+            not_found = []
+
+            for symbol_name in symbols:
+                matches = find_symbol_fts(symbol_name, scan_result, exact=True)
+
+                if not matches:
+                    not_found.append(symbol_name)
+                    continue
+
+                for symbol in matches:
+                    # Normalize path to relative for deduplication
+                    try:
+                        normalized_path = str(Path(symbol.file_path).relative_to(Path.cwd()))
+                    except ValueError:
+                        normalized_path = symbol.file_path
+
+                    # Create deduplication key with normalized path
+                    key = (normalized_path, symbol.name, symbol.start_line, symbol.end_line, symbol.type)
+                    if key in all_seen:
+                        continue
+                    all_seen.add(key)
+
+                    snippet = read_range(
+                        Path(symbol.file_path),
+                        symbol.start_line,
+                        symbol.end_line,
+                        padding=context_lines,
+                    )
+
+                    # Estimate tokens for this symbol
+                    symbol_tokens = estimate_tokens(snippet.content)
+                    total_tokens += symbol_tokens
+
+                    all_results.append({
+                        "name": symbol.name,
+                        "type": symbol.type,
+                        "file": normalized_path,
+                        "start_line": symbol.start_line,
+                        "end_line": symbol.end_line,
+                        "signature": symbol.signature,
+                        "code": snippet.content,
+                    })
+
+                    # Track files for token savings calculation
+                    if symbol.file_path not in processed_files:
+                        processed_files.add(symbol.file_path)
+                        try:
+                            file_path_obj = Path(symbol.file_path)
+                            if file_path_obj.exists():
+                                with open(file_path_obj) as f:
+                                    total_lines = sum(1 for _ in f)
+                                estimated_full_file_tokens += estimate_file_tokens(symbol.file_path, total_lines)
+                        except:
+                            pass
+
+            # Build bulk response
+            response = {
+                "result": all_results,
+                "bulk_mode": True,
+                "requested_count": len(symbols),
+                "found_count": len(all_results),
+            }
+
+            if not_found:
+                response["not_found"] = not_found
+
+            if estimated_full_file_tokens > 0:
+                tokens_saved = estimated_full_file_tokens - total_tokens
+                savings_percent = round((tokens_saved / estimated_full_file_tokens) * 100, 1) if estimated_full_file_tokens > 0 else 0
+
+                response["_token_info"] = {
+                    "estimated_tokens": total_tokens,
+                    "alternative": "Read full file(s)",
+                    "alternative_tokens": estimated_full_file_tokens,
+                    "tokens_saved": tokens_saved,
+                    "savings_percent": savings_percent
+                }
+            else:
+                response["_token_info"] = {
+                    "estimated_tokens": total_tokens,
+                    "result_count": len(all_results)
+                }
+
+            return response
+
+        # Single mode (original logic)
         manager = get_index_manager()
         scan_result = manager.get_index()
         matches = find_symbol_fts(name, scan_result, exact=True)
