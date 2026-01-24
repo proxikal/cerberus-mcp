@@ -663,6 +663,26 @@ def parse_claude_code_transcript(transcript_path: Path) -> List[Tuple[str, str]]
 
                     # Handle string content (simple user messages)
                     if isinstance(content, str):
+                        # Filter out skill content and system injections
+                        if content.strip().startswith('Base directory for this skill:'):
+                            continue
+
+                        # Skip system-reminder blocks
+                        if '<system-reminder>' in content:
+                            # Remove system-reminder content
+                            import re
+                            filtered_content = re.sub(r'<system-reminder>.*?</system-reminder>', '', content, flags=re.DOTALL)
+                            filtered_content = filtered_content.strip()
+
+                            # If nothing left after removing system-reminders, skip
+                            if not filtered_content or len(filtered_content) < 10:
+                                continue
+                            content = filtered_content
+
+                        # Skip abnormally long messages (likely tool results or errors)
+                        if len(content) > 5000:
+                            continue
+
                         messages.append((role, content))
                         continue
 
@@ -674,6 +694,28 @@ def parse_claude_code_transcript(transcript_path: Path) -> List[Tuple[str, str]]
 
                     if text_parts:
                         message_text = '\n'.join(text_parts)
+
+                        # Filter out skill content and system injections
+                        # Skip if message starts with skill header (tool result)
+                        if message_text.strip().startswith('Base directory for this skill:'):
+                            continue
+
+                        # Skip system-reminder blocks
+                        if '<system-reminder>' in message_text:
+                            # Remove system-reminder content
+                            import re
+                            message_text = re.sub(r'<system-reminder>.*?</system-reminder>', '', message_text, flags=re.DOTALL)
+                            message_text = message_text.strip()
+
+                            # If nothing left after removing system-reminders, skip
+                            if not message_text or len(message_text) < 10:
+                                continue
+
+                        # Skip abnormally long messages (likely tool results or errors)
+                        # Normal user messages are rarely over 5000 chars
+                        if len(message_text) > 5000:
+                            continue
+
                         messages.append((role, message_text))
 
                 except json.JSONDecodeError:

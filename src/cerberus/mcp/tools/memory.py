@@ -308,11 +308,11 @@ def register(mcp):
         """
         Remove a specific memory entry.
 
-        Deletes a previously learned preference, decision, or correction
+        Deletes a previously learned preference, decision, correction, or rule
         from memory.
 
         Args:
-            category: Type of memory - "preference", "decision", or "correction"
+            category: Type of memory - "preference", "decision", "correction", or "rule"
             identifier: The content or ID of the entry to remove (can be memory ID or content text)
             project: Project name (required for decisions, auto-detected if not provided)
 
@@ -323,7 +323,7 @@ def register(mcp):
             - message: Description of result
         """
         # Validate category
-        valid_categories = ["preference", "decision", "correction"]
+        valid_categories = ["preference", "decision", "correction", "rule"]
         if category not in valid_categories:
             return {
                 "status": "error",
