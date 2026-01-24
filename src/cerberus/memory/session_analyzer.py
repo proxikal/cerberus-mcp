@@ -1374,6 +1374,70 @@ def save_session_context_to_db():
         "next_actions": [c for c in codes if c.startswith("next:")],
     }
 
+    # Cross-category deduplication: Filter out "next:" items that were completed
+    def simple_stem(word: str) -> str:
+        """Simple stemming to normalize verb tenses and plurals."""
+        # Remove common suffixes
+        suffixes = ['ing', 'ed', 's']
+        for suffix in suffixes:
+            if word.endswith(suffix) and len(word) > len(suffix) + 2:
+                return word[:-len(suffix)]
+        return word
+
+    def extract_keywords_from_code(code: str) -> set:
+        """Extract meaningful keywords from semantic code with stemming."""
+        # Remove prefix (next:, done:, etc.)
+        content = ':'.join(code.split(':')[1:])
+        # Split on common delimiters
+        words = re.split(r'[-_:\s]+', content.lower())
+        # Filter out short/common words and apply stemming
+        stop_words = {'the', 'and', 'or', 'to', 'a', 'an', 'is', 'for', 'of', 'in', 'on'}
+        return {simple_stem(w) for w in words if len(w) > 2 and w not in stop_words}
+
+    def calculate_keyword_similarity(keywords1: set, keywords2: set) -> float:
+        """
+        Calculate containment similarity between two keyword sets.
+
+        Uses containment (intersection / min) instead of Jaccard (intersection / union)
+        to handle cases where one description is more detailed than the other.
+
+        Example:
+          next:register-again-mcp-add-cerberus-dev (6 words)
+          done:registered-cerberus-dev (3 words)
+          Intersection: 3 words
+          Containment: 3/3 = 100% (smaller set fully contained)
+          Jaccard: 3/6 = 50% (would miss the match)
+        """
+        if not keywords1 or not keywords2:
+            return 0.0
+        intersection = keywords1 & keywords2
+        # Use the smaller set as denominator (containment similarity)
+        min_size = min(len(keywords1), len(keywords2))
+        return len(intersection) / min_size if min_size > 0 else 0.0
+
+    # Filter next_actions: remove items that match completed items
+    filtered_next_actions = []
+    for next_item in context_data["next_actions"]:
+        next_keywords = extract_keywords_from_code(next_item)
+
+        # Check if this "next:" item matches any "done:" item
+        is_completed = False
+        for done_item in context_data["completed"]:
+            done_keywords = extract_keywords_from_code(done_item)
+            similarity = calculate_keyword_similarity(next_keywords, done_keywords)
+
+            # If 60%+ keyword overlap, consider it completed
+            if similarity >= 0.6:
+                is_completed = True
+                break
+
+        # Only keep "next:" items that weren't completed
+        if not is_completed:
+            filtered_next_actions.append(next_item)
+
+    # Update context_data with filtered next_actions
+    context_data["next_actions"] = filtered_next_actions
+
     # Extract structured details (hybrid format)
     details = extract_session_details()
 
