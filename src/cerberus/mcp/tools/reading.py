@@ -21,44 +21,35 @@ def register(mcp):
         ranges: List[Dict[str, Any]] = None,
     ) -> dict:
         """
-        Read specific line ranges from file(s).
+        Read line ranges or entire files with Cerberus metadata.
 
-        Supports both single and bulk operations:
-        - Single: Provide file_path, start_line, end_line parameters
-        - Bulk: Provide ranges list (other params ignored)
+        Supports single, bulk, and full-file modes:
+        - Single range: Provide file_path, start_line, end_line
+        - Full file: Provide file_path only (omit start_line/end_line)
+        - Bulk: Provide ranges list
 
         Args:
             file_path: Path to file (single mode)
-            start_line: Starting line number, 1-indexed (single mode)
-            end_line: Ending line number, 1-indexed (single mode)
+            start_line: Starting line number, 1-indexed (optional - omit for full file)
+            end_line: Ending line number, 1-indexed (optional - omit for full file)
             context_lines: Additional context lines before/after (default: 0)
-            ranges: List of range dicts for bulk reading (each with file_path, start_line, end_line, optional context_lines)
+            ranges: List of range dicts for bulk reading (each with file_path, optional start_line/end_line)
 
         Returns:
             Dict with result(s) and token info
 
         Examples:
+            # Full file (NEW - entire file with metadata)
+            read_range(file_path="src/config.py")
+
             # Single range
             read_range(file_path="src/main.py", start_line=10, end_line=20)
 
             # Bulk ranges (multiple ranges from same or different files)
             read_range(ranges=[
-                {
-                    "file_path": "src/config.py",
-                    "start_line": 10,
-                    "end_line": 30,
-                    "context_lines": 5
-                },
-                {
-                    "file_path": "src/utils.py",
-                    "start_line": 45,
-                    "end_line": 60
-                },
-                {
-                    "file_path": "src/config.py",
-                    "start_line": 100,
-                    "end_line": 120
-                }
+                {"file_path": "src/config.py", "start_line": 10, "end_line": 30},
+                {"file_path": "src/utils.py"},  # Full file in bulk
+                {"file_path": "src/models.py", "start_line": 100, "end_line": 120}
             ])
         """
         # Validate inputs
@@ -82,9 +73,21 @@ def register(mcp):
                     r_end_line = range_spec.get("end_line")
                     r_context_lines = range_spec.get("context_lines", 0)
 
-                    if not r_file_path or r_start_line is None or r_end_line is None:
-                        errors.append(f"Range {idx}: Missing required fields (file_path, start_line, end_line)")
+                    if not r_file_path:
+                        errors.append(f"Range {idx}: Missing file_path")
                         continue
+
+                    # If start/end not provided, read entire file
+                    if r_start_line is None or r_end_line is None:
+                        file_path_obj = Path(r_file_path)
+                        if not file_path_obj.exists():
+                            errors.append(f"Range {idx}: File not found: {r_file_path}")
+                            continue
+
+                        with open(file_path_obj) as f:
+                            total_lines = sum(1 for _ in f)
+                        r_start_line = 1
+                        r_end_line = total_lines
 
                     snippet = core_read_range(
                         Path(r_file_path),
@@ -152,7 +155,20 @@ def register(mcp):
 
             return response
 
-        # Single mode (original logic)
+        # Single mode
+        # If start/end not provided, read entire file
+        if start_line is None or end_line is None:
+            file_path_obj = Path(file_path)
+            if not file_path_obj.exists():
+                return {
+                    "error": f"File not found: {file_path}"
+                }
+
+            with open(file_path_obj) as f:
+                total_lines = sum(1 for _ in f)
+            start_line = 1
+            end_line = total_lines
+
         snippet = core_read_range(
             Path(file_path),
             start_line,
