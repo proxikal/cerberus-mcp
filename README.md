@@ -105,7 +105,7 @@ Add to your `cerberus.toml`:
 ```toml
 [summarization]
 enabled = true
-model = "deepseek-coder:6.7b"  # Or any Ollama model
+model = "qwen3:8b"  # Best for tool calling (or any Ollama model)
 ollama_url = "http://localhost:11434"
 ```
 
