@@ -10,7 +10,7 @@ Zero token cost - pure regex and keyword matching.
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import json
 import os
 import re
@@ -817,7 +817,7 @@ def analyze_session_from_transcript() -> List[CorrectionCandidate]:
 # Session Context Extraction (Work Summary)
 # ============================================================================
 
-def extract_tool_calls_from_transcript(transcript_path: Path) -> List[Dict[str, str]]:
+def extract_tool_calls_from_transcript(transcript_path: Path) -> List[Dict[str, Any]]:
     """
     Extract tool calls (Edit, Write, Bash) from transcript.
 
@@ -939,7 +939,7 @@ def extract_session_codes() -> List[str]:
 
     # 2. Extract tool calls WITH CONTEXT from surrounding messages
     tool_calls = extract_tool_calls_from_transcript(transcript)
-    file_context = {}  # Maps filename -> list of contexts
+    file_context: dict[str, list[str]] = {}  # Maps filename -> list of contexts
 
     # Build context map from conversations
     for i, (user_msg, ai_msg) in enumerate(conversations):
@@ -1083,7 +1083,7 @@ def extract_session_codes() -> List[str]:
                     logger.debug(f"Error formatting fix pattern: {e}")
 
         # Extract BLOCKERS with specifics
-        blocker_patterns_contextual = [
+        blocker_patterns_contextual: list[tuple[str, Union[str, Callable[[Any], str]]]] = [
             (r'(?:session\s+)?end\s+hook.*error(?:ing)?',
              'block:session-end-hook:erroring'),
             (r'(?:cerberus|search)\s+(?:is\s+)?broken.*(?:search|empty|failing)',
@@ -1092,7 +1092,7 @@ def extract_session_codes() -> List[str]:
              lambda m: f"block:{extract_keywords(m.group(1), 3)}:needs-{extract_keywords(m.group(2), 3)}"),
         ]
 
-        for pattern, formatter in blocker_patterns_contextual:
+        for pattern, formatter in blocker_patterns_contextual:  # type: ignore[assignment]
             match = re.search(pattern, msg_lower, re.IGNORECASE)
             if match:
                 if callable(formatter):
@@ -1103,7 +1103,7 @@ def extract_session_codes() -> List[str]:
                     except Exception as e:
                         logger.debug(f"Error formatting blocker pattern: {e}")
                 else:
-                    codes.append(formatter)
+                    codes.append(formatter)  # type: ignore[unreachable]
 
         # Extract NEXT ACTIONS with context
         next_patterns_contextual = [
@@ -1126,14 +1126,14 @@ def extract_session_codes() -> List[str]:
                     logger.debug(f"Error formatting next action pattern: {e}")
 
         # Extract COMPLETIONS with context
-        completion_patterns_contextual = [
+        completion_patterns_contextual: list[tuple[str, Union[str, Callable[[Any], str]]]] = [
             (r'(?:awesome|great).*(?:now|so)\s+(.{10,40}?)\s+(?:is\s+)?(?:working|functional)',
              lambda m: f"done:{extract_keywords(m.group(1), 3)}:working"),
             (r'(?:so\s+)?memories\s+(?:are\s+)?working',
              'done:memories:functional'),
         ]
 
-        for pattern, formatter in completion_patterns_contextual:
+        for pattern, formatter in completion_patterns_contextual:  # type: ignore[assignment]
             match = re.search(pattern, msg_lower, re.IGNORECASE)
             if match:
                 if callable(formatter):
@@ -1144,7 +1144,7 @@ def extract_session_codes() -> List[str]:
                     except Exception as e:
                         logger.debug(f"Error formatting completion pattern: {e}")
                 else:
-                    codes.append(formatter)
+                    codes.append(formatter)  # type: ignore[unreachable]
 
         # Extract completions from AI messages
         ai_completion_patterns = [
@@ -1194,7 +1194,7 @@ def extract_session_codes() -> List[str]:
     def semantic_dedupe(codes_list: List[str]) -> List[str]:
         """Remove semantically duplicate codes."""
         unique: list = []
-        seen = set()
+        seen: set[str] = set()
 
         for code in codes_list:
             if ':' not in code:
@@ -1266,7 +1266,7 @@ def extract_session_details() -> str:
     conversations = parse_claude_code_transcript(transcript)
     tool_calls = extract_tool_calls_from_transcript(transcript)
 
-    sections = {
+    sections: dict[str, Union[list[str], set[str]]] = {
         'bugs': [],
         'investigations': [],
         'files': set()
@@ -1303,7 +1303,9 @@ def extract_session_details() -> str:
         # Deduplicate
         normalized = text.lower()
         if normalized not in seen:
-            sections[category].append(text)
+            category_list = sections[category]
+            assert isinstance(category_list, list)
+            category_list.append(text)
             seen.add(normalized)
 
     # Extract bug fixes and their context
@@ -1357,28 +1359,34 @@ def extract_session_details() -> str:
     # Extract modified files
     for call in tool_calls:
         if call.get('name') in ['Edit', 'Write', 'NotebookEdit']:
-            params = call.get('params', {})
+            params: dict[str, Any] = call.get('params', {})
             file_path = params.get('file_path', '')
             if file_path:
                 # Get just filename
                 filename = file_path.split('/')[-1]
-                sections['files'].add(filename)
+                files_set = sections['files']
+                assert isinstance(files_set, set)
+                files_set.add(filename)
 
     # Format output
     output: list = []
 
     # Bugs/Fixes section
-    if sections['bugs']:
+    bugs_list = sections['bugs']
+    assert isinstance(bugs_list, list)
+    if bugs_list:
         output.append("Bugs/Fixes:")
-        for item in sections['bugs'][:8]:  # Limit to 8 items
+        for item in bugs_list[:8]:  # Limit to 8 items
             output.append(f"- {item}")
 
     # Investigations section
-    if sections['investigations']:
+    investigations_list = sections['investigations']
+    assert isinstance(investigations_list, list)
+    if investigations_list:
         if output:
             output.append("")
         output.append("Investigations:")
-        for item in sections['investigations'][:5]:  # Limit to 5 items
+        for item in investigations_list[:5]:  # Limit to 5 items
             output.append(f"- {item}")
 
     # Files section

@@ -6,7 +6,7 @@ Defaults can be overridden via:
 3. Environment variables CERBERUS_MEMORY_*
 """
 import os
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 # Default values (conservative but effective for most users)
 MEMORY_DEFAULTS = {
@@ -120,52 +120,52 @@ def reload():
 
 # Convenience accessors for commonly used limits
 def max_profile_size() -> int:
-    return get("max_profile_size")
+    return cast(int, get("max_profile_size"))
 
 
 def max_context_size() -> int:
-    return get("max_context_size")
+    return cast(int, get("max_context_size"))
 
 
 def max_project_decisions_size() -> int:
-    return get("max_project_decisions_size")
+    return cast(int, get("max_project_decisions_size"))
 
 
 def max_total_memory_size() -> int:
-    return get("max_total_memory_size")
+    return cast(int, get("max_total_memory_size"))
 
 
 def max_decisions_per_project() -> int:
-    return get("max_decisions_per_project")
+    return cast(int, get("max_decisions_per_project"))
 
 
 def max_corrections() -> int:
-    return get("max_corrections")
+    return cast(int, get("max_corrections"))
 
 
 def max_prompts_per_project() -> int:
-    return get("max_prompts_per_project")
+    return cast(int, get("max_prompts_per_project"))
 
 
 def max_profile_lines() -> int:
-    return get("max_profile_lines")
+    return cast(int, get("max_profile_lines"))
 
 
 def max_context_lines() -> int:
-    return get("max_context_lines")
+    return cast(int, get("max_context_lines"))
 
 
 def max_decisions_in_context() -> int:
-    return get("max_decisions_in_context")
+    return cast(int, get("max_decisions_in_context"))
 
 
 def max_corrections_in_context() -> int:
-    return get("max_corrections_in_context")
+    return cast(int, get("max_corrections_in_context"))
 
 
 def max_prompts_in_context() -> int:
-    return get("max_prompts_in_context")
+    return cast(int, get("max_prompts_in_context"))
 
 
 def max_project_age_days() -> int:
-    return get("max_project_age_days")
+    return cast(int, get("max_project_age_days"))
