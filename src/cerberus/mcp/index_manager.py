@@ -190,6 +190,9 @@ class IndexManager:
                 result = self.ensure_fresh_index()
                 if result["status"] == "updated":
                     logger.info(f"Auto-updated stale index: {result['reason']}")
+                    # Reload index after update (ensure_fresh_index invalidates cache)
+                    if self._index is None:
+                        self._load_index()
                 elif result["status"] == "stale" and result["error"]:
                     logger.warning(
                         f"Index may be stale ({result['reason']}): {result['error']}"
