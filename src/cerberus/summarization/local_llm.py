@@ -62,11 +62,12 @@ class LocalLLMClient:
             # Initialize tool-enabled session if available
             if self.available and TOOLCHAIN_AVAILABLE:
                 try:
+                    # Note: Ollama connection uses OLLAMA_HOST env var (default: http://localhost:11434)
+                    # Users can set OLLAMA_HOST to override if needed
                     self.toolchain_session = OllamaSession(
                         model=self.config["model"],
                         root=".",
-                        enabled_tools=["read_file"],  # Only enable file reading
-                        ollama_url=self.config["api_base"]
+                        enabled_tools=["read_file"]  # Only enable file reading
                     )
                     logger.info("llm-toolchain enabled - using zero-token file operations")
                 except Exception as e:
