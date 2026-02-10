@@ -345,6 +345,18 @@ class SQLiteSymbolsOperations:
             # Escape FTS5 special characters to prevent syntax errors
             safe_query = escape_fts5_query(query)
 
+            # Convert multi-word queries to OR logic for better matching
+            # Preserves:
+            # - Quoted phrase searches (already quoted by escape_fts5_query)
+            # - Advanced queries (already contain AND/OR/NOT)
+            is_quoted = safe_query.startswith('"') and safe_query.endswith('"')
+            is_advanced_query = bool(re.search(r'\b(AND|OR|NOT)\b', safe_query, re.IGNORECASE))
+
+            if not is_quoted and not is_advanced_query:
+                tokens = safe_query.split()
+                if len(tokens) > 1:
+                    safe_query = " OR ".join(tokens)
+
             # FTS5 query with BM25 ranking
             # The bm25() function returns negative scores (more negative = better match)
             # We negate it to get positive scores (higher = better)
