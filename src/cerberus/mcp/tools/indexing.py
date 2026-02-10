@@ -8,8 +8,17 @@ from ..index_manager import get_index_manager
 
 def register(mcp):
     @mcp.tool()
-    def index_build(path: str = ".", extensions: Optional[List[str]] = None) -> dict:
-        """Build or rebuild codebase index from scratch."""
+    def index_build(path: str = ".", extensions: Optional[List[str]] = None, no_embeddings: bool = False) -> dict:
+        """Build or rebuild codebase index from scratch.
+
+        Args:
+            path: Directory to index (default: current directory)
+            extensions: File extensions to include (default: common code/doc files)
+            no_embeddings: Skip embedding generation for semantic search (default: False, rare use)
+
+        Semantic search is enabled by default with bundled all-MiniLM-L6-v2 model.
+        Only use no_embeddings=True to disable embeddings in edge cases (e.g., testing, resource constraints).
+        """
         if extensions is None:
             # Code files
             extensions = [".py", ".ts", ".js", ".go", ".tsx", ".jsx"]
@@ -31,7 +40,7 @@ def register(mcp):
             extensions = corrected_extensions
 
         manager = get_index_manager()
-        return manager.rebuild(Path(path), extensions)
+        return manager.rebuild(Path(path), extensions, store_embeddings=not no_embeddings)
 
     @mcp.tool()
     def index_status() -> dict:

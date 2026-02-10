@@ -138,7 +138,11 @@ class ContextAssembler:
         conn = self.store._get_connection()
         try:
             if file_path:
-                # Exact match requested - no ambiguity
+                # Normalize file path for comparison (remove leading ./ and convert to consistent format)
+                from pathlib import Path as PathLib
+                normalized_input = str(PathLib(file_path).as_posix()).lstrip('./')
+
+                # Try exact match first
                 cursor = conn.execute("""
                     SELECT name, type, file_path, start_line, end_line,
                            signature, return_type, parameters, parent_class
@@ -147,6 +151,23 @@ class ContextAssembler:
                     LIMIT 1
                 """, (symbol_name, file_path))
                 result = cursor.fetchone()
+
+                # If no exact match, try normalized path matching
+                if not result:
+                    cursor = conn.execute("""
+                        SELECT name, type, file_path, start_line, end_line,
+                               signature, return_type, parameters, parent_class
+                        FROM symbols
+                        WHERE name = ?
+                    """, (symbol_name,))
+                    all_matches = cursor.fetchall()
+
+                    # Find match by normalized path comparison
+                    for match in all_matches:
+                        db_path = str(PathLib(match[2]).as_posix()).lstrip('./')
+                        if db_path == normalized_input or match[2].endswith(normalized_input):
+                            result = match
+                            break
             else:
                 # Fetch ALL matches and rank them
                 cursor = conn.execute("""

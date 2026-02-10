@@ -338,13 +338,23 @@ def register(mcp):
 
     @mcp.tool()
     def memory_forget(
-        category: str,
+        category: Optional[str] = None,
         identifier: Optional[str] = None,
         project: Optional[str] = None,
         ids: Optional[List[str]] = None,
     ) -> dict:
-        """Remove memory entries by ID or filter criteria."""
-        # Validate category
+        """Remove memory entries by ID or filter criteria.
+
+        Args:
+            category: Category filter (optional when ids provided)
+            identifier: Memory identifier
+            project: Project scope
+            ids: List of memory IDs to delete (allows mixed categories)
+
+        Note: When using ids parameter, category is optional and used only for validation.
+              To delete memories of mixed categories, omit the category parameter.
+        """
+        # Validate category if provided
         valid_categories = ["preference", "decision", "correction", "rule"]
         if category and category not in valid_categories:
             return {
@@ -352,7 +362,7 @@ def register(mcp):
                 "message": f"Invalid category: {category}. Must be one of: {', '.join(valid_categories)}"
             }
 
-        # Handle bulk deletion
+        # Handle bulk deletion by IDs
         if ids:
             import sqlite3
             from pathlib import Path
@@ -368,7 +378,7 @@ def register(mcp):
             try:
                 for memory_id in ids:
                     try:
-                        # Validate ID exists and matches category if provided
+                        # Only validate category if provided
                         if category:
                             cursor = conn.execute(
                                 "SELECT category FROM memory_store WHERE id = ?",
@@ -382,7 +392,7 @@ def register(mcp):
                                 errors.append(f"{memory_id}: category mismatch (expected {category}, got {row[0]})")
                                 continue
 
-                        # Delete the memory
+                        # Delete the memory (works regardless of category when category not specified)
                         if storage.delete_memory(memory_id):
                             deleted.append(memory_id)
                         else:

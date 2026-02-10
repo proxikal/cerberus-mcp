@@ -30,7 +30,7 @@ def build_index(
     respect_gitignore: bool = True,
     extensions: Optional[List[str]] = None,
     incremental: bool = False,
-    store_embeddings: bool = False,
+    store_embeddings: bool = True,
     padding: int = 3,
     model_name: str = "all-MiniLM-L6-v2",
     max_bytes: Optional[int] = None,
@@ -54,7 +54,7 @@ def build_index(
         respect_gitignore: Honor .gitignore patterns
         extensions: File extensions to scan (None = all)
         incremental: Use previous index for unchanged files
-        store_embeddings: Generate and store vector embeddings
+        store_embeddings: Generate and store vector embeddings (default: True for semantic search)
         padding: Context lines around symbols for embeddings
         model_name: Embedding model name
         max_bytes: Skip files larger than this (default: 1MB from limits config)

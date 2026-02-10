@@ -17,6 +17,9 @@ def get_model(model_name: str = "all-MiniLM-L6-v2") -> "SentenceTransformer":
     The model is loaded on first call and cached. For keyword-only searches,
     this function is never called, keeping RAM usage < 50MB.
 
+    Models are bundled locally in the models/ directory for faster loading.
+    Falls back to HuggingFace download if local model is missing or corrupted.
+
     Args:
         model_name: HuggingFace model identifier
 
@@ -25,9 +28,27 @@ def get_model(model_name: str = "all-MiniLM-L6-v2") -> "SentenceTransformer":
     """
     # Lazy import to avoid loading torch for commands that don't need semantic search
     from sentence_transformers import SentenceTransformer
+    from pathlib import Path
 
+    # Check for bundled local model first
+    # Go up from src/cerberus/semantic/embeddings.py to project root
+    local_model_path = Path(__file__).parent.parent.parent.parent / "models" / model_name
+
+    if local_model_path.exists() and (local_model_path / "config.json").exists():
+        logger.info(
+            f"Loading bundled embedding model '{model_name}' from {local_model_path}"
+        )
+        try:
+            return SentenceTransformer(str(local_model_path))
+        except Exception as e:
+            logger.warning(
+                f"Failed to load local model from {local_model_path}: {e}. "
+                "Falling back to HuggingFace download."
+            )
+
+    # Fallback: Download from HuggingFace
     logger.warning(
-        f"Loading 400MB+ embedding model '{model_name}' into RAM. "
+        f"Loading 400MB+ embedding model '{model_name}' from HuggingFace into RAM. "
         "This only happens for semantic searches. Keyword searches remain < 50MB."
     )
     return SentenceTransformer(model_name)

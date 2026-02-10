@@ -125,6 +125,78 @@ class PatternChecker:
             negative_indicators=[r'"""\s*:param', r'"""\s*:return'],  # Sphinx style
             suggestion_template="Use Google-style docstrings (Args:, Returns:)"
         ),
+
+        # TypeScript/JavaScript Patterns
+        "ts_async_await": PatternDefinition(
+            name="ts_async_await",
+            description="Use async/await for promises (TypeScript/JavaScript)",
+            positive_indicators=[r"async\s+(?:function|\()", r"await\s+\w+"],
+            negative_indicators=[r"\.then\(", r"\.catch\("],  # Promise chains instead of async/await
+            suggestion_template="Use async/await instead of .then()/.catch() chains"
+        ),
+        "ts_promise_patterns": PatternDefinition(
+            name="ts_promise_patterns",
+            description="Proper Promise usage (TypeScript/JavaScript)",
+            positive_indicators=[r"Promise\.all\(", r"Promise\.race\(", r"new Promise\("],
+            negative_indicators=[],
+            suggestion_template="Use Promise.all() for parallel operations"
+        ),
+        "ts_type_guards": PatternDefinition(
+            name="ts_type_guards",
+            description="TypeScript type guard functions",
+            positive_indicators=[r"function\s+is\w+\(.*\):\s*\w+\s+is\s+\w+", r":\s*\w+\s+is\s+\w+\s*{"],
+            negative_indicators=[],
+            suggestion_template="Use type guards (x is Type) for runtime type checking"
+        ),
+        "ts_interface_usage": PatternDefinition(
+            name="ts_interface_usage",
+            description="Use interfaces for object shapes (TypeScript)",
+            positive_indicators=[r"interface\s+\w+", r":\s*\{\s*\w+:"],
+            negative_indicators=[r"type\s+\w+\s*=\s*\{"],  # Type aliases for object shapes (prefer interface)
+            suggestion_template="Use interface instead of type for object shapes"
+        ),
+        "ts_generic_types": PatternDefinition(
+            name="ts_generic_types",
+            description="Generic type usage (TypeScript)",
+            positive_indicators=[r"<[A-Z]\w*>", r"<[A-Z]\w*\s+extends\s+\w+>"],
+            negative_indicators=[],
+            suggestion_template="Use generic types for reusable components"
+        ),
+        "ts_error_handling": PatternDefinition(
+            name="ts_error_handling",
+            description="Use try/catch for error handling (TypeScript/JavaScript)",
+            positive_indicators=[r"try\s*\{", r"catch\s*\("],
+            negative_indicators=[r"catch\s*\(\s*\)\s*\{", r"catch\s*\([^)]+\)\s*\{\s*\}"],  # Empty catch or catch without param
+            suggestion_template="Use try/catch with proper error logging"
+        ),
+        "ts_import_style": PatternDefinition(
+            name="ts_import_style",
+            description="ES6 import style (TypeScript/JavaScript)",
+            positive_indicators=[r"^import\s+\{", r"^import\s+\w+\s+from", r"^import\s+\*\s+as"],
+            negative_indicators=[r"^const\s+\w+\s*=\s*require\("],  # CommonJS require (prefer ES6)
+            suggestion_template="Use ES6 imports (import X from 'Y') over require()"
+        ),
+        "ts_jsdoc_style": PatternDefinition(
+            name="ts_jsdoc_style",
+            description="JSDoc comment style (TypeScript/JavaScript)",
+            positive_indicators=[r"/\*\*.*@param", r"/\*\*.*@returns"],
+            negative_indicators=[],
+            suggestion_template="Use JSDoc comments for public APIs"
+        ),
+        "ts_const_over_let": PatternDefinition(
+            name="ts_const_over_let",
+            description="Prefer const over let (TypeScript/JavaScript)",
+            positive_indicators=[r"const\s+\w+\s*="],
+            negative_indicators=[r"let\s+\w+\s*=(?!.*=.*=)"],  # let without reassignment
+            suggestion_template="Use const by default, let only when reassignment needed"
+        ),
+        "ts_arrow_functions": PatternDefinition(
+            name="ts_arrow_functions",
+            description="Arrow functions for callbacks (TypeScript/JavaScript)",
+            positive_indicators=[r"\(\w*\)\s*=>", r"\w+\s*=>\s*"],
+            negative_indicators=[r"function\s*\("],  # Traditional function expressions
+            suggestion_template="Use arrow functions for callbacks and short functions"
+        ),
     }
 
     def __init__(self, project_root: Path, extensions: Optional[List[str]] = None):
@@ -133,10 +205,23 @@ class PatternChecker:
 
         Args:
             project_root: Root directory of project
-            extensions: File extensions to check (default: ['.py'])
+            extensions: File extensions to check (default: auto-detect)
         """
         self.project_root = Path(project_root)
-        self.extensions = extensions or ['.py']
+
+        # Auto-detect extensions if not provided
+        if extensions is None:
+            # Check what languages are in the project
+            sample_files = list(self.project_root.glob("**/*"))[:100]
+            found_extensions = set(f.suffix for f in sample_files if f.is_file())
+
+            # Default based on what's found
+            if any(ext in found_extensions for ext in ['.ts', '.tsx', '.js', '.jsx']):
+                self.extensions = ['.ts', '.tsx', '.js', '.jsx']
+            else:
+                self.extensions = ['.py']
+        else:
+            self.extensions = extensions
 
     def check_pattern(
         self,

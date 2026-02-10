@@ -16,7 +16,7 @@ Cerberus provides AI agents with AST-based navigation and a dual-layer memory sy
 
 | Feature | Description |
 | :--- | :--- |
-| **🔍 Intelligent Search** | Navigate via AST (Abstract Syntax Trees). Finds functions and symbols with **95% fewer false positives** than text search. |
+| **🔍 Intelligent Search** | Navigate via AST (Abstract Syntax Trees) + **semantic search** (enabled by default with bundled all-MiniLM-L6-v2 model). Finds functions and symbols with **95% fewer false positives** than text search. |
 | **🧠 Persistent Memory** | A dual-layer system that remembers your **Global Preferences** (everywhere) and **Project Decisions** (context-specific). |
 | **📉 90% Token Savings** | "Skeletonization" and "Context Assembly" retrieve only the necessary signatures and dependencies, preventing context window bloat. |
 
@@ -126,6 +126,34 @@ We maintain detailed documentation in our [Wiki](https://github.com/proxikal/cer
 | **🛠️ [MCP Tools](https://github.com/proxikal/cerberus-mcp/wiki/MCP-Tools-Reference)** | Reference for all 51+ tools (Search, Analysis, Memory). |
 | **🧠 [Memory System](https://github.com/proxikal/cerberus-mcp/wiki/Session-Memory)** | How the dual-layer preference and decision engine works. |
 | **⚡ [Efficiency](https://github.com/proxikal/cerberus-mcp/wiki/Token-Efficiency)** | Deep dive into how we save 90% of tokens. |
+
+---
+
+## 🌐 Language Support
+
+**Cerberus supports multiple programming languages** with varying feature coverage:
+
+### ✅ **Universal Features** (All Languages)
+These tools work across Python, TypeScript, JavaScript, Go, and other languages:
+- **Core Navigation:** `search`, `get_symbol`, `context`, `blueprint`, `read_range`, `file_info`, `skeletonize`
+- **Dependency Analysis:** `deps`, `call_graph`, `analyze_impact`, `test_coverage`
+- **Project Tools:** `project_summary`, `smart_update`, `index_build`
+- **Memory System:** All memory tools (`memory_learn`, `memory_search`, `memory_context`, etc.)
+
+### 🔄 **Multi-Language Support**
+- **`find_circular_deps`**: Python, TypeScript, JavaScript (detects import cycles)
+
+### 🔄 **Enhanced Multi-Language Features**
+- **`check_pattern`**: Supports both Python and TypeScript/JavaScript patterns
+  - **Python patterns:** dataclass, type_hints, async_await, error_handling, import_style, docstring_style
+  - **TypeScript/JavaScript patterns:** ts_async_await, ts_promise_patterns, ts_type_guards, ts_interface_usage, ts_generic_types, ts_error_handling, ts_import_style, ts_jsdoc_style, ts_const_over_let, ts_arrow_functions
+- **`style_check`**: Python-optimized style rules (basic TS/JS support available)
+- **`related_changes`**: Full TypeScript/JavaScript type and interface support
+
+### 📝 **Notes**
+- **Parser:** Uses tree-sitter for multi-language AST parsing (Python, TS/JS, Go)
+- **Semantic Search:** Language-agnostic (works with all indexed code)
+- **Import Resolution:** Supports Python imports, ES6 modules, and CommonJS requires
 
 ---
 

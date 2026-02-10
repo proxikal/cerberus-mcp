@@ -1,13 +1,14 @@
 """
 Circular Dependency Detection.
 
-Detects circular import chains in Python projects.
+Detects circular import chains in Python, TypeScript, and JavaScript projects.
 """
 
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Dict, Optional, Any, Set, Tuple
 import ast
+import re
 
 
 @dataclass
@@ -39,9 +40,12 @@ class CircularDependencyResult:
 
 class CircularDependencyDetector:
     """
-    Detects circular dependencies in Python projects.
+    Detects circular dependencies in Python, TypeScript, and JavaScript projects.
 
     Uses depth-first search to find all circular import chains.
+    Supports:
+    - Python: import/from statements
+    - TypeScript/JavaScript: ES6 imports, CommonJS requires
     """
 
     def __init__(self, project_root: Path):
@@ -54,6 +58,16 @@ class CircularDependencyDetector:
         self.project_root = Path(project_root)
         self.dependency_graph: Dict[str, Set[str]] = {}
         self.module_files: Dict[str, Path] = {}
+
+        # Patterns for TS/JS imports
+        self.ts_js_import_patterns = [
+            # ES6 imports: import X from 'Y'
+            re.compile(r'''import\s+(?:[\w\s{},*]+\s+from\s+)?['"]([^'"]+)['"]'''),
+            # CommonJS: require('Y')
+            re.compile(r'''require\s*\(['"]([^'"]+)['"]\)'''),
+            # Dynamic imports: import('Y')
+            re.compile(r'''import\s*\(['"]([^'"]+)['"]\)'''),
+        ]
 
     def detect(
         self,
@@ -105,19 +119,22 @@ class CircularDependencyDetector:
         )
 
     def _get_python_files(self, scope_path: Path) -> List[Path]:
-        """Get all Python files in scope."""
+        """Get all Python, TypeScript, and JavaScript files in scope."""
         files: list = []
+        supported_extensions = ['.py', '.ts', '.tsx', '.js', '.jsx']
 
         if scope_path.is_file():
-            if scope_path.suffix == '.py':
+            if scope_path.suffix in supported_extensions:
                 files.append(scope_path)
         elif scope_path.is_dir():
-            files.extend(scope_path.glob("**/*.py"))
+            # Collect all supported file types
+            for ext in supported_extensions:
+                files.extend(scope_path.glob(f"**/*{ext}"))
 
         # Filter out non-code files
         files = [
             f for f in files
-            if not any(part.startswith(('.', '__pycache__', 'venv', 'env'))
+            if not any(part.startswith(('.', '__pycache__', 'venv', 'env', 'node_modules', 'dist', 'build'))
                       for part in f.parts)
         ]
 
@@ -128,13 +145,16 @@ class CircularDependencyDetector:
         for file_path in files:
             try:
                 content = file_path.read_text()
-                tree = ast.parse(content)
-
                 module_name = self._get_module_name(file_path)
                 self.module_files[module_name] = file_path
 
-                # Extract imports
-                imports = self._extract_imports(tree)
+                # Extract imports based on file type
+                if file_path.suffix == '.py':
+                    tree = ast.parse(content)
+                    imports = self._extract_imports(tree)
+                else:
+                    # TypeScript/JavaScript
+                    imports = self._extract_ts_js_imports(content, file_path)
 
                 # Add to graph
                 if module_name not in self.dependency_graph:
@@ -147,7 +167,7 @@ class CircularDependencyDetector:
                 continue
 
     def _get_module_name(self, file_path: Path) -> str:
-        """Get module name from file path."""
+        """Get module name from file path (works for Python and TS/JS)."""
         try:
             rel_path = file_path.relative_to(self.project_root)
         except ValueError:
@@ -156,21 +176,26 @@ class CircularDependencyDetector:
 
         parts = list(rel_path.parts)
 
-        # Remove .py extension
-        if parts[-1].endswith('.py'):
-            parts[-1] = parts[-1][:-3]
+        # Remove extension (.py, .ts, .tsx, .js, .jsx)
+        if parts[-1]:
+            name_without_ext = parts[-1].rsplit('.', 1)[0]
+            parts[-1] = name_without_ext
 
-        # Remove __init__
-        if parts[-1] == '__init__':
+        # Remove __init__ (Python) or index (TS/JS)
+        if parts[-1] in ('__init__', 'index'):
             parts = parts[:-1]
 
         # Skip empty parts
         parts = [p for p in parts if p]
 
-        return '.'.join(parts)
+        # For TS/JS, use / separator; for Python use .
+        if file_path.suffix in ['.ts', '.tsx', '.js', '.jsx']:
+            return '/'.join(parts)
+        else:
+            return '.'.join(parts)
 
     def _extract_imports(self, tree: ast.AST) -> Set[str]:
-        """Extract all imports from AST."""
+        """Extract all imports from Python AST."""
         imports = set()
 
         for node in ast.walk(tree):
@@ -182,6 +207,69 @@ class CircularDependencyDetector:
                     imports.add(node.module)
 
         return imports
+
+    def _extract_ts_js_imports(self, content: str, file_path: Path) -> Set[str]:
+        """Extract all imports from TypeScript/JavaScript file."""
+        imports = set()
+
+        for pattern in self.ts_js_import_patterns:
+            matches = pattern.findall(content)
+            for match in matches:
+                # Normalize import path
+                import_path = match.strip()
+
+                # Skip external packages (don't start with . or /)
+                if not import_path.startswith('.') and not import_path.startswith('/'):
+                    continue
+
+                # Resolve relative imports to module names
+                resolved = self._resolve_ts_js_import(import_path, file_path)
+                if resolved:
+                    imports.add(resolved)
+
+        return imports
+
+    def _resolve_ts_js_import(self, import_path: str, from_file: Path) -> Optional[str]:
+        """Resolve relative TS/JS import to module name."""
+        try:
+            # Get directory of importing file
+            from_dir = from_file.parent
+
+            # Resolve the import path
+            if import_path.startswith('.'):
+                # Relative import
+                resolved_path = (from_dir / import_path).resolve()
+            elif import_path.startswith('/'):
+                # Absolute from project root
+                resolved_path = (self.project_root / import_path.lstrip('/')).resolve()
+            else:
+                # External package, skip
+                return None
+
+            # Try to find the actual file
+            # TS/JS allows imports without extensions
+            possible_files = [
+                resolved_path,
+                resolved_path.with_suffix('.ts'),
+                resolved_path.with_suffix('.tsx'),
+                resolved_path.with_suffix('.js'),
+                resolved_path.with_suffix('.jsx'),
+                resolved_path / 'index.ts',
+                resolved_path / 'index.tsx',
+                resolved_path / 'index.js',
+                resolved_path / 'index.jsx',
+            ]
+
+            for possible_file in possible_files:
+                if possible_file.exists() and possible_file.is_file():
+                    return self._get_module_name(possible_file)
+
+            # If no file found, still try to generate a module name
+            # This handles directory imports
+            return self._get_module_name(resolved_path)
+
+        except Exception:
+            return None
 
     def _find_circular_chains(self) -> List[CircularChain]:
         """Find all circular dependency chains using DFS."""

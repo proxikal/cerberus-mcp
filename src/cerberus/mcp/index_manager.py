@@ -496,18 +496,19 @@ class IndexManager:
             "watch_extensions": self._watch_extensions,
         }
 
-    def rebuild(self, path: Path, extensions: list[str]) -> dict:
+    def rebuild(self, path: Path, extensions: list[str], store_embeddings: bool = True) -> dict:
         """
         Explicitly rebuild index.
 
         Args:
             path: Directory to index
             extensions: File extensions to include
+            store_embeddings: Generate and store vector embeddings (default: True)
 
         Returns:
             Index statistics
         """
-        logger.info(f"Rebuilding index for {path}")
+        logger.info(f"Rebuilding index for {path} (embeddings={'enabled' if store_embeddings else 'disabled'})")
 
         output_path = path / ".cerberus" / "cerberus.db"
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -516,6 +517,7 @@ class IndexManager:
             directory=path,
             output_path=output_path,
             extensions=extensions,
+            store_embeddings=store_embeddings,
         )
 
         self._index_path = output_path

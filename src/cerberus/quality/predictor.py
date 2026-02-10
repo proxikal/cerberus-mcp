@@ -78,22 +78,31 @@ class PredictionEngine:
         Args:
             edited_symbol: Name of the edited symbol
             file_path: File path where the symbol was edited
-            symbol_type: Type of symbol (function, class, etc.)
+            symbol_type: Type of symbol (function, class, interface, type, etc.)
 
         Returns:
             Tuple of (predictions, stats)
         """
         all_suggestions: list = []
 
-        # 1. Direct Callers (Confidence: 1.0)
-        # Who calls this symbol? They might need updates.
-        caller_suggestions = self._find_direct_callers(edited_symbol, file_path)
-        all_suggestions.extend(caller_suggestions)
+        # First, detect if this is a TypeScript type/interface
+        actual_symbol_type = self._detect_symbol_type(edited_symbol, file_path)
 
-        # 2. Direct Dependencies (Confidence: 1.0)
-        # What does this symbol call? Signature changes might propagate.
-        dependency_suggestions = self._find_direct_dependencies(edited_symbol, file_path)
-        all_suggestions.extend(dependency_suggestions)
+        # For TypeScript types/interfaces, find all usages
+        if actual_symbol_type in ('interface', 'type', 'type_alias'):
+            type_usages = self._find_type_usages(edited_symbol, file_path)
+            all_suggestions.extend(type_usages)
+        else:
+            # For regular symbols (functions, classes, methods)
+            # 1. Direct Callers (Confidence: 1.0)
+            # Who calls this symbol? They might need updates.
+            caller_suggestions = self._find_direct_callers(edited_symbol, file_path)
+            all_suggestions.extend(caller_suggestions)
+
+            # 2. Direct Dependencies (Confidence: 1.0)
+            # What does this symbol call? Signature changes might propagate.
+            dependency_suggestions = self._find_direct_dependencies(edited_symbol, file_path)
+            all_suggestions.extend(dependency_suggestions)
 
         # 3. Test File Pattern Match (Confidence: 0.95)
         # Exact pattern: test_<symbol>.py or test_<module>.py with verified imports
@@ -118,6 +127,75 @@ class PredictionEngine:
         )
 
         return shown, stats
+
+    def _detect_symbol_type(self, symbol: str, file_path: str) -> str:
+        """
+        Detect the type of a symbol from the database.
+
+        Returns:
+            Symbol type ('interface', 'type', 'type_alias', 'function', 'class', 'method', etc.)
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT type FROM symbols
+                WHERE name = ? AND file_path = ?
+                LIMIT 1
+            """, (symbol, file_path))
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+        except Exception:
+            pass
+        return "unknown"
+
+    def _find_type_usages(self, type_name: str, file_path: str) -> List[Prediction]:
+        """
+        Find all usages of a TypeScript type/interface across the codebase.
+
+        Confidence: 0.95 (text-based search for type references)
+        """
+        predictions: list = []
+
+        try:
+            cursor = self.conn.cursor()
+
+            # Find all files that might reference this type
+            # Look for: variable declarations, function parameters, return types, etc.
+            cursor.execute("""
+                SELECT DISTINCT file_path, name, start_line
+                FROM symbols
+                WHERE file_path != ?
+                  AND (
+                    parameters LIKE '%' || ? || '%'
+                    OR return_type LIKE '%' || ? || '%'
+                    OR signature LIKE '%' || ? || '%'
+                  )
+                LIMIT 20
+            """, (file_path, type_name, type_name, type_name))
+
+            rows = cursor.fetchall()
+            for row in rows:
+                ref_file = row[0]
+                ref_symbol = row[1]
+                ref_line = row[2]
+
+                predictions.append(Prediction(
+                    confidence="HIGH",
+                    confidence_score=0.95,
+                    symbol=ref_symbol,
+                    file=ref_file,
+                    line=ref_line,
+                    reason="type_usage",
+                    relationship=f"uses type {type_name}",
+                    command=f"cerberus retrieval get-symbol {ref_symbol}"
+                ))
+
+        except Exception:
+            # Fail gracefully
+            pass
+
+        return predictions
 
     def _find_direct_callers(self, symbol: str, file_path: str) -> List[Prediction]:
         """
