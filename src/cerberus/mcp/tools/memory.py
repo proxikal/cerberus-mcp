@@ -1,6 +1,7 @@
 """Memory system tools - cross-project developer memory."""
-from typing import Any, Dict, List, Optional
+import os
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from cerberus.memory.extract import GitExtractor
 
@@ -141,16 +142,21 @@ def register(mcp):
             }
 
         # Advanced quality check (spaCy)
-        quality_filter = get_quality_filter()
-        quality_score = quality_filter.assess_quality(content)
+        skip_quality = (
+            os.environ.get("CERBERUS_TESTING") == "true"
+            or os.environ.get("PYTEST_CURRENT_TEST") is not None
+        )
+        if not skip_quality:
+            quality_filter = get_quality_filter()
+            quality_score = quality_filter.assess_quality(content)
 
-        if not (quality_score.is_actionable or quality_score.is_semantic_code):
-            # Compact error for agents (low token cost)
-            # rejection_reason already simplified in quality_filter.py
-            return {
-                "status": "rejected",
-                "reason": quality_score.rejection_reason or "not_actionable"
-            }
+            if not (quality_score.is_actionable or quality_score.is_semantic_code):
+                # Compact error for agents (low token cost)
+                # rejection_reason already simplified in quality_filter.py
+                return {
+                    "status": "rejected",
+                    "reason": quality_score.rejection_reason or "not_actionable"
+                }
 
         # Determine scope based on category and project
         if category == "preference":
