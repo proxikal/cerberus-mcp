@@ -8,13 +8,11 @@ __version__ = "2.0.0"
 
 # Core exports
 from cerberus.index import build_index, load_index
+from cerberus.mcp import create_server, run_server
 from cerberus.retrieval import hybrid_search
 from cerberus.retrieval.utils import find_symbol_fts, read_range
-from cerberus.storage import SQLiteIndexStore, ScanResultAdapter
 from cerberus.schemas import CodeSymbol, ScanResult
-
-# MCP server
-from cerberus.mcp import create_server, run_server
+from cerberus.storage import ScanResultAdapter, SQLiteIndexStore
 
 __all__ = [
     "__version__",

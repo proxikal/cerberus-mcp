@@ -12,10 +12,9 @@ Features:
 - Default display after task completion
 """
 
-import os
 import json
+import os
 import time
-from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -33,15 +32,15 @@ class SessionMetrics:
     task_tokens_saved: int = 0  # Tokens saved in current task
 
     # Operation counts
-    commands_used: Dict[str, int] = field(default_factory=dict)
-    files_accessed: List[str] = field(default_factory=list)
+    commands_used: dict[str, int] = field(default_factory=dict)
+    files_accessed: list[str] = field(default_factory=list)
 
     # Session info
-    session_start: Optional[float] = None
-    session_end: Optional[float] = None
-    last_operation_time: Optional[float] = None  # For inactivity detection
+    session_start: float | None = None
+    session_end: float | None = None
+    last_operation_time: float | None = None  # For inactivity detection
 
-    def record_command(self, command: str, tokens_read: int = 0, tokens_saved: int = 0, file_path: Optional[str] = None):
+    def record_command(self, command: str, tokens_read: int = 0, tokens_saved: int = 0, file_path: str | None = None):
         """Record a command execution."""
         self.commands_used[command] = self.commands_used.get(command, 0) + 1
 
@@ -211,7 +210,7 @@ class SessionTracker:
         except Exception:
             pass  # Silently fail if can't save
 
-    def record(self, command: str, tokens_read: int = 0, tokens_saved: int = 0, file_path: Optional[str] = None):
+    def record(self, command: str, tokens_read: int = 0, tokens_saved: int = 0, file_path: str | None = None):
         """Record command usage."""
         if self.enabled:
             self.metrics.record_command(command, tokens_read, tokens_saved, file_path)
@@ -303,7 +302,7 @@ class SessionTracker:
 
 
 # Global session tracker instance
-_session_tracker: Optional[SessionTracker] = None
+_session_tracker: SessionTracker | None = None
 
 
 def get_session_tracker() -> SessionTracker:
@@ -314,7 +313,7 @@ def get_session_tracker() -> SessionTracker:
     return _session_tracker
 
 
-def record_operation(command: str, tokens_read: int = 0, tokens_saved: int = 0, file_path: Optional[str] = None):
+def record_operation(command: str, tokens_read: int = 0, tokens_saved: int = 0, file_path: str | None = None):
     """Record an operation in the session tracker."""
     tracker = get_session_tracker()
     tracker.record(command, tokens_read, tokens_saved, file_path)
