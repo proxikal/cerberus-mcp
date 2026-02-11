@@ -72,7 +72,7 @@ def _infer_scope(observations: List[AgentObservation]) -> str:
     # PRIORITY 1: Check observation content for project overrides
     for obs in observations:
         # Check action and outcome text for project mentions/paths
-        combined_text = f"{obs.action} {obs.outcome}"
+        combined_text = f"{obs.action_taken} {obs.user_response}"
         detected_project = detect_project_from_content(combined_text, obs.context)
         if detected_project:
             # Extract project name from scope string
