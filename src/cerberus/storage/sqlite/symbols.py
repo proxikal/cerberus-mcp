@@ -131,15 +131,19 @@ class SQLiteSymbolsOperations:
                 chunk_end = min(chunk_start + chunk_size, total_symbols)
                 chunk = symbols[chunk_start:chunk_end]
 
-                # Insert chunk
+                # Insert chunk and track IDs for ALL symbols (including duplicates)
                 chunk_ids: list = []
-                seen = set()
+                seen_map: dict = {}  # key -> symbol_id mapping for deduplication
+
                 for s in chunk:
                     key = (s.file_path, s.name, s.start_line, s.end_line, s.type)
-                    if key in seen:
-                        continue  # skip duplicate within batch
-                    seen.add(key)
 
+                    # If already seen in this batch, reuse the ID
+                    if key in seen_map:
+                        chunk_ids.append(seen_map[key])
+                        continue
+
+                    # Try to insert
                     cursor = _conn.execute("""
                         INSERT OR IGNORE INTO symbols (name, type, file_path, start_line, end_line,
                                            signature, return_type, parameters, parameter_types, parent_class)
@@ -149,8 +153,20 @@ class SQLiteSymbolsOperations:
                          json.dumps(s.parameters) if s.parameters else None,
                          json.dumps(s.parameter_types) if s.parameter_types else None,
                          s.parent_class))
+
                     if cursor.rowcount:
-                        chunk_ids.append(cursor.lastrowid)
+                        symbol_id = cursor.lastrowid
+                    else:
+                        # Symbol already exists, retrieve its ID
+                        existing_id = _conn.execute("""
+                            SELECT id FROM symbols
+                            WHERE name = ? AND type = ? AND file_path = ? AND start_line = ? AND end_line = ?
+                        """, (s.name, s.type, s.file_path, s.start_line, s.end_line)).fetchone()
+                        symbol_id = existing_id[0] if existing_id else None
+
+                    if symbol_id:
+                        chunk_ids.append(symbol_id)
+                        seen_map[key] = symbol_id
 
                 all_symbol_ids.extend(chunk_ids)
 
