@@ -23,7 +23,7 @@ def test_semantic_search_returns_ranked_results(tmp_path):
 
     assert results
     names = {r.symbol.name for r in results}
-    assert {"greet", "sayHello", "MyTsClass"} & names
+    assert {"greet", "sayHello", "Greet"} & names
     assert results[0].score > 0
 
 

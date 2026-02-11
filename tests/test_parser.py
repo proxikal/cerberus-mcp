@@ -55,13 +55,19 @@ def test_parse_javascript_file():
     """
     symbols = parse_file(SAMPLE_JS)
 
-    # Parser now includes file-level symbol: 2 code symbols + 1 file symbol = 3
-    assert len(symbols) == 3
+    # Parser now includes file-level symbol + class + methods + top-level function
+    assert len(symbols) == 5
     symbol_map = {s.name: s for s in symbols}
 
     assert "MyJsClass" in symbol_map
     assert symbol_map["MyJsClass"].type == "class"
     assert symbol_map["MyJsClass"].start_line == 4
+
+    assert "constructor" in symbol_map
+    assert symbol_map["constructor"].type == "method"
+
+    assert "sayHello" in symbol_map
+    assert symbol_map["sayHello"].type == "method"
 
     assert "topLevelJsFunction" in symbol_map
     assert symbol_map["topLevelJsFunction"].type == "function"

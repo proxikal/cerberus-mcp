@@ -458,6 +458,19 @@ def _generate_embeddings_sqlite(
 ):
     """Generate embeddings for SQLite format (batch with streaming write)."""
     try:
+        # Filter out symbols that failed to get an ID (e.g., unsupported types)
+        paired = [(symbol, symbol_id) for symbol, symbol_id in zip(symbols, symbol_ids) if symbol_id]
+        if not paired:
+            logger.warning("No valid symbols to embed (all symbol IDs missing).")
+            return
+        if len(paired) != len(symbols):
+            logger.warning(
+                f"Embedding subset: {len(paired)}/{len(symbols)} symbols had valid IDs"
+            )
+
+        symbols = [p[0] for p in paired]
+        symbol_ids = [p[1] for p in paired]
+
         # Generate snippets
         snippets = [
             read_range(Path(sym.file_path), sym.start_line, sym.end_line, padding=padding).content
